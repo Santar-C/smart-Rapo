@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAPO System</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#021D49">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ── Reset & Base ─────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --blue:    #021D49;
+      --red:     #E1261C;
+      --indigo:  #6366f1;
+      --green:   #16a34a;
+      --amber:   #d97706;
+      --teal:    #0d9488;
+      --gray:    #6b7280;
+      --light:   #f8fafc;
+      --white:   #ffffff;
+      --border:  #e2e8f0;
+      --shadow:  0 4px 24px rgba(0,0,0,0.08);
+      --radius:  14px;
+    }
+    body {
+      font-family: 'Sarabun', sans-serif;
+      background: var(--light);
+      color: #1e293b;
+      min-height: 100dvh;
+    }
+
+    /* ── LOGIN PAGE ──────────────────────────────── */
+    #login-page {
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #021D49 0%, #1e3a8a 50%, #312e81 100%);
+      padding: 1.5rem;
+    }
+    .login-card {
+      background: var(--white);
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .login-logo {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .login-logo img {
+      width: 90px;
+      height: 90px;
+      object-fit: contain;
+      border-radius: 16px;
+    }
+    .login-logo .logo-fallback {
+      width: 90px;
+      height: 90px;
+      background: var(--blue);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      font-size: 2rem;
+      font-weight: 700;
+      color: white;
+    }
+    .login-title {
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--blue);
+      margin-bottom: 0.25rem;
+    }
+    .login-subtitle {
+      text-align: center;
+      font-size: 0.875rem;
+      color: var(--gray);
+      margin-bottom: 1.75rem;
+    }
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #374151;
+      margin-bottom: 0.4rem;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 1rem;
+      font-family: 'Sarabun', sans-serif;
+      transition: border-color 0.2s;
+      outline: none;
+      background: #f8fafc;
+    }
+    .form-group input:focus {
+      border-color: var(--indigo);
+      background: white;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+    }
+    .btn-login {
+      width: 100%;
+      padding: 0.875rem;
+      background: var(--red);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: 'Sarabun', sans-serif;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 0.5rem;
+    }
+    .btn-login:hover { background: #c0392b; transform: translateY(-1px); }
+    .btn-login:active { transform: translateY(0); }
+    .btn-login:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .login-error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .login-footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-top: 1.5rem;
+    }
+
+    /* ── DASHBOARD PAGE ──────────────────────────── */
+    #dashboard-page { display: none; }
+    .dash-header {
+      background: var(--blue);
+      color: white;
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    }
+    .dash-header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .dash-header-logo {
+      width: 40px;
+      height: 40px;
+      background: white;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: var(--blue);
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+    .dash-header-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .dash-header-subtitle {
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+    .dash-header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+    .user-badge {
+      background: rgba(255,255,255,0.15);
+      padding: 0.35rem 0.75rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .user-badge .role-pill {
+      background: var(--indigo);
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+    .btn-logout {
+      background: rgba(255,255,255,0.15);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.3);
+      padding: 0.4rem 0.9rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-family: 'Sarabun', sans-serif;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.25); }
+    .dash-body {
+      padding: 1.5rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .dash-greeting {
+      margin-bottom: 1.5rem;
+    }
+    .dash-greeting h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--blue);
+    }
+    .dash-greeting p {
+      font-size: 0.9rem;
+      color: var(--gray);
+      margin-top: 0.2rem;
+    }
+    /* Card Grid */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem;
+    }
+    .menu-card {
+      background: white;
+      border-radius: var(--radius);
+      padding: 1.5rem 1rem;
+      box-shadow: var(--shadow);
+      border: 1.5px solid var(--border);
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 160px;
+      gap: 0.75rem;
+      transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .menu-card::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 4px;
+      background: var(--card-color, var(--border));
+      border-radius: 0 0 var(--radius) var(--radius);
+    }
+    .menu-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 12px 36px rgba(0,0,0,0.12);
+      border-color: transparent;
+    }
+    .menu-card .card-icon { font-size: 2.5rem; line-height: 1; }
+    .menu-card .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--blue);
+      text-align: center;
+      line-height: 1.3;
+    }
+    .menu-card .card-sub {
+      font-size: 0.75rem;
+      color: var(--gray);
+      text-align: center;
+    }
+    /* Card color accents */
+    .card-medicine  { --card-color: #ec4899; }
+    .card-stock     { --card-color: var(--green); }
+    .card-stocktake { --card-color: var(--amber); }
+    .card-monitor   { --card-color: var(--gray); }
+    .card-dock      { --card-color: var(--indigo); }
+    .card-wi        { --card-color: #94a3b8; }
+
+    /* Admin-only badge */
+    .admin-badge {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: #fef3c7;
+      color: #92400e;
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 6px;
+      border: 1px solid #fde68a;
+    }
+
+    /* ── LOADING OVERLAY ─────────────────────────── */
+    #loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    #loading-overlay .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    #loading-overlay p { color: rgba(255,255,255,0.8); font-size: 0.9rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── RESPONSIVE ──────────────────────────────── */
+    @media (max-width: 480px) {
+      .card-grid { grid-template-columns: repeat(2, 1fr); }
+      .dash-body { padding: 1rem; }
+      .user-badge span.name { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Overlay -->
+  <div id="loading-overlay">
+    <div class="spinner"></div>
+    <p>กำลังโหลดระบบ...</p>
+  </div>
+
+  <!-- ── LOGIN PAGE ──────────────────────────────── -->
+  <div id="login-page">
+    <div class="login-card">
+      <div class="login-logo">
+        <img src="assets/logo.png" alt="RAPO Logo"
+             onerror="this.style.display='none'; document.getElementById('logo-fallback').style.display='flex'">
+        <div id="logo-fallback" class="logo-fallback" style="display:none">R</div>
+      </div>
+      <h1 class="login-title">RAPO System</h1>
+      <p class="login-subtitle">Stock · Medicine · Smart Dock</p>
+
+      <div class="login-error" id="login-error"></div>
+
+      <div class="form-group">
+        <label for="email">อีเมล</label>
+        <input type="email" id="email" placeholder="admin@rapo.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="password">รหัสผ่าน</label>
+        <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn-login" id="btn-login">เข้าสู่ระบบ</button>
+
+      <p class="login-footer">Version 1.0 · RAPO Stock & Dock System<br>Presented by Teerapat Tunthikul</p>
+    </div>
+  </div>
+
+  <!-- ── DASHBOARD PAGE ─────────────────────────── -->
+  <div id="dashboard-page">
+    <header class="dash-header">
+      <div class="dash-header-left">
+        <div class="dash-header-logo">R</div>
+        <div>
+          <div class="dash-header-title">RAPO System</div>
+          <div class="dash-header-subtitle" id="header-date">—</div>
+        </div>
+      </div>
+      <div class="dash-header-right">
+        <div class="user-badge">
+          <span class="name" id="user-name-display">—</span>
+          <span class="role-pill" id="user-role-display">—</span>
+        </div>
+        <button class="btn-logout" id="btn-logout">ออกจากระบบ</button>
+      </div>
+    </header>
+
+    <div class="dash-body">
+      <div class="dash-greeting">
+        <h2>สวัสดี, <span id="greeting-name">—</span> 👋</h2>
+        <p>กรุณาเลือกระบบที่ต้องการใช้งาน</p>
+      </div>
+
+      <div class="card-grid" id="card-grid">
+        <!-- การ์ดจะถูก render โดย JS ตาม Role -->
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth, db } from "./firebase-config.js";
+    import { loginUser, logoutUser, getUserProfile } from "./auth.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    // ── เมนูทั้งหมด (role: all = ทุกคน, admin = เฉพาะ admin) ──
+    const MENUS = [
+      {
+        id: "medicine",
+        icon: "💊",
+        title: "ระบบเบิกจ่ายยา",
+        sub: "",
+        href: "medicine.html",
+        color: "card-medicine",
+        role: "all"
+      },
+      {
+        id: "stock",
+        icon: "📦",
+        title: "ระบบสต็อกทั่วไป",
+        sub: "Consumer / General",
+        href: "stock.html",
+        color: "card-stock",
+        role: "all"
+      },
+      {
+        id: "stocktake",
+        icon: "📝",
+        title: "Stock Take",
+        sub: "สำหรับพนักงานนับ",
+        href: "stocktake.html",
+        color: "card-stocktake",
+        role: "all"
+      },
+      {
+        id: "monitor",
+        icon: "📊",
+        title: "Monitor & Audit",
+        sub: "สำหรับหัวหน้างาน",
+        href: "monitor.html",
+        color: "card-monitor",
+        role: "admin"
+      },
+      {
+        id: "dock",
+        icon: "🚢",
+        title: "Smart Dock",
+        sub: "Management",
+        href: "dock.html",
+        color: "card-dock",
+        role: "all"
+      },
+      {
+        id: "wi",
+        icon: "📄",
+        title: "คู่มือการทำงาน",
+        sub: "WI Documents",
+        href: "wi.html",
+        color: "card-wi",
+        role: "all"
+      }
+    ];
+
+    // ── Render การ์ด ──────────────────────────────
+    function renderCards(role) {
+      const grid = document.getElementById("card-grid");
+      grid.innerHTML = "";
+      MENUS.forEach(menu => {
+        if (menu.role === "admin" && role !== "admin") return;
+        const card = document.createElement("a");
+        card.className = `menu-card ${menu.color}`;
+        card.href = menu.href;
+        card.innerHTML = `
+          ${menu.role === "admin" ? '<span class="admin-badge">Admin</span>' : ""}
+          <span class="card-icon">${menu.icon}</span>
+          <span class="card-title">${menu.title}</span>
+          ${menu.sub ? `<span class="card-sub">${menu.sub}</span>` : ""}
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    // ── อัปเดต Header วันที่ ──────────────────────
+    function updateDate() {
+      const now = new Date();
+      document.getElementById("header-date").textContent =
+        now.toLocaleDateString("th-TH", {
+          weekday: "long", year: "numeric",
+          month: "long", day: "numeric"
+        });
+    }
+    updateDate();
+    setInterval(updateDate, 60000);
+
+    // ── Auth State ────────────────────────────────
+    onAuthStateChanged(auth, async (user) => {
+      document.getElementById("loading-overlay").style.display = "none";
+      if (user) {
+        // มี session → ไปหน้า Dashboard
+        const profile = await getUserProfile(user.uid);
+        const name = profile.name || user.email;
+        const role = profile.role || "user";
+
+        document.getElementById("login-page").style.display = "none";
+        document.getElementById("dashboard-page").style.display = "block";
+        document.getElementById("user-name-display").textContent = name;
+        document.getElementById("user-role-display").textContent = role;
+        document.getElementById("greeting-name").textContent = name;
+        renderCards(role);
+      } else {
+        // ยังไม่ Login → แสดงหน้า Login
+        document.getElementById("login-page").style.display = "flex";
+        document.getElementById("dashboard-page").style.display = "none";
+      }
+    });
+
+    // ── Login Button ──────────────────────────────
+    const btnLogin = document.getElementById("btn-login");
+    const errBox   = document.getElementById("login-error");
+
+    async function doLogin() {
+      const email    = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      if (!email || !password) {
+        showError("กรุณากรอกอีเมลและรหัสผ่าน");
+        return;
+      }
+      btnLogin.disabled = true;
+      btnLogin.textContent = "กำลังเข้าสู่ระบบ...";
+      errBox.style.display = "none";
+
+      const result = await loginUser(email, password);
+      if (!result.ok) {
+        showError(result.error);
+        btnLogin.disabled = false;
+        btnLogin.textContent = "เข้าสู่ระบบ";
+      }
+      // ถ้าสำเร็จ onAuthStateChanged จะ handle เอง
+    }
+
+    function showError(msg) {
+      errBox.textContent = msg;
+      errBox.style.display = "block";
+    }
+
+    btnLogin.addEventListener("click", doLogin);
+    document.getElementById("password").addEventListener("keydown", e => {
+      if (e.key === "Enter") doLogin();
+    });
+
+    // ── Logout Button ─────────────────────────────
+    document.getElementById("btn-logout").addEventListener("click", logoutUser);
+  </script>
+</body>
+</html>

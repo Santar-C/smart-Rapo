@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper Functions ──────────────────────────────────
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isLoggedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isOwner(uid) {
+      return isLoggedIn() && request.auth.uid == uid;
+    }
+
+    // ── Users Collection ──────────────────────────────────
+    match /users/{userId} {
+      allow read:   if isLoggedIn();
+      allow create: if isLoggedIn() && isOwner(userId);
+      allow update: if isAdmin() || isOwner(userId);
+      allow delete: if isAdmin();
+    }
+
+    // ── Products Collection ───────────────────────────────
+    match /products/{productId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+
+    // ── Transactions Collection ───────────────────────────
+    match /transactions/{txId} {
+      allow read:   if isLoggedIn();
+      allow create: if isLoggedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Stock Take Jobs ───────────────────────────────────
+    match /stock_take_jobs/{jobId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isLoggedIn();
+    }
+
+    // ── Medicines Collection ──────────────────────────────
+    match /medicines/{medId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+
+    // ── Medicine Batches ──────────────────────────────────
+    match /medicine_batches/{batchId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isLoggedIn();
+    }
+
+    // ── Medicine Logs ─────────────────────────────────────
+    match /medicine_logs/{logId} {
+      allow read:   if isLoggedIn();
+      allow create: if isLoggedIn();
+      allow update, delete: if isAdmin();
+    }
+
+    // ── WI Documents ──────────────────────────────────────
+    match /wi_documents/{docId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+  }
+}

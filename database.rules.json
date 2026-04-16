@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "smartdock": {
+      ".read":  "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

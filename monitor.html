@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monitor & Audit - RAPO</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#021D49">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .job-card { border:1.5px solid var(--border); border-radius:12px; padding:1rem; background:white; transition:all 0.2s; }
+    .job-card.counting  { border-color:var(--indigo); }
+    .job-card.finished  { border-color:var(--green); opacity:0.8; }
+    .progress-bar { height:8px; background:#e2e8f0; border-radius:10px; overflow:hidden; margin-top:6px; }
+    .progress-fill { height:100%; border-radius:10px; background:var(--indigo); }
+    .diff-plus  { color:var(--green); font-weight:700; }
+    .diff-minus { color:var(--red);   font-weight:700; }
+    .diff-zero  { color:var(--gray); }
+    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
+    #toast.show { transform:translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<div id="topbar-placeholder"></div>
+<div class="page-body">
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="jobs">📋 Jobs Overview</button>
+    <button class="tab-btn" data-tab="audit">🔍 ผลการนับ & ส่วนต่าง</button>
+    <button class="tab-btn" data-tab="import">📥 Import Master CSV</button>
+    <button class="tab-btn" data-tab="status">📊 สถานะสินค้า</button>
+  </div>
+
+  <!-- TAB: Jobs Overview -->
+  <div id="tab-jobs">
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-value" id="s-total">—</div><div class="stat-label">งานทั้งหมด</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--indigo)" id="s-counting">—</div><div class="stat-label">กำลังนับ</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--green)" id="s-done">—</div><div class="stat-label">เสร็จแล้ว</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--amber)" id="s-notstart">—</div><div class="stat-label">ยังไม่เริ่ม</div></div>
+    </div>
+
+    <!-- Overall Progress -->
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+        <div style="font-weight:700; color:var(--blue);">ความคืบหน้าการนับรวม</div>
+        <div id="overall-pct" style="font-weight:700; color:var(--indigo); font-size:1.2rem;">—</div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="overall-bar" style="width:0%"></div></div>
+      <div style="font-size:0.8rem; color:var(--gray); margin-top:0.4rem;" id="overall-detail">—</div>
+    </div>
+
+    <!-- Create/Manage Jobs (Admin only) -->
+    <div class="card" id="create-job-card">
+      <div class="card-title">➕ สร้าง / มอบหมายงาน</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Location</label>
+          <input type="text" id="job-loc" placeholder="เช่น Shelf A1" style="text-transform:uppercase;">
+        </div>
+        <div class="form-group">
+          <label>มอบหมายให้</label>
+          <input type="text" id="job-team" placeholder="ชื่อทีม / พนักงาน">
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btn-create-job">สร้างงาน</button>
+    </div>
+
+    <!-- Jobs List -->
+    <div id="jobs-grid" style="display:grid; gap:0.75rem;">
+      <div class="spinner-wrap"><div class="spinner"></div><span>กำลังโหลด...</span></div>
+    </div>
+  </div>
+
+  <!-- TAB: ผลการนับ & ส่วนต่าง -->
+  <div id="tab-audit" style="display:none">
+    <div class="action-bar">
+      <div class="search-bar" style="flex:1; margin-bottom:0;"><input type="text" id="audit-search" placeholder="ค้นหา SKU หรือชื่อสินค้า..."></div>
+      <select id="audit-filter" style="padding:0.6rem 0.8rem; border:1.5px solid var(--border); border-radius:9px; font-family:Sarabun,sans-serif; font-size:0.9rem; background:white; cursor:pointer;">
+        <option value="all">ทั้งหมด</option>
+        <option value="counted">นับแล้ว</option>
+        <option value="notcounted">ยังไม่นับ</option>
+        <option value="diff">มีส่วนต่าง</option>
+      </select>
+      <button class="btn btn-outline btn-sm" id="btn-export-audit">⬇️ Export</button>
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div class="table-wrap" style="border:none; border-radius:0;">
+        <table>
+          <thead>
+            <tr><th>SKU</th><th>ชื่อสินค้า</th><th>Location</th><th>ยอดระบบ</th><th>ยอดนับจริง</th><th>ส่วนต่าง</th><th>สถานะ</th></tr>
+          </thead>
+          <tbody id="audit-tbody">
+            <tr><td colspan="7" style="text-align:center; padding:2rem; color:var(--gray);">กำลังโหลด...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div style="margin-top:0.75rem; display:flex; gap:0.75rem; flex-wrap:wrap;">
+      <button class="btn btn-red btn-sm" id="btn-reset-audit">🗑️ ล้างผลการนับทั้งหมด (Reset)</button>
+    </div>
+  </div>
+
+  <!-- TAB: Import Master CSV -->
+  <div id="tab-import" style="display:none">
+    <div class="card">
+      <div class="card-title">📥 Import Master Stock จาก CSV</div>
+      <div class="alert alert-warning" style="margin-bottom:1rem;">
+        <b>⚠️ คำเตือน:</b> ถ้าเลือก "ล้างข้อมูลเก่า" ระบบจะลบสินค้าทั้งหมดก่อน Import
+      </div>
+      <div class="alert alert-info" style="margin-bottom:1rem; font-size:0.85rem;">
+        <b>Format หัวคอลัมน์:</b><br>
+        <code>sku, name, unit, category, location, tag, quantity, min_stock, cost_price, sale_price</code>
+      </div>
+      <div class="form-group">
+        <label>สถานะข้อมูลปัจจุบัน</label>
+        <div style="background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:0.75rem; font-size:0.875rem;">
+          มีสินค้า: <b id="import-product-count">—</b> รายการ &nbsp;|&nbsp; Jobs: <b id="import-job-count">—</b> งาน
+        </div>
+      </div>
+      <div class="form-group">
+        <label>เลือกไฟล์ CSV</label>
+        <input type="file" id="import-file" accept=".csv">
+      </div>
+      <label style="display:flex; align-items:center; gap:0.5rem; margin-bottom:1rem; cursor:pointer;">
+        <input type="checkbox" id="import-clear"> ล้างข้อมูลเก่าทั้งหมดก่อน Import
+      </label>
+      <button class="btn btn-primary btn-full" id="btn-do-import">📥 เริ่ม Import</button>
+    </div>
+    <!-- Reset All -->
+    <div class="card" style="border:2px dashed var(--red);">
+      <div class="card-title" style="color:var(--red);">🛑 Reset ฐานข้อมูลทั้งหมด</div>
+      <p style="font-size:0.875rem; color:var(--gray); margin-bottom:1rem;">ลบสินค้าและ Jobs ทั้งหมด ไม่ลบประวัติ Transaction</p>
+      <button class="btn btn-red" id="btn-reset-all">🗑️ Reset ฐานข้อมูล</button>
+    </div>
+  </div>
+
+  <!-- TAB: สถานะสินค้า -->
+  <div id="tab-status" style="display:none">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-value" id="inv-total">—</div><div class="stat-label">สินค้าทั้งหมด</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--amber)" id="inv-low">—</div><div class="stat-label">ใกล้หมด</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--red)" id="inv-out">—</div><div class="stat-label">หมดสต็อก</div></div>
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div class="table-wrap" style="border:none; border-radius:0;">
+        <table>
+          <thead><tr><th>SKU</th><th>ชื่อสินค้า</th><th>Location</th><th>คงเหลือ</th><th>Min</th><th>สถานะ</th></tr></thead>
+          <tbody id="inv-tbody"><tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+<div id="toast">—</div>
+
+<script type="module">
+  import { auth, db } from "./firebase-config.js";
+  import { requireAdmin } from "./auth.js";
+  import {
+    collection, doc, getDocs, setDoc, addDoc, updateDoc,
+    deleteDoc, query, orderBy, where, onSnapshot, serverTimestamp, writeBatch, getCountFromServer
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  let currentUser, currentProfile;
+  let allProducts = [], allJobs = [];
+  let auditSearch = "", auditFilter = "all";
+
+  const { user, profile } = await requireAdmin();
+  currentUser = user; currentProfile = profile;
+
+  document.getElementById("topbar-placeholder").innerHTML = `
+    <nav class="topbar">
+      <a class="topbar-back" href="index.html">←</a>
+      <div style="flex:1">
+        <div class="topbar-title">📊 Monitor & Audit</div>
+        <div class="topbar-sub">สำหรับหัวหน้างาน</div>
+      </div>
+      <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
+    </nav>`;
+
+  function toast(msg, d=2500) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), d);
+  }
+
+  // ── Tab Switch ────────────────────────────────────────────
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      ["jobs","audit","import","status"].forEach(t =>
+        document.getElementById(`tab-${t}`).style.display = t === tab ? "block" : "none"
+      );
+      if (tab === "audit")  renderAudit();
+      if (tab === "status") renderStatus();
+      if (tab === "import") updateImportCounts();
+    });
+  });
+
+  // ── Load Data (realtime) ──────────────────────────────────
+  onSnapshot(query(collection(db, "products"), orderBy("location"), orderBy("id")), snap => {
+    allProducts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAudit(); renderStatus(); updateOverallProgress();
+  });
+
+  onSnapshot(query(collection(db, "stock_take_jobs"), orderBy("location")), snap => {
+    allJobs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderJobs();
+    updateOverallProgress();
+  });
+
+  // ── Jobs ──────────────────────────────────────────────────
+  function renderJobs() {
+    const total    = allJobs.length;
+    const counting = allJobs.filter(j => j.status === "Counting").length;
+    const done     = allJobs.filter(j => j.status === "Finished").length;
+    const notstart = total - counting - done;
+    document.getElementById("s-total").textContent    = total;
+    document.getElementById("s-counting").textContent = counting;
+    document.getElementById("s-done").textContent     = done;
+    document.getElementById("s-notstart").textContent = notstart;
+
+    const el = document.getElementById("jobs-grid");
+    if (!allJobs.length) {
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>ยังไม่มี Job — กรุณาสร้างหรือ Import Master CSV</p></div>`;
+      return;
+    }
+    el.innerHTML = allJobs.map(j => {
+      const locProds = allProducts.filter(p => (p.location||"").toUpperCase() === j.location.toUpperCase());
+      const counted  = locProds.filter(p => p.last_audit_date).length;
+      const total    = locProds.length;
+      const pct      = total > 0 ? Math.round((counted/total)*100) : 0;
+      const statusBadge = j.status === "Finished"
+        ? `<span class="badge badge-green">เสร็จแล้ว</span>`
+        : j.status === "Counting"
+          ? `<span class="badge badge-indigo">กำลังนับ</span>`
+          : `<span class="badge badge-gray">ยังไม่เริ่ม</span>`;
+      const cls = j.status === "Finished" ? "finished" : j.status === "Counting" ? "counting" : "";
+      return `<div class="job-card ${cls}">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700; font-size:1rem;">📍 ${j.location}</div>
+            <div style="font-size:0.8rem; color:var(--gray); margin-top:2px;">
+              ทีม: ${j.assigned_to || "—"} &nbsp;|&nbsp; ${counted}/${total} รายการ
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            ${statusBadge}
+            <button class="btn btn-outline btn-sm" onclick="updateJobTeam('${j.id}','${j.assigned_to||""}')">✏️ ทีม</button>
+            ${j.status !== "Finished" ? `<button class="btn btn-green btn-sm" onclick="finishJob('${j.id}','${j.location}')">🏁 จบ</button>` : ""}
+            <button class="btn btn-red btn-sm" onclick="deleteJob('${j.id}','${j.location}')">🗑️</button>
+          </div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        <div style="font-size:0.75rem; color:var(--indigo); margin-top:4px; text-align:right">${pct}%</div>
+      </div>`;
+    }).join("");
+  }
+
+  function updateOverallProgress() {
+    const total   = allProducts.length;
+    const counted = allProducts.filter(p => p.last_audit_date).length;
+    const pct = total > 0 ? Math.round((counted/total)*100) : 0;
+    document.getElementById("overall-pct").textContent    = `${pct}%`;
+    document.getElementById("overall-bar").style.width    = `${pct}%`;
+    document.getElementById("overall-detail").textContent = `นับแล้ว ${counted} จาก ${total} รายการ`;
+  }
+
+  document.getElementById("btn-create-job").addEventListener("click", async () => {
+    const loc  = document.getElementById("job-loc").value.trim().toUpperCase();
+    const team = document.getElementById("job-team").value.trim();
+    if (!loc) { toast("⚠️ กรุณาระบุ Location"); return; }
+    await addDoc(collection(db, "stock_take_jobs"), {
+      location: loc, assigned_to: team,
+      status: "Not Started", start_time: null, end_time: null
+    });
+    document.getElementById("job-loc").value  = "";
+    document.getElementById("job-team").value = "";
+    toast(`✅ สร้างงาน ${loc} เรียบร้อย`);
+  });
+
+  window.updateJobTeam = async (id, current) => {
+    const team = prompt("ระบุชื่อทีม / พนักงาน:", current);
+    if (team === null) return;
+    await updateDoc(doc(db, "stock_take_jobs", id), { assigned_to: team });
+    toast("✅ อัปเดตทีมเรียบร้อย");
+  };
+
+  window.finishJob = async (id, loc) => {
+    if (!confirm(`จบงาน "${loc}" แน่ใจหรือไม่?`)) return;
+    await updateDoc(doc(db, "stock_take_jobs", id), { status: "Finished", end_time: serverTimestamp() });
+    toast(`🏁 จบงาน ${loc} เรียบร้อย`);
+  };
+
+  window.deleteJob = async (id, loc) => {
+    if (!confirm(`ลบงาน "${loc}" แน่ใจหรือไม่?`)) return;
+    await deleteDoc(doc(db, "stock_take_jobs", id));
+    toast(`🗑️ ลบงาน ${loc} เรียบร้อย`);
+  };
+
+  // ── Audit (ผลการนับ) ──────────────────────────────────────
+  function renderAudit() {
+    const q = auditSearch.toLowerCase();
+    let data = allProducts.filter(p =>
+      (p.id||"").toLowerCase().includes(q) || (p.name||"").toLowerCase().includes(q)
+    );
+    if (auditFilter === "counted")    data = data.filter(p => p.last_audit_date);
+    if (auditFilter === "notcounted") data = data.filter(p => !p.last_audit_date);
+    if (auditFilter === "diff")       data = data.filter(p => p.last_audit_date && p.audit_qty_actual !== p.quantity);
+
+    const tbody = document.getElementById("audit-tbody");
+    if (!data.length) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray);">ไม่พบข้อมูล</td></tr>`; return; }
+    tbody.innerHTML = data.map(p => {
+      const counted = p.last_audit_date;
+      const diff = counted ? (p.audit_qty_actual ?? 0) - p.quantity : null;
+      const diffStr = diff === null ? "—"
+        : diff > 0 ? `<span class="diff-plus">+${diff}</span>`
+        : diff < 0 ? `<span class="diff-minus">${diff}</span>`
+        : `<span class="diff-zero">0</span>`;
+      const badge = !counted
+        ? `<span class="badge badge-amber">ยังไม่นับ</span>`
+        : diff !== 0
+          ? `<span class="badge badge-red">มีส่วนต่าง</span>`
+          : `<span class="badge badge-green">ตรง</span>`;
+      return `<tr>
+        <td style="font-weight:600;color:var(--blue)">${p.id}</td>
+        <td>${p.name}</td>
+        <td>${p.location || "—"}</td>
+        <td>${p.quantity} ${p.unit}</td>
+        <td>${counted ? `${p.audit_qty_actual ?? "—"} ${p.unit}` : "—"}</td>
+        <td>${diffStr}</td>
+        <td>${badge}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  document.getElementById("audit-search").addEventListener("input", e => { auditSearch = e.target.value; renderAudit(); });
+  document.getElementById("audit-filter").addEventListener("change", e => { auditFilter = e.target.value; renderAudit(); });
+
+  document.getElementById("btn-reset-audit").addEventListener("click", async () => {
+    if (!confirm("ล้างผลการนับทั้งหมด (reset last_audit_date) แน่ใจหรือไม่?")) return;
+    const batch = writeBatch(db);
+    allProducts.forEach(p => {
+      batch.update(doc(db, "products", p.id), { last_audit_date: null, audit_qty_actual: null });
+    });
+    await batch.commit();
+    toast("✅ ล้างผลการนับเรียบร้อย");
+  });
+
+  document.getElementById("btn-export-audit").addEventListener("click", () => {
+    if (!allProducts.length) { toast("ไม่มีข้อมูล"); return; }
+    const rows = [["SKU","ชื่อสินค้า","Location","Tag","ยอดระบบ","ยอดนับจริง","ส่วนต่าง","สถานะ"]];
+    allProducts.forEach(p => {
+      const diff = p.last_audit_date ? (p.audit_qty_actual ?? 0) - p.quantity : "";
+      rows.push([p.id, p.name, p.location||"", p.tag||"", p.quantity, p.last_audit_date ? p.audit_qty_actual : "", diff, p.last_audit_date ? "นับแล้ว" : "ยังไม่นับ"]);
+    });
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF"+csv], { type:"text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `audit_result_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    toast("✅ Export เรียบร้อย");
+  });
+
+  // ── Import Master CSV ─────────────────────────────────────
+  async function updateImportCounts() {
+    document.getElementById("import-product-count").textContent = allProducts.length;
+    document.getElementById("import-job-count").textContent     = allJobs.length;
+  }
+
+  document.getElementById("btn-do-import").addEventListener("click", async () => {
+    const file = document.getElementById("import-file").files[0];
+    if (!file) { toast("⚠️ กรุณาเลือกไฟล์"); return; }
+    const clear = document.getElementById("import-clear").checked;
+    const text  = await file.text();
+    const lines = text.split("\n").filter(l => l.trim());
+    const hdrs  = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g,"").toLowerCase());
+    const batch = writeBatch(db);
+    let count = 0;
+    if (clear) {
+      allProducts.forEach(p => batch.delete(doc(db, "products", p.id)));
+      allJobs.forEach(j    => batch.delete(doc(db, "stock_take_jobs", j.id)));
+    }
+    const locationSet = new Set();
+    for (let i = 1; i < lines.length; i++) {
+      const vals = lines[i].split(",").map(v => v.trim().replace(/^"|"$/g,""));
+      const obj  = {};
+      hdrs.forEach((h, idx) => { obj[h] = vals[idx] || ""; });
+      if (!obj.sku) continue;
+      batch.set(doc(db, "products", obj.sku), {
+        name: obj.name||obj.sku, unit: obj.unit||"pcs",
+        category: obj.category||"", location: obj.location||"", tag: obj.tag||"",
+        quantity: parseInt(obj.quantity)||0, min_stock: parseInt(obj.min_stock)||10,
+        cost_price: parseFloat(obj.cost_price)||0, sale_price: parseFloat(obj.sale_price)||0,
+        last_audit_date: null, audit_qty_actual: null, updated_at: serverTimestamp()
+      }, { merge: !clear });
+      if (obj.location) locationSet.add(obj.location.toUpperCase());
+      count++;
+    }
+    // สร้าง Job ต่อ Location อัตโนมัติ
+    locationSet.forEach(loc => {
+      const jobRef = doc(collection(db, "stock_take_jobs"));
+      batch.set(jobRef, { location: loc, assigned_to: "", status: "Not Started", start_time: null, end_time: null });
+    });
+    await batch.commit();
+    toast(`✅ Import ${count} รายการ | สร้าง ${locationSet.size} Jobs เรียบร้อย`);
+  });
+
+  document.getElementById("btn-reset-all").addEventListener("click", async () => {
+    if (!confirm("⚠️ ล้างข้อมูลสินค้าและ Jobs ทั้งหมด?\nไม่สามารถกู้คืนได้!")) return;
+    const batch = writeBatch(db);
+    allProducts.forEach(p => batch.delete(doc(db, "products", p.id)));
+    allJobs.forEach(j    => batch.delete(doc(db, "stock_take_jobs", j.id)));
+    await batch.commit();
+    toast("🗑️ Reset เรียบร้อย");
+  });
+
+  // ── Status ────────────────────────────────────────────────
+  function renderStatus() {
+    const total = allProducts.length;
+    const low   = allProducts.filter(p => p.quantity > 0 && p.quantity <= p.min_stock).length;
+    const out   = allProducts.filter(p => p.quantity <= 0).length;
+    document.getElementById("inv-total").textContent = total;
+    document.getElementById("inv-low").textContent   = low;
+    document.getElementById("inv-out").textContent   = out;
+    const tbody = document.getElementById("inv-tbody");
+    if (!allProducts.length) { tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--gray);">ไม่มีข้อมูล</td></tr>`; return; }
+    tbody.innerHTML = allProducts.map(p => {
+      const badge = p.quantity <= 0
+        ? `<span class="badge badge-red">หมดสต็อก</span>`
+        : p.quantity <= p.min_stock
+          ? `<span class="badge badge-amber">ใกล้หมด</span>`
+          : `<span class="badge badge-green">ปกติ</span>`;
+      return `<tr><td style="font-weight:600;color:var(--blue)">${p.id}</td><td>${p.name}</td><td>${p.location||"—"}</td><td><b>${p.quantity}</b> ${p.unit}</td><td>${p.min_stock}</td><td>${badge}</td></tr>`;
+    }).join("");
+  }
+</script>
+</body>
+</html>

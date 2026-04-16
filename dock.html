@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Dock Management - RAPO</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#021D49">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <!-- Html5Qrcode for Scanner -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    /* Dock Board */
+    .dock-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:1rem; }
+    .dock-card { border-radius:14px; border:2px solid var(--border); background:white; overflow:hidden; transition:all 0.2s; min-height:200px; display:flex; flex-direction:column; }
+    .dock-card.occupied { border-color:#6366f1; box-shadow:0 4px 20px rgba(99,102,241,0.12); }
+    .dock-card.busy      { border-color:var(--amber); opacity:0.7; }
+    .dock-card.maint     { border-color:var(--gray);  opacity:0.6; }
+    .dock-card.delay     { border-color:var(--red); box-shadow:0 0 0 3px rgba(220,38,38,0.1); }
+    .dock-header { padding:0.65rem 1rem; font-weight:700; font-size:0.95rem; display:flex; justify-content:space-between; align-items:center; }
+    .dock-body   { padding:0.75rem 1rem; flex:1; display:flex; flex-direction:column; }
+    .dock-footer { padding:0.6rem 1rem; background:#f8fafc; border-top:1px solid var(--border); display:flex; justify-content:space-between; font-size:0.75rem; color:var(--gray); }
+    /* Waitlist */
+    .waitlist-card { background:white; border:1.5px solid var(--border); border-radius:12px; overflow:hidden; transition:all 0.2s; }
+    .waitlist-card:hover { border-color:var(--indigo); box-shadow:0 4px 12px rgba(99,102,241,0.08); }
+    /* Scan */
+    #reader { border-radius:14px; overflow:hidden; }
+    #scan-result { border-radius:12px; padding:1.5rem; text-align:center; font-weight:700; font-size:1rem; }
+    #scan-result.success { background:#f0fdf4; color:#15803d; }
+    #scan-result.error   { background:#fef2f2; color:#dc2626; }
+    /* Status cycle cursor */
+    .clickable { cursor:pointer; }
+    /* IN/OUT badge */
+    .in-badge  { background:#dbeafe; color:#1d4ed8; padding:2px 7px; border-radius:6px; font-size:0.7rem; font-weight:700; }
+    .out-badge { background:#fff7ed; color:#c2410c; padding:2px 7px; border-radius:6px; font-size:0.7rem; font-weight:700; }
+    /* delay pulse */
+    @keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:0.5} }
+    .delay-pulse { animation: pulse-red 1s ease-in-out infinite; color:var(--red); }
+    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); white-space:nowrap; }
+    #toast.show { transform:translateX(-50%) translateY(0); }
+    .form-date-row { display:grid; grid-template-columns:1fr auto auto; gap:0.5rem; align-items:end; }
+    @media(max-width:480px){ .form-date-row { grid-template-columns:1fr; } .dock-grid { grid-template-columns:1fr 1fr; } }
+  </style>
+</head>
+<body>
+
+<div id="topbar-placeholder"></div>
+<div class="page-body">
+
+  <!-- Tabs -->
+  <div class="tab-bar" style="overflow-x:auto;">
+    <button class="tab-btn active" data-tab="board">🏭 หน้าท่า</button>
+    <button class="tab-btn" data-tab="schedule">📅 ตาราง</button>
+    <button class="tab-btn" data-tab="list">📋 คิวทั้งหมด</button>
+    <button class="tab-btn" data-tab="scan">📷 สแกน</button>
+    <button class="tab-btn" data-tab="reports" id="tab-reports-btn">📊 รายงาน</button>
+    <button class="tab-btn" data-tab="settings" id="tab-settings-btn">⚙️ ตั้งค่า</button>
+  </div>
+
+  <!-- Date Picker -->
+  <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:1rem; flex-wrap:wrap;">
+    <div style="display:flex; align-items:center; gap:0.5rem; background:white; border:1.5px solid var(--border); border-radius:10px; padding:0.5rem 0.85rem;">
+      <span style="font-size:0.85rem; color:var(--gray); font-weight:600;">📅 วันที่:</span>
+      <input type="date" id="view-date" style="background:transparent; border:none; font-family:Sarabun,sans-serif; font-size:0.9rem; font-weight:700; color:var(--blue); outline:none; cursor:pointer;">
+    </div>
+    <a href="dock-tv.html" target="_blank" class="btn btn-indigo btn-sm">🖥️ TV Mode</a>
+  </div>
+
+  <!-- TAB: Live Dock Board -->
+  <div id="tab-board">
+    <!-- Waitlist Strip -->
+    <div class="card" style="margin-bottom:1rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+        <div class="card-title" style="margin-bottom:0;">🅿️ Waitlist &nbsp;<span id="waitlist-count" class="badge badge-indigo">0</span></div>
+        <button class="btn btn-primary btn-sm" id="btn-add-booking" >➕ จองคิว</button>
+      </div>
+      <div id="waitlist-area" style="display:flex; gap:0.75rem; overflow-x:auto; padding-bottom:0.25rem; min-height:60px; align-items:flex-start;">
+        <div style="color:var(--gray); font-size:0.875rem; padding:0.5rem 0; white-space:nowrap;">ไม่มีคิวรอ</div>
+      </div>
+    </div>
+
+    <!-- Live Dock Board -->
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="padding:0.85rem 1.25rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <div class="card-title" style="margin-bottom:0;">🏭 Live Dock Board</div>
+        <div style="display:flex; gap:0.5rem; font-size:0.75rem; font-weight:700; flex-wrap:wrap;">
+          <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block;"></span>ว่าง</span>
+          <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#6366f1;display:inline-block;"></span>มีรถ</span>
+          <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:var(--amber);display:inline-block;"></span>ปิด</span>
+          <span style="display:flex; align-items:center; gap:4px;"><span class="delay-pulse" style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block;animation:pulse-red 1s ease-in-out infinite;"></span>Delay</span>
+        </div>
+      </div>
+      <div style="padding:1rem;">
+        <div class="dock-grid" id="dock-grid">
+          <div class="spinner-wrap"><div class="spinner"></div><span>กำลังโหลด...</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: Schedule Timeline -->
+  <div id="tab-schedule" style="display:none">
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div style="padding:0.85rem 1.25rem; border-bottom:1px solid var(--border);">
+        <div class="card-title" style="margin-bottom:0;">📅 ตารางเวลาหน้าท่า</div>
+      </div>
+      <div style="overflow-x:auto; padding:1rem;">
+        <div id="schedule-wrap" style="min-width:800px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: All Queues -->
+  <div id="tab-list" style="display:none">
+    <div class="action-bar">
+      <div class="search-bar" style="flex:1; margin-bottom:0;"><input type="text" id="list-search" placeholder="ค้นหา DO / ทะเบียน..."></div>
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div class="table-wrap" style="border:none; border-radius:0;">
+        <table>
+          <thead><tr><th>วันที่</th><th>DO/Shipment</th><th>IN/OUT</th><th>ทะเบียน/ขนาด</th><th>ช่องจอด</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+          <tbody id="list-tbody"><tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: Scanner -->
+  <div id="tab-scan" style="display:none">
+    <div class="card" style="text-align:center; max-width:420px; margin:0 auto;">
+      <div class="card-title" style="justify-content:center;">📷 สแกนคิวอัตโนมัติ</div>
+      <div class="alert alert-warning" style="font-size:0.85rem; margin-bottom:1rem; text-align:left;">
+        💡 ลำดับสแกน: 1. รถมาดึง → 2. โหลดงาน → 3. รอเอกสาร → 4. เสร็จสิ้น
+      </div>
+      <div id="scan-result" style="display:none; margin-bottom:1rem;"></div>
+      <div id="reader" style="width:100%; background:#1e293b; border-radius:14px; min-height:260px; display:flex; align-items:center; justify-content:center;">
+        <div style="color:rgba(255,255,255,0.4); font-size:0.9rem;">กล้องยังไม่เปิด</div>
+      </div>
+      <button class="btn btn-primary btn-full" id="btn-cam" style="margin-top:1rem;">📷 เปิดกล้องสแกน</button>
+    </div>
+  </div>
+
+  <!-- TAB: Reports -->
+  <div id="tab-reports" style="display:none">
+    <div style="display:flex; justify-content:flex-end; margin-bottom:0.75rem;">
+      <button class="btn btn-green btn-sm" id="btn-export-dock">⬇️ Export CSV & ล้างข้อมูล</button>
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div class="table-wrap" style="border:none; border-radius:0;">
+        <table>
+          <thead><tr><th>วันที่</th><th>ช่องจอด</th><th>DO/Shipment</th><th>IN/OUT</th><th>บริษัท</th><th>ทะเบียน</th><th>Plan เข้า</th><th>มาถึง</th><th>โหลด</th><th>รอเอกสาร</th><th>เสร็จ</th><th>Plan ออก</th></tr></thead>
+          <tbody id="reports-tbody"><tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: Settings (Admin) -->
+  <div id="tab-settings" style="display:none">
+    <div class="card">
+      <div class="card-title">🏭 จัดการช่องจอด</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>ชื่อช่องจอดใหม่</label>
+          <input type="text" id="new-bay-name" placeholder="เช่น Dock 10">
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btn-add-bay">➕ เพิ่มช่องจอด</button>
+    </div>
+    <div class="card" style="padding:0; overflow:hidden;">
+      <div class="table-wrap" style="border:none; border-radius:0;">
+        <table>
+          <thead><tr><th>ช่องจอด</th><th>สถานะ</th><th>จัดการ</th></tr></thead>
+          <tbody id="bays-tbody"><tr><td colspan="3" style="text-align:center;padding:2rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end page-body -->
+
+<!-- Booking Modal -->
+<div id="modal-booking" style="display:none" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-booking-title">📝 จองคิว / นัดหมายหน้าท่า</h3>
+      <button class="modal-close" id="btn-close-booking">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="b-editing-id">
+      <!-- IN/OUT -->
+      <div style="display:flex; background:#f1f5f9; border-radius:10px; padding:0.3rem; margin-bottom:1rem; gap:0.25rem;">
+        <label style="flex:1; text-align:center; padding:0.5rem; border-radius:8px; cursor:pointer; font-weight:700; font-size:0.9rem; transition:all 0.2s;" id="label-in">
+          <input type="radio" name="job-type" value="IN" checked style="display:none;" id="radio-in"> 📥 รับเข้า (IN)
+        </label>
+        <label style="flex:1; text-align:center; padding:0.5rem; border-radius:8px; cursor:pointer; font-weight:700; font-size:0.9rem; transition:all 0.2s;" id="label-out">
+          <input type="radio" name="job-type" value="OUT" style="display:none;" id="radio-out"> 📤 จ่ายออก (OUT)
+        </label>
+      </div>
+      <div class="form-group">
+        <label>วันที่</label>
+        <input type="date" id="b-date">
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>เวลาเข้า</label><input type="time" id="b-start"></div>
+        <div class="form-group"><label>เวลาออก (Plan)</label><input type="time" id="b-end"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Shipment / DO <span style="color:red">*</span></label><input type="text" id="b-shipment" placeholder="DO-2024-001"></div>
+        <div class="form-group"><label>บริษัท / Vendor <span style="color:red">*</span></label><input type="text" id="b-vendor" placeholder="ชื่อบริษัท"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>ทะเบียนรถ <span style="color:red">*</span></label><input type="text" id="b-license" placeholder="กข 1234"></div>
+        <div class="form-group">
+          <label>ขนาดรถ</label>
+          <select id="b-vehicle">
+            <option value="40FT">40FT</option>
+            <option value="20FT">20FT</option>
+            <option value="10WT">10WT (สิบล้อ)</option>
+            <option value="6WT">6WT (หกล้อ)</option>
+            <option value="4WT" selected>4WT (สี่ล้อ)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>การจัดสรรช่องจอด</label>
+        <select id="b-allocation"></select>
+      </div>
+      <div id="target-dock-group" style="display:none;">
+        <div class="form-group">
+          <label>🎯 ระบุช่องจอดที่รอ (Target Dock)</label>
+          <select id="b-target-dock">
+            <option value="">ไม่ระบุ (Any Dock)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="btn-cancel-booking">ยกเลิก</button>
+      <button class="btn btn-primary" id="btn-save-booking">💾 บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast">—</div>
+
+<script type="module">
+  import { auth, rtdb } from "./firebase-config.js";
+  import { requireAuth } from "./auth.js";
+  import { ref, onValue, set, push, update, remove, get }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // ── Constants ─────────────────────────────────────────────
+  const STATUSES     = ["Pending","Arrived","Loading","WaitingDoc","Completed"];
+  const STATUS_LABEL = { Pending:"รอเข้าท่า", Arrived:"1. รถมาถึง", Loading:"2. โหลดงาน", WaitingDoc:"3. รอเอกสาร", Completed:"4. เสร็จสิ้น" };
+  const STATUS_BADGE = { Pending:"badge-gray", Arrived:"badge-blue", Loading:"badge-purple", WaitingDoc:"badge-orange", Completed:"badge-green" };
+  const INITIAL_BAYS = Array.from({length:9}, (_,i) => ({ name:`Dock ${String(i+1).padStart(2,"0")}`, status:"Available" }));
+
+  let currentUser, currentProfile;
+  let allBookings = {}, allBays = [];
+  let viewDate = new Date().toISOString().split("T")[0];
+  let listSearch = "", editingId = null;
+  let scannerStarted = false, lastScan = { text:"", time:0 };
+
+  // ── Init ──────────────────────────────────────────────────
+  const { user, profile } = await requireAuth();
+  currentUser = user; currentProfile = profile;
+
+  document.getElementById("topbar-placeholder").innerHTML = `
+    <nav class="topbar">
+      <a class="topbar-back" href="index.html">←</a>
+      <div style="flex:1">
+        <div class="topbar-title">🚢 Smart Dock Management</div>
+        <div class="topbar-sub">Realtime Dock Board</div>
+      </div>
+      <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
+    </nav>`;
+
+  if (!["admin","Ship Co"].includes(profile.role)) {
+    document.getElementById("tab-reports-btn").style.display  = "none";
+    document.getElementById("tab-settings-btn").style.display = "none";
+  }
+
+  // View Date
+  document.getElementById("view-date").value = viewDate;
+  document.getElementById("view-date").addEventListener("change", e => {
+    viewDate = e.target.value;
+    renderBoard(); renderWaitlist(); renderSchedule(); renderList(); renderReports();
+  });
+
+  function toast(msg, d=2500) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), d);
+  }
+
+  // ── Firebase Realtime Listeners ───────────────────────────
+  onValue(ref(rtdb, "smartdock/bays"), snap => {
+    const data = snap.val();
+    if (!data) {
+      // Seed initial bays
+      set(ref(rtdb, "smartdock/bays"), INITIAL_BAYS);
+      allBays = [...INITIAL_BAYS];
+    } else {
+      allBays = Array.isArray(data)
+        ? data.filter(Boolean)
+        : Object.values(data).filter(Boolean);
+    }
+    renderBoard(); renderSettings(); updateAllocationOptions();
+  });
+
+  onValue(ref(rtdb, "smartdock/bookings"), snap => {
+    const data = snap.val();
+    allBookings = data || {};
+    renderBoard(); renderWaitlist(); renderSchedule(); renderList(); renderReports();
+  });
+
+  // Helper
+  function getBookingsArray() {
+    return Object.entries(allBookings).map(([id, b]) => ({ ...b, _id: id }));
+  }
+  function todayBookings() {
+    return getBookingsArray().filter(b => b.date === viewDate && b.status !== "Completed");
+  }
+  function waitlistBookings() {
+    return todayBookings().filter(b => b.allocation === "Waitlist");
+  }
+  function dockBookings() {
+    return todayBookings().filter(b => b.allocation !== "Waitlist");
+  }
+  function getTimeStr() {
+    return new Date().toLocaleTimeString("th-TH", { hour12:false, hour:"2-digit", minute:"2-digit" });
+  }
+  function isDelay(b) {
+    if (!b || b.status === "Completed" || b.status === "Pending") return false;
+    if (b.date !== new Date().toISOString().split("T")[0]) return false;
+    const now = new Date().toLocaleTimeString("th-TH", { hour12:false, hour:"2-digit", minute:"2-digit" });
+    return now > b.end_time;
+  }
+
+  // ── BOARD ─────────────────────────────────────────────────
+  function renderBoard() {
+    const grid = document.getElementById("dock-grid");
+    if (!allBays.length) { grid.innerHTML = `<div style="color:var(--gray); padding:1rem;">ยังไม่มีช่องจอด</div>`; return; }
+    const docksMap = {};
+    dockBookings().forEach(b => { docksMap[b.allocation] = b; });
+
+    grid.innerHTML = allBays.map(bay => {
+      const booking = docksMap[bay.name];
+      const delay   = booking && isDelay(booking);
+      const isBusy  = bay.status === "Busy" || bay.status === "Maintenance";
+
+      if (booking) {
+        const ioB = booking.job_type === "OUT"
+          ? `<span class="out-badge">OUT</span>`
+          : `<span class="in-badge">IN</span>`;
+        const canEdit = ["admin","Ship Co"].includes(profile.role);
+        return `<div class="dock-card occupied${delay?" delay":""}">
+          ${delay ? `<div style="background:var(--red);color:white;font-size:0.75rem;font-weight:700;padding:0.3rem;text-align:center;" class="delay-pulse">⚠️ Delay เกินเวลา Plan</div>` : ""}
+          <div class="dock-header" style="background:#eef2ff;">
+            <span>${bay.name} ${ioB}</span>
+            ${canEdit ? `<button onclick="openEdit('${booking._id}')" style="background:none;border:none;cursor:pointer;font-size:0.85rem;">✏️</button>` : ""}
+          </div>
+          <div class="dock-body">
+            <div style="font-size:0.8rem;color:var(--gray);margin-bottom:2px;">${booking.shipment_no}</div>
+            <div style="font-size:1.4rem;font-weight:700;color:var(--blue);margin-bottom:4px;">${booking.license_plate}</div>
+            <div style="font-size:0.8rem;color:var(--gray);">${booking.vendor}</div>
+            <div style="margin-top:auto;padding-top:0.5rem;">
+              <span class="badge ${STATUS_BADGE[booking.status]} clickable"
+                    onclick="cycleStatus('${booking._id}')" title="คลิกเพื่อเปลี่ยนสถานะ">
+                ${STATUS_LABEL[booking.status]}
+              </span>
+            </div>
+          </div>
+          <div class="dock-footer">
+            <span>Plan ออก: <b>${booking.end_time}</b></span>
+            <span>มาถึง: <b>${booking.time_arrived||"—"}</b></span>
+          </div>
+        </div>`;
+      }
+
+      // ว่าง / ปิด / ซ่อม
+      let cardClass="", headerBg="#f0fdf4", statusText="ว่าง (Available)", statusIcon="✅";
+      if (bay.status === "Busy")        { cardClass="busy";  headerBg="#fffbeb"; statusText="ปิดชั่วคราว"; statusIcon="⚠️"; }
+      if (bay.status === "Maintenance") { cardClass="maint"; headerBg="#f8fafc"; statusText="ซ่อมบำรุง";   statusIcon="🔧"; }
+      const canToggle = ["admin","Sup"].includes(profile.role);
+      return `<div class="dock-card ${cardClass} ${canToggle?"clickable":""}" onclick="${canToggle ? `toggleBayStatus('${bay.name}','${bay.status}')` : ""}">
+        <div class="dock-header" style="background:${headerBg};">
+          <span>${bay.name}</span>
+          ${canToggle ? `<span style="font-size:0.7rem;color:var(--gray);">คลิกเพื่อเปลี่ยน</span>` : ""}
+        </div>
+        <div class="dock-body" style="align-items:center;justify-content:center;text-align:center;">
+          <div style="font-size:2rem;margin-bottom:0.5rem;">${statusIcon}</div>
+          <div style="font-weight:700;font-size:0.9rem;">${statusText}</div>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  // ── WAITLIST ──────────────────────────────────────────────
+  function renderWaitlist() {
+    const list = waitlistBookings();
+    document.getElementById("waitlist-count").textContent = list.length;
+    const area = document.getElementById("waitlist-area");
+    if (!list.length) {
+      area.innerHTML = `<div style="color:var(--gray);font-size:0.875rem;padding:0.5rem 0;white-space:nowrap;">ไม่มีคิวรอ</div>`;
+      return;
+    }
+    const canEdit = ["admin","Ship Co"].includes(profile.role);
+    area.innerHTML = list.map((b,i) => `
+      <div class="waitlist-card" style="min-width:200px; flex-shrink:0;">
+        <div style="padding:0.5rem 0.75rem; background:#f8fafc; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:700; font-size:0.85rem;">คิว${i+1} ${b.job_type==="OUT"?`<span class="out-badge">OUT</span>`:`<span class="in-badge">IN</span>`}</span>
+          <span class="badge ${STATUS_BADGE[b.status]}" style="font-size:0.7rem;">${STATUS_LABEL[b.status]}</span>
+        </div>
+        <div style="padding:0.6rem 0.75rem; font-size:0.82rem;">
+          <div style="font-weight:700;">${b.license_plate} <span style="font-weight:400; color:var(--gray);">(${b.vehicle})</span></div>
+          <div style="color:var(--gray);">${b.shipment_no}</div>
+          <div style="color:var(--indigo); font-weight:700; margin-top:2px;">${b.start_time} - ${b.end_time}</div>
+          ${b.target_dock ? `<div style="font-size:0.75rem;color:var(--indigo);">รอ ${b.target_dock}</div>` : ""}
+        </div>
+        ${canEdit ? `<div style="display:flex; border-top:1px solid var(--border);">
+          <button onclick="openEdit('${b._id}')" style="flex:1; padding:0.5rem; background:none; border:none; font-family:Sarabun,sans-serif; font-size:0.8rem; font-weight:700; color:var(--indigo); cursor:pointer;">จัดสรรช่อง</button>
+        </div>` : ""}
+      </div>`).join("");
+  }
+
+  // ── SCHEDULE ──────────────────────────────────────────────
+  function renderSchedule() {
+    const hours = Array.from({length:11}, (_,i) => i+8);
+    const bays  = allBays;
+    const bookings = getBookingsArray().filter(b => b.date === viewDate && b.allocation !== "Waitlist" && b.status !== "Completed");
+
+    const COLORS = { Pending:"#94a3b8", Arrived:"#38bdf8", Loading:"#a78bfa", WaitingDoc:"#fb923c", Completed:"#4ade80" };
+    let html = `<div style="display:flex; border-bottom:1px solid var(--border); padding-bottom:0.5rem; margin-left:100px; margin-bottom:4px;">`;
+    hours.forEach(h => {
+      html += `<div style="flex:1; font-size:0.7rem; color:var(--gray); font-weight:700;">${String(h).padStart(2,"0")}:00</div>`;
+    });
+    html += `</div>`;
+    html += bays.map(bay => {
+      const bayBooks = bookings.filter(b => b.allocation === bay.name);
+      return `<div style="display:flex; height:52px; align-items:center; border-radius:10px; margin-bottom:4px; background:#f8fafc; position:relative;">
+        <div style="width:100px; font-weight:700; font-size:0.82rem; color:var(--blue); padding:0 0.5rem; flex-shrink:0; z-index:2; background:#f8fafc; border-right:1px solid var(--border);">${bay.name}</div>
+        <div style="flex:1; position:relative; height:100%;">
+          ${Array.from({length:10}).map((_,i) => `<div style="position:absolute; left:${i*10}%; top:0; bottom:0; width:1px; background:var(--border); opacity:0.5;"></div>`).join("")}
+          ${bayBooks.map(b => {
+            const [sh,sm] = b.start_time.split(":").map(Number);
+            const [eh,em] = b.end_time.split(":").map(Number);
+            const left = Math.max(0, (((sh-8)*60+sm)/600)*100);
+            const w    = Math.min(100-left, ((((eh*60+em)-(sh*60+sm))/600)*100));
+            const color = COLORS[b.status] || "#94a3b8";
+            return `<div title="${b.shipment_no} | ${b.vendor}" onclick="openEdit('${b._id}')"
+              style="position:absolute; left:${left}%; width:${w}%; top:6px; bottom:6px; background:${color}; border-radius:6px; padding:0 6px; font-size:0.72rem; font-weight:700; color:white; overflow:hidden; white-space:nowrap; cursor:pointer; display:flex; align-items:center; transition:opacity 0.2s;"
+              onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+              ${b.job_type==="OUT"?"📤":"📥"} ${b.shipment_no}
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`;
+    }).join("");
+    document.getElementById("schedule-wrap").innerHTML = html;
+  }
+
+  // ── LIST ──────────────────────────────────────────────────
+  function renderList() {
+    const q = listSearch.toLowerCase();
+    const data = getBookingsArray()
+      .filter(b => b.status !== "Completed")
+      .filter(b =>
+        (b.shipment_no||"").toLowerCase().includes(q) ||
+        (b.license_plate||"").toLowerCase().includes(q) ||
+        (b.vendor||"").toLowerCase().includes(q)
+      )
+      .sort((a,b) => (a.date+a.start_time).localeCompare(b.date+b.start_time));
+
+    const tbody = document.getElementById("list-tbody");
+    if (!data.length) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray);">ไม่มีข้อมูล</td></tr>`; return; }
+    const canEdit = ["admin","Ship Co"].includes(profile.role);
+    tbody.innerHTML = data.map(b => `<tr>
+      <td style="font-size:0.8rem;">${b.date}<br><span style="color:var(--indigo);font-weight:700;">${b.start_time}-${b.end_time}</span></td>
+      <td><b>${b.shipment_no}</b><div style="font-size:0.8rem;color:var(--gray);">${b.vendor}</div></td>
+      <td><span class="${b.job_type==="OUT"?"out-badge":"in-badge"}">${b.job_type}</span></td>
+      <td><b>${b.license_plate}</b><br><span style="font-size:0.75rem;color:var(--gray);">${b.vehicle}</span></td>
+      <td>${b.allocation}${b.target_dock?`<br><span style="font-size:0.75rem;color:var(--indigo);">รอ ${b.target_dock}</span>`:""}</td>
+      <td><span class="badge ${STATUS_BADGE[b.status]}">${STATUS_LABEL[b.status]}</span></td>
+      <td>${canEdit ? `<button onclick="openEdit('${b._id}')" class="btn btn-outline btn-sm">✏️</button>
+           <button onclick="deleteBooking('${b._id}')" class="btn btn-red btn-sm">🗑️</button>` : "—"}</td>
+    </tr>`).join("");
+  }
+
+  document.getElementById("list-search").addEventListener("input", e => { listSearch = e.target.value; renderList(); });
+
+  // ── REPORTS ───────────────────────────────────────────────
+  function renderReports() {
+    const data = getBookingsArray()
+      .filter(b => b.status === "Completed" && b.date === viewDate)
+      .sort((a,b) => a.start_time.localeCompare(b.start_time));
+    const tbody = document.getElementById("reports-tbody");
+    if (!data.length) { tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--gray);">ไม่มีข้อมูลที่เสร็จสิ้น</td></tr>`; return; }
+    tbody.innerHTML = data.map(b => `<tr>
+      <td>${b.date}</td><td>${b.allocation}</td><td><b>${b.shipment_no}</b></td>
+      <td><span class="${b.job_type==="OUT"?"out-badge":"in-badge"}">${b.job_type}</span></td>
+      <td>${b.vendor}</td><td>${b.license_plate}</td>
+      <td>${b.start_time}</td><td>${b.time_arrived||"—"}</td>
+      <td>${b.time_loading||"—"}</td><td>${b.time_waiting_doc||"—"}</td>
+      <td>${b.time_completed||"—"}</td><td>${b.end_time}</td>
+    </tr>`).join("");
+  }
+
+  document.getElementById("btn-export-dock").addEventListener("click", () => {
+    const data = getBookingsArray().filter(b => b.status === "Completed" && b.date === viewDate);
+    if (!data.length) { toast("ไม่มีข้อมูลที่เสร็จสิ้น"); return; }
+    const rows = [["วันที่","ช่องจอด","DO","IN/OUT","บริษัท","ทะเบียน","ขนาดรถ","Plan เข้า","มาถึง","โหลด","รอเอกสาร","เสร็จ","Plan ออก"]];
+    data.forEach(b => rows.push([b.date,b.allocation,b.shipment_no,b.job_type,b.vendor,b.license_plate,b.vehicle,b.start_time,b.time_arrived||"",b.time_loading||"",b.time_waiting_doc||"",b.time_completed||"",b.end_time]));
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"}));
+    a.download = `dock_report_${viewDate}.csv`;
+    a.click();
+    if (confirm("✅ Export สำเร็จ!\n\nต้องการลบรายการ Completed ออกจากระบบหรือไม่?")) {
+      data.forEach(b => remove(ref(rtdb, `smartdock/bookings/${b._id}`)));
+      toast("🗑️ ล้างข้อมูลที่เสร็จสิ้นแล้ว");
+    }
+  });
+
+  // ── SETTINGS ──────────────────────────────────────────────
+  function renderSettings() {
+    const tbody = document.getElementById("bays-tbody");
+    if (!allBays.length) { tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:2rem;color:var(--gray);">ยังไม่มีช่องจอด</td></tr>`; return; }
+    tbody.innerHTML = allBays.map((bay, idx) => {
+      const badge = bay.status === "Available"
+        ? `<span class="badge badge-green">ว่าง</span>`
+        : bay.status === "Busy"
+          ? `<span class="badge badge-amber">ปิด</span>`
+          : `<span class="badge badge-gray">ซ่อม</span>`;
+      return `<tr>
+        <td><b>${bay.name}</b></td>
+        <td>${badge}</td>
+        <td>
+          <button onclick="toggleBayStatus('${bay.name}','${bay.status}')" class="btn btn-outline btn-sm">สลับสถานะ</button>
+          <button onclick="deleteBay(${idx},'${bay.name}')" class="btn btn-red btn-sm">🗑️</button>
+        </td>
+      </tr>`;
+    }).join("");
+  }
+
+  document.getElementById("btn-add-bay").addEventListener("click", async () => {
+    const name = document.getElementById("new-bay-name").value.trim();
+    if (!name) { toast("⚠️ กรุณาระบุชื่อช่องจอด"); return; }
+    if (allBays.find(b => b.name === name)) { toast("⚠️ มีช่องจอดนี้แล้ว"); return; }
+    const newBays = [...allBays, { name, status:"Available" }];
+    await set(ref(rtdb, "smartdock/bays"), newBays);
+    document.getElementById("new-bay-name").value = "";
+    toast(`✅ เพิ่มช่องจอด ${name} เรียบร้อย`);
+  });
+
+  window.deleteBay = async (idx, name) => {
+    if (!confirm(`ลบช่องจอด "${name}" แน่ใจหรือไม่?`)) return;
+    const newBays = allBays.filter((_,i) => i !== idx);
+    await set(ref(rtdb, "smartdock/bays"), newBays);
+    toast(`🗑️ ลบ ${name} เรียบร้อย`);
+  };
+
+  window.toggleBayStatus = async (name, current) => {
+    const isAdmin = profile.role === "admin";
+    let next = "Available";
+    if (current === "Available") next = "Busy";
+    else if (current === "Busy") next = isAdmin ? "Maintenance" : "Available";
+    else if (current === "Maintenance") next = "Available";
+    const newBays = allBays.map(b => b.name === name ? { ...b, status:next } : b);
+    await set(ref(rtdb, "smartdock/bays"), newBays);
+  };
+
+  // ── STATUS CYCLE ──────────────────────────────────────────
+  window.cycleStatus = async (id) => {
+    if (!["admin","Ship Co"].includes(profile.role)) {
+      toast("⚠️ ต้องสแกนบาร์โค้ดเพื่อเปลี่ยนสถานะ");
+      return;
+    }
+    const b = allBookings[id];
+    if (!b) return;
+    const idx = STATUSES.indexOf(b.status);
+    if (idx >= STATUSES.length - 1) { toast("งานเสร็จสิ้นแล้ว"); return; }
+    const next = STATUSES[idx + 1];
+    const now  = getTimeStr();
+    const upd = { status: next };
+    if (next === "Arrived"    && !b.time_arrived)     upd.time_arrived     = now;
+    if (next === "Loading"    && !b.time_loading)     upd.time_loading     = now;
+    if (next === "WaitingDoc" && !b.time_waiting_doc) upd.time_waiting_doc = now;
+    if (next === "Completed"  && !b.time_completed)   upd.time_completed   = now;
+    await update(ref(rtdb, `smartdock/bookings/${id}`), upd);
+    toast(`✅ อัปเดต → ${STATUS_LABEL[next]}`);
+  };
+
+  // ── DELETE Booking ────────────────────────────────────────
+  window.deleteBooking = async (id) => {
+    if (!confirm("ยืนยันลบคิวนี้?")) return;
+    await remove(ref(rtdb, `smartdock/bookings/${id}`));
+    toast("🗑️ ลบคิวเรียบร้อย");
+  };
+
+  // ── BOOKING MODAL ─────────────────────────────────────────
+  function updateAllocationOptions() {
+    const sel     = document.getElementById("b-allocation");
+    const selTarget = document.getElementById("b-target-dock");
+    sel.innerHTML = `<option value="Waitlist">🅿️ ขอจองคิวรอก่อน (Waitlist)</option>`;
+    selTarget.innerHTML = `<option value="">ไม่ระบุ (Any Dock)</option>`;
+    allBays.forEach(bay => {
+      sel.innerHTML += `<option value="${bay.name}"${bay.status !== "Available" ? " disabled" : ""}>📍 ลง ${bay.name}${bay.status !== "Available" ? ` (${bay.status})` : ""}</option>`;
+      selTarget.innerHTML += `<option value="${bay.name}">${bay.name}</option>`;
+    });
+    sel.addEventListener("change", () => {
+      document.getElementById("target-dock-group").style.display = sel.value === "Waitlist" ? "block" : "none";
+    });
+  }
+
+  // IN/OUT label styles
+  function updateIOStyle() {
+    const isIn = document.getElementById("radio-in").checked;
+    document.getElementById("label-in").style.cssText  = isIn ? "flex:1;text-align:center;padding:0.5rem;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;background:white;color:#1d4ed8;box-shadow:0 2px 6px rgba(0,0,0,0.08);" : "flex:1;text-align:center;padding:0.5rem;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;color:var(--gray);";
+    document.getElementById("label-out").style.cssText = !isIn ? "flex:1;text-align:center;padding:0.5rem;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;background:white;color:#c2410c;box-shadow:0 2px 6px rgba(0,0,0,0.08);" : "flex:1;text-align:center;padding:0.5rem;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.9rem;color:var(--gray);";
+  }
+  ["radio-in","radio-out"].forEach(id => document.getElementById(id).addEventListener("change", updateIOStyle));
+  updateIOStyle();
+
+  function openBookingModal(id = null) {
+    editingId = id;
+    document.getElementById("modal-booking-title").textContent = id ? "✏️ แก้ไขข้อมูลคิว" : "📝 จองคิว / นัดหมายหน้าท่า";
+    if (id && allBookings[id]) {
+      const b = allBookings[id];
+      document.getElementById("b-editing-id").value  = id;
+      document.getElementById("b-date").value         = b.date;
+      document.getElementById("b-start").value        = b.start_time;
+      document.getElementById("b-end").value          = b.end_time;
+      document.getElementById("b-shipment").value     = b.shipment_no;
+      document.getElementById("b-vendor").value       = b.vendor;
+      document.getElementById("b-license").value      = b.license_plate;
+      document.getElementById("b-vehicle").value      = b.vehicle || "4WT";
+      document.getElementById("b-allocation").value   = b.allocation;
+      document.getElementById("b-target-dock").value  = b.target_dock || "";
+      document.getElementById(b.job_type === "OUT" ? "radio-out" : "radio-in").checked = true;
+      document.getElementById("target-dock-group").style.display = b.allocation === "Waitlist" ? "block" : "none";
+    } else {
+      document.getElementById("b-editing-id").value = "";
+      document.getElementById("b-date").value       = viewDate;
+      document.getElementById("b-start").value      = "";
+      document.getElementById("b-end").value        = "";
+      ["b-shipment","b-vendor","b-license"].forEach(id => document.getElementById(id).value = "");
+      document.getElementById("b-vehicle").value    = "4WT";
+      document.getElementById("b-allocation").value = "Waitlist";
+      document.getElementById("radio-in").checked   = true;
+      document.getElementById("target-dock-group").style.display = "block";
+    }
+    updateIOStyle();
+    document.getElementById("modal-booking").style.display = "flex";
+  }
+
+  window.openEdit = (id) => openBookingModal(id);
+  document.getElementById("btn-add-booking").addEventListener("click", () => openBookingModal());
+  ["btn-close-booking","btn-cancel-booking"].forEach(id =>
+    document.getElementById(id).addEventListener("click", () =>
+      document.getElementById("modal-booking").style.display = "none"
+    )
+  );
+
+  document.getElementById("btn-save-booking").addEventListener("click", async () => {
+    const date      = document.getElementById("b-date").value;
+    const startTime = document.getElementById("b-start").value;
+    const endTime   = document.getElementById("b-end").value;
+    const shipment  = document.getElementById("b-shipment").value.trim();
+    const vendor    = document.getElementById("b-vendor").value.trim();
+    const license   = document.getElementById("b-license").value.trim();
+    const vehicle   = document.getElementById("b-vehicle").value;
+    const alloc     = document.getElementById("b-allocation").value;
+    const targetDock = document.getElementById("b-target-dock").value;
+    const jobType   = document.querySelector('input[name="job-type"]:checked')?.value || "IN";
+
+    if (!date || !startTime || !endTime || !shipment || !vendor || !license) {
+      toast("⚠️ กรุณากรอกข้อมูลให้ครบ"); return;
+    }
+    if (startTime >= endTime) { toast("⚠️ เวลาออกต้องมากกว่าเวลาเข้า"); return; }
+
+    const data = {
+      date, start_time: startTime, end_time: endTime,
+      shipment_no: shipment.toUpperCase(), vendor, license_plate: license.toUpperCase(),
+      vehicle, allocation: alloc, target_dock: alloc === "Waitlist" ? targetDock : "",
+      job_type: jobType, status: "Pending",
+      time_arrived: null, time_loading: null, time_waiting_doc: null, time_completed: null
+    };
+
+    const eid = document.getElementById("b-editing-id").value;
+    if (eid) {
+      const existing = allBookings[eid];
+      data.status         = existing?.status || "Pending";
+      data.time_arrived   = existing?.time_arrived   || null;
+      data.time_loading   = existing?.time_loading   || null;
+      data.time_waiting_doc = existing?.time_waiting_doc || null;
+      data.time_completed = existing?.time_completed || null;
+      await update(ref(rtdb, `smartdock/bookings/${eid}`), data);
+      toast("✅ อัปเดตคิวเรียบร้อย");
+    } else {
+      await push(ref(rtdb, "smartdock/bookings"), data);
+      toast("✅ เพิ่มคิวเรียบร้อย");
+    }
+    document.getElementById("modal-booking").style.display = "none";
+  });
+
+  // ── TAB SWITCH ────────────────────────────────────────────
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      ["board","schedule","list","scan","reports","settings"].forEach(t =>
+        document.getElementById(`tab-${t}`).style.display = t === tab ? "block" : "none"
+      );
+      if (tab === "schedule") renderSchedule();
+      if (tab === "reports")  renderReports();
+      if (tab === "settings") renderSettings();
+      // Stop scanner when leaving scan tab
+      if (tab !== "scan" && scannerStarted) stopScanner();
+    });
+  });
+
+  // ── SCANNER ───────────────────────────────────────────────
+  let html5QrCode = null;
+  async function stopScanner() {
+    if (html5QrCode) {
+      try { await html5QrCode.stop(); } catch(e) {}
+      html5QrCode = null;
+    }
+    scannerStarted = false;
+    document.getElementById("btn-cam").textContent = "📷 เปิดกล้องสแกน";
+    document.getElementById("btn-cam").style.background = "var(--blue)";
+  }
+
+  document.getElementById("btn-cam").addEventListener("click", async () => {
+    if (scannerStarted) { await stopScanner(); return; }
+    html5QrCode = new Html5Qrcode("reader");
+    try {
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        async (decodedText) => {
+          const now = Date.now();
+          if (lastScan.text === decodedText && (now - lastScan.time) < 3500) return;
+          lastScan = { text: decodedText, time: now };
+          await handleScan(decodedText);
+        },
+        () => {}
+      );
+      scannerStarted = true;
+      document.getElementById("btn-cam").textContent = "🔴 ปิดกล้อง";
+      document.getElementById("btn-cam").style.background = "var(--red)";
+    } catch(e) {
+      toast("❌ ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการใช้งานกล้อง");
+    }
+  });
+
+  async function handleScan(text) {
+    const bookArr = getBookingsArray();
+    const today = new Date().toISOString().split("T")[0];
+    // หาจาก bay name ก่อน
+    const bay = allBays.find(b => b.name.toUpperCase().replace(" ","") === text.toUpperCase().replace(" ","") || b.name.toUpperCase() === text.toUpperCase());
+    let booking;
+    if (bay) {
+      booking = bookArr.find(b => b.allocation === bay.name && b.status !== "Completed" && b.date === today);
+      if (!booking) { showScanResult(`ไม่มีคิวใน ${bay.name} วันนี้`, false); return; }
+    } else {
+      booking = bookArr.find(b => (b.shipment_no === text.toUpperCase() || b.license_plate === text.toUpperCase()) && b.date === today && b.status !== "Completed");
+      if (!booking) { showScanResult("ไม่พบคิวที่ตรงกับบาร์โค้ดนี้", false); return; }
+    }
+    const idx  = STATUSES.indexOf(booking.status);
+    if (idx >= STATUSES.length - 1) { showScanResult(`${booking.shipment_no} เสร็จสิ้นแล้ว`, false); return; }
+    const next = STATUSES[idx + 1];
+    const now  = getTimeStr();
+    const upd  = { status: next };
+    if (next === "Arrived")    upd.time_arrived     = now;
+    if (next === "Loading")    upd.time_loading     = now;
+    if (next === "WaitingDoc") upd.time_waiting_doc = now;
+    if (next === "Completed")  upd.time_completed   = now;
+    await update(ref(rtdb, `smartdock/bookings/${booking._id}`), upd);
+    showScanResult(`✅ ${booking.shipment_no} → ${STATUS_LABEL[next]}`, true);
+  }
+
+  function showScanResult(msg, success) {
+    const el = document.getElementById("scan-result");
+    el.textContent = msg;
+    el.className = `scan-result ${success ? "success" : "error"}`;
+    el.style.display = "block";
+    setTimeout(() => { el.style.display = "none"; }, 3000);
+  }
+</script>
+</body>
+</html>

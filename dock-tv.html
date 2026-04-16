@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Dock TV Display</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;900&display=swap" rel="stylesheet">
+  <!-- Firebase SDK v8 (ทำงานได้กับทีวีทุกรุ่น) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+    body {
+      font-family: 'Sarabun', Tahoma, Arial, sans-serif;
+      background: #060a14;
+      color: #fff;
+    }
+
+    /* ── HEADER ── */
+    .tv-header {
+      height: 70px;
+      background: #0b1120;
+      border-bottom: 2px solid #1e2d48;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.5rem;
+      flex-shrink: 0;
+    }
+    .tv-header-left { display: flex; flex-direction: column; }
+    .tv-logo-row { display: flex; align-items: center; gap: 0.75rem; }
+    .tv-logo-box { width: 36px; height: 36px; background: #6366f1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.1rem; }
+    .tv-app-name { font-size: 1.1rem; font-weight: 900; letter-spacing: 0.05em; color: white; }
+    .tv-app-name span { color: #818cf8; }
+    .tv-date-badge { font-size: 0.75rem; color: #64748b; margin-top: 2px; }
+    .tv-clock { font-size: 2.5rem; font-weight: 900; color: #34d399; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .tv-clock-date { font-size: 0.8rem; color: #64748b; text-align: right; margin-top: 2px; }
+
+    /* ── BODY ── */
+    .tv-body {
+      display: flex;
+      height: calc(100vh - 70px);
+      overflow: hidden;
+    }
+
+    /* ── LEFT: DOCK BOARD ── */
+    .tv-left {
+      flex: 0 0 68%;
+      border-right: 2px solid #1e2d48;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .tv-section-header {
+      padding: 0.5rem 1.25rem;
+      background: rgba(255,255,255,0.03);
+      border-bottom: 1px solid #1e2d48;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      flex-shrink: 0;
+    }
+    .tv-dock-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      padding: 0.75rem;
+      overflow: hidden;
+      align-content: start;
+    }
+    .tv-dock-card {
+      border: 1.5px solid #1e2d48;
+      border-radius: 12px;
+      background: #0d1523;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .tv-dock-card.occupied {
+      border-color: #6366f1;
+      background: #13193a;
+      box-shadow: 0 0 20px rgba(99,102,241,0.15);
+    }
+    .tv-dock-card.busy { opacity: 0.5; border-color: #374151; }
+    .tv-dock-card.delay {
+      border-color: #ef4444;
+      box-shadow: 0 0 20px rgba(239,68,68,0.2);
+    }
+    @keyframes pulse-delay { 0%,100%{opacity:1} 50%{opacity:0.6} }
+    .delay-text { animation: pulse-delay 1s ease-in-out infinite; color: #f87171; }
+
+    .tv-card-head {
+      padding: 0.4rem 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1e2d48;
+      flex-shrink: 0;
+    }
+    .tv-card-dock-name { font-size: 1rem; font-weight: 900; color: #e2e8f0; }
+    .tv-card-status {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+    }
+    .status-arrived    { background: #0e4429; color: #4ade80; }
+    .status-loading    { background: #1e1b4b; color: #a5b4fc; }
+    .status-waitingdoc { background: #431407; color: #fb923c; }
+    .status-pending    { background: #1e2d48; color: #94a3b8; }
+
+    .tv-card-body { padding: 0.5rem 0.75rem; flex: 1; display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+    .tv-card-license { font-size: 1.5rem; font-weight: 900; color: #fff; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tv-card-do      { font-size: 0.75rem; color: #818cf8; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tv-card-vendor  { font-size: 0.72rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tv-card-tags    { display: flex; gap: 0.35rem; margin-top: auto; padding-top: 4px; flex-wrap: wrap; }
+    .tv-tag          { font-size: 0.65rem; padding: 2px 6px; border-radius: 6px; font-weight: 700; }
+    .tv-tag-vehicle  { background: #1e2d48; color: #94a3b8; }
+    .tv-tag-in       { background: #0c2340; color: #60a5fa; }
+    .tv-tag-out      { background: #2c1207; color: #fb923c; }
+    .tv-card-footer  { padding: 0.35rem 0.75rem; background: rgba(255,255,255,0.03); border-top: 1px solid #1e2d48; display: flex; justify-content: space-between; font-size: 0.7rem; color: #64748b; flex-shrink: 0; }
+
+    .tv-empty-bay { padding: 0.5rem 0.75rem; flex: 1; display: flex; align-items: center; justify-content: center; color: #1e3a5f; font-weight: 700; font-size: 0.85rem; }
+
+    /* ── RIGHT: WAITLIST ── */
+    .tv-right {
+      flex: 0 0 32%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #080e1a;
+    }
+    .tv-waitlist-header {
+      padding: 0.5rem 1rem;
+      background: rgba(251,191,36,0.06);
+      border-bottom: 1px solid rgba(251,191,36,0.15);
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #fbbf24;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .waitlist-count-badge {
+      background: rgba(251,191,36,0.15);
+      color: #fbbf24;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.8rem;
+    }
+    .tv-waitlist-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.5rem;
+    }
+    .tv-waitlist-body::-webkit-scrollbar { width: 4px; }
+    .tv-waitlist-body::-webkit-scrollbar-thumb { background: #1e2d48; border-radius: 4px; }
+
+    .wl-row {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: 10px;
+      background: #0d1523;
+      border: 1px solid #1e2d48;
+      margin-bottom: 0.5rem;
+      animation: slideIn 0.4s ease;
+    }
+    @keyframes slideIn { from { transform:translateX(-10px); opacity:0; } to { transform:translateX(0); opacity:1; } }
+    .wl-num { width: 28px; height: 28px; border-radius: 50%; background: #1e2d48; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 900; color: #94a3b8; flex-shrink: 0; }
+    .wl-info { flex: 1; min-width: 0; }
+    .wl-license { font-size: 1rem; font-weight: 900; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wl-do      { font-size: 0.72rem; color: #818cf8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wl-target  { font-size: 0.68rem; color: #818cf8; font-weight: 700; }
+    .wl-time    { font-size: 1rem; font-weight: 900; color: #fbbf24; flex-shrink: 0; text-align: right; }
+    .wl-type    { font-size: 0.65rem; font-weight: 700; padding: 2px 5px; border-radius: 5px; flex-shrink: 0; }
+    .wl-type-in  { background: #0c2340; color: #60a5fa; }
+    .wl-type-out { background: #2c1207; color: #fb923c; }
+
+    .tv-empty-wl { padding: 3rem 1rem; text-align: center; color: #1e3a5f; font-size: 0.9rem; font-weight: 700; }
+
+    /* ── OFFLINE BADGE ── */
+    #status-dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; display: inline-block; margin-right: 6px; animation: pulse-delay 1s ease-in-out infinite; }
+    #status-dot.online { background: #34d399; animation: none; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="tv-header">
+  <div class="tv-header-left">
+    <div class="tv-logo-row">
+      <div class="tv-logo-box">R</div>
+      <div>
+        <div class="tv-app-name">DOCK <span>QUEUE</span></div>
+      </div>
+    </div>
+    <div class="tv-date-badge">
+      <span id="status-dot"></span>
+      <span id="status-label">กำลังเชื่อมต่อ...</span>
+      &nbsp;|&nbsp; 📅 <span id="view-date-display">—</span>
+    </div>
+  </div>
+  <div style="text-align:right;">
+    <div class="tv-clock" id="tv-clock">00:00:00</div>
+    <div class="tv-clock-date" id="tv-clock-date">—</div>
+  </div>
+</header>
+
+<!-- BODY -->
+<div class="tv-body">
+  <!-- Left: Dock Board -->
+  <div class="tv-left">
+    <div class="tv-section-header">Live Dock Board (สถานะหน้าท่า)</div>
+    <div class="tv-dock-grid" id="dock-grid">
+      <div style="color:#374151; font-size:1rem; padding:2rem; grid-column:1/-1; text-align:center;">กำลังเชื่อมต่อ Firebase...</div>
+    </div>
+  </div>
+
+  <!-- Right: Waitlist -->
+  <div class="tv-right">
+    <div class="tv-waitlist-header">
+      Waitlist <span class="waitlist-count-badge" id="wl-count">0</span>
+    </div>
+    <div class="tv-waitlist-body" id="wl-body">
+      <div class="tv-empty-wl">ไม่มีคิวรอ</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Firebase Init ─────────────────────────────────────────
+  var firebaseConfig = {
+    apiKey:            "AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
+    authDomain:        "rapo-system.firebaseapp.com",
+    databaseURL:       "https://rapo-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:         "rapo-system",
+    storageBucket:     "rapo-system.firebasestorage.app",
+    messagingSenderId: "87090183469",
+    appId:             "1:87090183469:web:eafb1ded183755f329a7a4"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  var db = firebase.database();
+
+  // ── State ─────────────────────────────────────────────────
+  var bays     = [];
+  var bookings = {};
+  var targetDate = new Date().toISOString().split("T")[0];
+
+  // URL ?date=YYYY-MM-DD
+  var qs = window.location.search.substring(1).split("&");
+  for (var i = 0; i < qs.length; i++) {
+    var pair = qs[i].split("=");
+    if (pair[0] === "date" && pair[1]) targetDate = pair[1];
+  }
+  document.getElementById("view-date-display").textContent = targetDate;
+
+  // ── Clock ─────────────────────────────────────────────────
+  var DAYS_TH = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"];
+  function updateClock() {
+    var n = new Date();
+    var h = String(n.getHours()).padStart(2,"0");
+    var m = String(n.getMinutes()).padStart(2,"0");
+    var s = String(n.getSeconds()).padStart(2,"0");
+    document.getElementById("tv-clock").textContent = h+":"+m+":"+s;
+    document.getElementById("tv-clock-date").textContent =
+      "วัน"+DAYS_TH[n.getDay()]+"ที่ "+n.getDate()+"/"+(n.getMonth()+1)+"/"+n.getFullYear();
+  }
+  setInterval(updateClock, 1000); updateClock();
+
+  // ── Firebase Listeners ────────────────────────────────────
+  db.ref("smartdock/bays").on("value", function(snap) {
+    var data = snap.val();
+    if (!data) { bays = []; render(); return; }
+    bays = Array.isArray(data) ? data.filter(Boolean) : Object.values(data).filter(Boolean);
+    render();
+  });
+
+  db.ref("smartdock/bookings").on("value", function(snap) {
+    bookings = snap.val() || {};
+    document.getElementById("status-dot").className = "online";
+    document.getElementById("status-label").textContent = "ออนไลน์";
+    render();
+  }, function() {
+    document.getElementById("status-dot").className = "";
+    document.getElementById("status-label").textContent = "ขาดการเชื่อมต่อ";
+  });
+
+  // ── Helpers ───────────────────────────────────────────────
+  function getBookingsArray() {
+    return Object.values(bookings).filter(Boolean);
+  }
+  function todayActive() {
+    return getBookingsArray().filter(function(b) {
+      return b.date === targetDate && b.status !== "Completed";
+    });
+  }
+  function dockBookings(bayName) {
+    return todayActive().filter(function(b) { return b.allocation === bayName; });
+  }
+  function waitlistBookings() {
+    return todayActive().filter(function(b) { return b.allocation === "Waitlist"; });
+  }
+  function isDelay(b) {
+    if (!b || b.status === "Completed" || b.status === "Pending") return false;
+    var today = new Date().toISOString().split("T")[0];
+    if (b.date !== today) return false;
+    var n = new Date();
+    var now = String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
+    return now > b.end_time;
+  }
+  var STATUS_LABEL = { Pending:"รอเข้าท่า", Arrived:"รถมาถึง", Loading:"กำลังโหลด", WaitingDoc:"รอเอกสาร" };
+  var STATUS_CLASS = { Arrived:"status-arrived", Loading:"status-loading", WaitingDoc:"status-waitingdoc", Pending:"status-pending" };
+
+  // ── Render ────────────────────────────────────────────────
+  function render() {
+    renderDockGrid();
+    renderWaitlist();
+  }
+
+  function renderDockGrid() {
+    var grid = document.getElementById("dock-grid");
+    if (!bays.length) {
+      grid.innerHTML = '<div style="color:#374151;padding:2rem;grid-column:1/-1;text-align:center;">ยังไม่มีช่องจอด</div>';
+      return;
+    }
+    var html = "";
+    for (var i = 0; i < bays.length; i++) {
+      var bay = bays[i];
+      var bList = dockBookings(bay.name);
+      var b     = bList.length > 0 ? bList[0] : null;
+      var delay = b && isDelay(b);
+      var isBusy = (bay.status === "Busy" || bay.status === "Maintenance");
+      var cardClass = b ? ("occupied"+(delay?" delay":"")) : (isBusy ? "busy" : "");
+
+      if (b) {
+        var statusCls = STATUS_CLASS[b.status] || "status-pending";
+        var statusLbl = STATUS_LABEL[b.status] || b.status;
+        var ioTag = b.job_type === "OUT"
+          ? '<span class="tv-tag tv-tag-out">OUT</span>'
+          : '<span class="tv-tag tv-tag-in">IN</span>';
+        html += '<div class="tv-dock-card ' + cardClass + '">';
+        if (delay) {
+          html += '<div style="background:#7f1d1d;color:#fca5a5;font-size:0.65rem;font-weight:700;padding:3px;text-align:center;" class="delay-text">⚠️ DELAY — เกินเวลา Plan</div>';
+        }
+        html += '<div class="tv-card-head">';
+        html += '<span class="tv-card-dock-name">' + bay.name + '</span>';
+        html += '<span class="tv-card-status ' + statusCls + '">' + statusLbl + '</span>';
+        html += '</div>';
+        html += '<div class="tv-card-body">';
+        html += '<div class="tv-card-do">' + b.shipment_no + '</div>';
+        html += '<div class="tv-card-license">' + b.license_plate + '</div>';
+        html += '<div class="tv-card-vendor">' + (b.vendor || "") + '</div>';
+        html += '<div class="tv-card-tags">';
+        html += '<span class="tv-tag tv-tag-vehicle">' + (b.vehicle || "—") + '</span>';
+        html += ioTag;
+        html += '</div>';
+        html += '</div>';
+        html += '<div class="tv-card-footer">';
+        html += '<span>Plan ออก: <b>' + b.end_time + '</b></span>';
+        html += '<span>มาถึง: <b>' + (b.time_arrived || "—") + '</b></span>';
+        html += '</div>';
+      } else {
+        html += '<div class="tv-dock-card ' + cardClass + '">';
+        html += '<div class="tv-card-head">';
+        html += '<span class="tv-card-dock-name">' + bay.name + '</span>';
+        html += isBusy
+          ? '<span style="font-size:0.65rem;color:#ef4444;font-weight:700;">CLOSED</span>'
+          : '<span style="font-size:0.65rem;color:#1e3a5f;font-weight:700;">EMPTY</span>';
+        html += '</div>';
+        html += '<div class="tv-empty-bay">';
+        html += isBusy ? (bay.status === "Maintenance" ? "🔧 ซ่อมบำรุง" : "⚠️ ปิดชั่วคราว") : "✅ ว่าง";
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    grid.innerHTML = html;
+  }
+
+  function renderWaitlist() {
+    var list = waitlistBookings();
+    document.getElementById("wl-count").textContent = list.length;
+    var el = document.getElementById("wl-body");
+    if (!list.length) {
+      el.innerHTML = '<div class="tv-empty-wl">ไม่มีคิวรอในระบบ</div>';
+      return;
+    }
+    var html = "";
+    for (var i = 0; i < list.length; i++) {
+      var b = list[i];
+      var ioClass = b.job_type === "OUT" ? "wl-type-out" : "wl-type-in";
+      var ioText  = b.job_type === "OUT" ? "OUT" : "IN";
+      html += '<div class="wl-row">';
+      html += '<div class="wl-num">' + (i+1) + '</div>';
+      html += '<div class="wl-info">';
+      html += '<div class="wl-license">' + b.license_plate + '</div>';
+      html += '<div class="wl-do">' + b.shipment_no + '</div>';
+      if (b.target_dock) {
+        html += '<div class="wl-target">รอ ' + b.target_dock + '</div>';
+      }
+      html += '</div>';
+      html += '<span class="wl-type ' + ioClass + '">' + ioText + '</span>';
+      html += '<div class="wl-time">' + b.start_time + '</div>';
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  }
+
+  // ── Auto-scroll Waitlist ──────────────────────────────────
+  var scrollDir = 1;
+  setInterval(function() {
+    var wl = document.getElementById("wl-body");
+    if (wl.scrollHeight <= wl.clientHeight) return;
+    wl.scrollTop += scrollDir;
+    if (wl.scrollTop + wl.clientHeight >= wl.scrollHeight - 2) {
+      scrollDir = -1;
+      setTimeout(function() { scrollDir = 1; }, 2000);
+    }
+    if (wl.scrollTop <= 0) scrollDir = 1;
+  }, 40);
+
+  // ── Auto-reload every 2 hours (ป้องกันทีวีค้าง) ──────────
+  setTimeout(function() { window.location.reload(); }, 2 * 60 * 60 * 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stock Take - RAPO</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#021D49">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .progress-bar { height: 8px; background: #e2e8f0; border-radius: 10px; overflow: hidden; margin-top: 6px; }
+    .progress-fill { height: 100%; border-radius: 10px; background: var(--indigo); transition: width 0.4s; }
+    .sku-card { border: 1.5px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem; background: white; }
+    .sku-card.counted { border-color: var(--green); background: #f0fdf4; }
+    .sku-card.missing { border-color: var(--red); background: #fef2f2; }
+    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
+    #toast.show { transform:translateX(-50%) translateY(0); }
+    .loc-card { border:1.5px solid var(--border); border-radius:12px; padding:1rem; background:white; cursor:pointer; transition:all 0.2s; }
+    .loc-card:hover { border-color:var(--indigo); box-shadow:0 4px 12px rgba(99,102,241,0.1); }
+    .loc-card.active { border-color:var(--indigo); background:#eef2ff; }
+    .loc-card.finished { border-color:var(--green); background:#f0fdf4; }
+  </style>
+</head>
+<body>
+
+<div id="topbar-placeholder"></div>
+<div class="page-body">
+
+  <!-- Step 1: เลือก Location -->
+  <div id="step-location">
+    <div class="card">
+      <div class="card-title">🎯 เริ่มงานนับสต็อก</div>
+      <div class="alert alert-info" style="margin-bottom:1rem;">
+        สแกน QR Code หรือพิมพ์ Location เพื่อเริ่มนับสต็อก
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <input type="text" id="loc-input" placeholder="เช่น Shelf A1, Zone B" autocomplete="off" style="font-size:1.1rem; text-transform:uppercase;">
+      </div>
+      <button class="btn btn-primary btn-full" id="btn-start-loc">เริ่มนับ Location นี้ ▶</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 งานที่ได้รับมอบหมาย</div>
+      <div id="my-jobs-list">
+        <div class="spinner-wrap"><div class="spinner"></div><span>กำลังโหลด...</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: หน้านับสต็อก -->
+  <div id="step-count" style="display:none">
+    <div class="card" style="position:sticky; top:60px; z-index:50; margin-bottom:0.75rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <div>
+          <div style="font-size:0.8rem; color:var(--gray);">📍 Location</div>
+          <div style="font-size:1.2rem; font-weight:700; color:var(--blue)" id="current-loc-title">—</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:0.8rem; color:var(--gray);">ความคืบหน้า</div>
+          <div id="count-progress" style="font-weight:700; color:var(--indigo);">0 / 0</div>
+        </div>
+      </div>
+      <div class="progress-bar" style="margin-top:0.5rem;"><div class="progress-fill" id="count-progress-bar" style="width:0%"></div></div>
+    </div>
+
+    <!-- Mode Selector -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-mode="tag">🏷️ โหมด Tag (สแกน)</button>
+      <button class="tab-btn" data-mode="normal">📝 โหมดกรอกจำนวน</button>
+    </div>
+
+    <!-- Mode: Tag -->
+    <div id="mode-tag">
+      <div class="card">
+        <div class="card-title" style="font-size:0.9rem">สแกน SKU → เลือก Tag</div>
+        <div class="form-group">
+          <label>SKU</label>
+          <input type="text" id="tag-sku" placeholder="สแกนหรือพิมพ์ SKU" autocomplete="off">
+          <div id="tag-sku-dd" style="display:none; border:1.5px solid var(--border); border-radius:10px; background:white; margin-top:4px; max-height:180px; overflow-y:auto; box-shadow:var(--shadow);"></div>
+        </div>
+        <div id="tag-list" style="display:none;">
+          <div class="form-group">
+            <label>เลือก Tag ที่นับ</label>
+            <div id="tag-buttons" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.25rem;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode: Normal -->
+    <div id="mode-normal" style="display:none">
+      <div id="normal-items"></div>
+      <button class="btn btn-primary btn-full" id="btn-save-normal">💾 บันทึกผลการนับ</button>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex; gap:0.75rem; margin-top:0.5rem;">
+      <button class="btn btn-outline" id="btn-back-loc" style="flex:1">← กลับ</button>
+      <button class="btn btn-green" id="btn-finish-job" style="flex:1">🏁 จบงาน Location นี้</button>
+    </div>
+
+    <!-- นับแล้ว -->
+    <div class="card" style="margin-top:1rem;">
+      <div class="card-title" style="font-size:0.9rem">✅ นับแล้ว</div>
+      <div id="counted-items"></div>
+    </div>
+  </div>
+
+</div>
+<div id="toast">—</div>
+
+<script type="module">
+  import { auth, db } from "./firebase-config.js";
+  import { requireAuth } from "./auth.js";
+  import {
+    collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
+    deleteDoc, query, orderBy, where, onSnapshot, serverTimestamp, writeBatch
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  let currentUser, currentProfile;
+  let currentJob = null, currentLoc = "", locationProducts = [];
+
+  const { user, profile } = await requireAuth();
+  currentUser = user; currentProfile = profile;
+
+  document.getElementById("topbar-placeholder").innerHTML = `
+    <nav class="topbar">
+      <a class="topbar-back" href="index.html">←</a>
+      <div style="flex:1">
+        <div class="topbar-title">📝 Stock Take</div>
+        <div class="topbar-sub">นับสต็อกประจำรอบ</div>
+      </div>
+      <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
+    </nav>`;
+
+  function toast(msg, d=2500) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), d);
+  }
+
+  // ── Load My Jobs ──────────────────────────────────────────
+  onSnapshot(collection(db, "stock_take_jobs"), snap => {
+    const jobs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const myJobs = profile.role === "admin" ? jobs : jobs.filter(j => j.assigned_to === profile.name);
+    const el = document.getElementById("my-jobs-list");
+    if (!myJobs.length) {
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>ยังไม่มีงานที่ได้รับมอบหมาย</p></div>`;
+      return;
+    }
+    el.innerHTML = myJobs.map(j => {
+      const cls = j.status === "Finished" ? "finished" : j.status === "Counting" ? "active" : "";
+      const badge = j.status === "Finished"
+        ? `<span class="badge badge-green">เสร็จแล้ว</span>`
+        : j.status === "Counting"
+          ? `<span class="badge badge-indigo">กำลังนับ</span>`
+          : `<span class="badge badge-gray">ยังไม่เริ่ม</span>`;
+      return `<div class="loc-card ${cls}" onclick="startLocation('${j.location}','${j.id}')">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div><div style="font-weight:700; font-size:1rem;">📍 ${j.location}</div>
+          <div style="font-size:0.8rem; color:var(--gray); margin-top:2px;">มอบหมาย: ${j.assigned_to || "ทุกคน"}</div></div>
+          ${badge}
+        </div>
+      </div>`;
+    }).join("");
+  });
+
+  // ── Start Location ────────────────────────────────────────
+  document.getElementById("btn-start-loc").addEventListener("click", async () => {
+    const loc = document.getElementById("loc-input").value.trim().toUpperCase();
+    if (!loc) { toast("⚠️ กรุณาระบุ Location"); return; }
+    await startLocation(loc, null);
+  });
+
+  window.startLocation = async (loc, jobId) => {
+    currentLoc = loc;
+    document.getElementById("current-loc-title").textContent = loc;
+
+    // หา Job หรือสร้างใหม่
+    const jobsSnap = await getDocs(query(collection(db, "stock_take_jobs"), where("location", "==", loc)));
+    if (jobsSnap.empty) {
+      // สร้าง Job ใหม่
+      const ref = await addDoc(collection(db, "stock_take_jobs"), {
+        location: loc,
+        assigned_to: profile.name,
+        status: "Counting",
+        start_time: serverTimestamp(),
+        end_time: null
+      });
+      currentJob = { id: ref.id, location: loc, status: "Counting" };
+    } else {
+      currentJob = { id: jobsSnap.docs[0].id, ...jobsSnap.docs[0].data() };
+      if (currentJob.status !== "Finished") {
+        await updateDoc(doc(db, "stock_take_jobs", currentJob.id), { status: "Counting", start_time: serverTimestamp() });
+      }
+    }
+
+    // โหลดสินค้าใน Location
+    const pSnap = await getDocs(query(collection(db, "products"), where("location", "==", loc)));
+    locationProducts = pSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => a.id.localeCompare(b.id));
+
+    document.getElementById("step-location").style.display = "none";
+    document.getElementById("step-count").style.display = "block";
+    renderCountView();
+    setupTagSearch();
+    renderNormalMode();
+  };
+
+  function renderCountView() {
+    const counted = locationProducts.filter(p => p.last_audit_date);
+    const pct = locationProducts.length > 0 ? Math.round((counted.length / locationProducts.length) * 100) : 0;
+    document.getElementById("count-progress").textContent = `${counted.length} / ${locationProducts.length}`;
+    document.getElementById("count-progress-bar").style.width = `${pct}%`;
+    // รายการที่นับแล้ว
+    const el = document.getElementById("counted-items");
+    if (!counted.length) { el.innerHTML = `<div style="color:var(--gray); font-size:0.875rem;">ยังไม่มีรายการ</div>`; return; }
+    el.innerHTML = counted.map(p => `
+      <div class="sku-card counted">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div><div style="font-weight:700">${p.id} — ${p.name}</div>
+          <div style="font-size:0.8rem; color:var(--gray);">Tag: ${p.tag||"—"}</div></div>
+          <div style="font-weight:700; color:var(--green);">✅ ${p.audit_qty_actual ?? "—"} ${p.unit}</div>
+        </div>
+      </div>`).join("");
+  }
+
+  // ── Tag Mode ──────────────────────────────────────────────
+  function setupTagSearch() {
+    const input = document.getElementById("tag-sku");
+    const dd    = document.getElementById("tag-sku-dd");
+    input.addEventListener("input", () => {
+      const q = input.value.toLowerCase();
+      document.getElementById("tag-list").style.display = "none";
+      if (!q) { dd.style.display = "none"; return; }
+      const filtered = locationProducts.filter(p =>
+        p.id.toLowerCase().includes(q) || (p.name||"").toLowerCase().includes(q)
+      ).slice(0, 8);
+      if (!filtered.length) { dd.style.display = "none"; return; }
+      const skus = [...new Set(filtered.map(p => p.id))];
+      dd.innerHTML = skus.map(sku => {
+        const items = locationProducts.filter(p => p.id === sku);
+        return `<div style="padding:0.65rem 1rem; cursor:pointer; border-bottom:1px solid var(--border);"
+             onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"
+             onclick="selectSKU('${sku}')">
+          <div style="font-weight:700;">${sku}</div>
+          <div style="font-size:0.78rem; color:var(--gray);">${items[0]?.name || ""} | Tags: ${items.map(i=>i.tag||"—").join(", ")}</div>
+        </div>`;
+      }).join("");
+      dd.style.display = "block";
+    });
+    document.addEventListener("click", e => {
+      if (!input.contains(e.target) && !dd.contains(e.target)) dd.style.display = "none";
+    });
+  }
+
+  window.selectSKU = (sku) => {
+    document.getElementById("tag-sku").value = sku;
+    document.getElementById("tag-sku-dd").style.display = "none";
+    const items = locationProducts.filter(p => p.id === sku && !p.last_audit_date);
+    if (!items.length) { toast("✅ SKU นี้นับครบแล้ว"); return; }
+    const tags = [...new Set(items.map(p => p.tag).filter(Boolean))];
+    if (!tags.length) { window.confirmTagCount(sku, null); return; }
+    document.getElementById("tag-list").style.display = "block";
+    document.getElementById("tag-buttons").innerHTML = tags.map(tag => `
+      <button class="btn btn-indigo btn-sm" onclick="confirmTagCount('${sku}','${tag}')">${tag}</button>`).join("");
+  };
+
+  window.confirmTagCount = async (sku, tag) => {
+    const targets = locationProducts.filter(p =>
+      p.id === sku && (tag ? p.tag === tag : true) && !p.last_audit_date
+    );
+    if (!targets.length) { toast("✅ นับครบแล้ว"); return; }
+    const batch = writeBatch(db);
+    targets.forEach(p => {
+      batch.update(doc(db, "products", p.id), {
+        last_audit_date: new Date().toISOString(),
+        audit_qty_actual: p.quantity
+      });
+      p.last_audit_date = new Date().toISOString();
+      p.audit_qty_actual = p.quantity;
+    });
+    await batch.commit();
+    document.getElementById("tag-sku").value = "";
+    document.getElementById("tag-list").style.display = "none";
+    toast(`✅ นับ SKU ${sku} Tag ${tag||"—"} แล้ว (${targets.length} รายการ)`);
+    renderCountView();
+    renderNormalMode();
+  };
+
+  // ── Normal Mode ───────────────────────────────────────────
+  function renderNormalMode() {
+    const el = document.getElementById("normal-items");
+    const uncounted = locationProducts.filter(p => !p.last_audit_date);
+    if (!uncounted.length) {
+      el.innerHTML = `<div class="alert alert-success">✅ นับครบทุกรายการใน Location นี้แล้ว!</div>`;
+      return;
+    }
+    el.innerHTML = uncounted.map(p => `
+      <div class="sku-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem;">
+          <div style="flex:1;">
+            <div style="font-weight:700">${p.id}</div>
+            <div style="font-size:0.85rem; color:var(--gray);">${p.name} ${p.tag ? `| Tag: ${p.tag}` : ""}</div>
+            <div style="font-size:0.8rem; color:var(--gray);">ระบบ: ${p.quantity} ${p.unit}</div>
+          </div>
+          <input type="number" class="form-group" min="0" placeholder="จำนวน" style="width:90px; padding:0.5rem; border:1.5px solid var(--border); border-radius:8px; font-family:Sarabun,sans-serif; text-align:center;" data-sku="${p.id}" id="nqty-${p.id}">
+        </div>
+      </div>`).join("");
+  }
+
+  document.getElementById("btn-save-normal").addEventListener("click", async () => {
+    const batch = writeBatch(db);
+    let count = 0;
+    locationProducts.filter(p => !p.last_audit_date).forEach(p => {
+      const input = document.getElementById(`nqty-${p.id}`);
+      if (!input || input.value === "") return;
+      const qty = parseInt(input.value);
+      batch.update(doc(db, "products", p.id), {
+        last_audit_date: new Date().toISOString(),
+        audit_qty_actual: qty
+      });
+      p.last_audit_date = new Date().toISOString();
+      p.audit_qty_actual = qty;
+      count++;
+    });
+    if (!count) { toast("⚠️ ยังไม่ได้กรอกจำนวน"); return; }
+    await batch.commit();
+    toast(`✅ บันทึก ${count} รายการเรียบร้อย`);
+    renderCountView(); renderNormalMode();
+  });
+
+  // ── Tab Mode Switch ───────────────────────────────────────
+  document.querySelectorAll("[data-mode]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-mode]").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const mode = btn.dataset.mode;
+      document.getElementById("mode-tag").style.display    = mode === "tag"    ? "block" : "none";
+      document.getElementById("mode-normal").style.display = mode === "normal" ? "block" : "none";
+    });
+  });
+
+  // ── Finish Job ────────────────────────────────────────────
+  document.getElementById("btn-finish-job").addEventListener("click", async () => {
+    if (!confirm(`จบงาน Location "${currentLoc}" แน่ใจหรือไม่?\nหลังจบแล้วจะไม่สามารถแก้ไขได้`)) return;
+    await updateDoc(doc(db, "stock_take_jobs", currentJob.id), {
+      status: "Finished",
+      end_time: serverTimestamp()
+    });
+    toast("🏁 จบงานเรียบร้อย!");
+    setTimeout(() => {
+      document.getElementById("step-count").style.display    = "none";
+      document.getElementById("step-location").style.display = "block";
+    }, 1000);
+  });
+
+  document.getElementById("btn-back-loc").addEventListener("click", () => {
+    document.getElementById("step-count").style.display    = "none";
+    document.getElementById("step-location").style.display = "block";
+  });
+</script>
+</body>
+</html>

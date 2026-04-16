@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>คู่มือการทำงาน WI - RAPO</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#021D49">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .wi-card { background:white; border:1.5px solid var(--border); border-radius:14px; padding:1.25rem; display:flex; align-items:center; gap:1rem; text-decoration:none; color:inherit; transition:all 0.25s; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+    .wi-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,0.1); border-color:var(--indigo); }
+    .wi-icon { width:52px; height:52px; background:#eef2ff; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0; }
+    .wi-title { font-weight:700; font-size:0.95rem; color:var(--blue); line-height:1.3; }
+    .wi-sub   { font-size:0.8rem; color:var(--gray); margin-top:2px; }
+    .wi-arrow { margin-left:auto; color:var(--indigo); font-size:1.2rem; flex-shrink:0; }
+    .wi-grid  { display:flex; flex-direction:column; gap:0.75rem; }
+    .add-form { display:none; }
+    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
+    #toast.show { transform:translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+
+<div id="topbar-placeholder"></div>
+<div class="page-body">
+
+  <!-- Search -->
+  <div class="search-bar" style="margin-bottom:1rem;">
+    <input type="text" id="wi-search" placeholder="ค้นหาคู่มือ...">
+  </div>
+
+  <!-- Admin: Add/Manage -->
+  <div id="admin-controls" style="display:none; margin-bottom:1rem;">
+    <button class="btn btn-primary btn-sm" id="btn-toggle-add">➕ เพิ่มเอกสาร WI</button>
+    <div class="add-form card" id="add-form" style="margin-top:0.75rem;">
+      <div class="card-title">➕ เพิ่มเอกสาร WI ใหม่</div>
+      <div class="form-group">
+        <label>รหัสเอกสาร (เช่น RAPO-W002)</label>
+        <input type="text" id="wi-code" placeholder="RAPO-W002">
+      </div>
+      <div class="form-group">
+        <label>ชื่อเอกสาร</label>
+        <input type="text" id="wi-title" placeholder="ชื่อเอกสาร WI">
+      </div>
+      <div class="form-group">
+        <label>คำอธิบาย (ไม่บังคับ)</label>
+        <input type="text" id="wi-desc" placeholder="คำอธิบายสั้นๆ">
+      </div>
+      <div class="form-group">
+        <label>หมวดหมู่</label>
+        <select id="wi-cat">
+          <option value="general">ทั่วไป</option>
+          <option value="safety">ความปลอดภัย</option>
+          <option value="quality">คุณภาพ</option>
+          <option value="operation">การปฏิบัติงาน</option>
+          <option value="it">IT</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>ลิงก์เอกสาร (Google Drive / URL)</label>
+        <input type="url" id="wi-link" placeholder="https://drive.google.com/...">
+      </div>
+      <div style="display:flex; gap:0.75rem;">
+        <button class="btn btn-primary" id="btn-save-wi">💾 บันทึก</button>
+        <button class="btn btn-outline" id="btn-cancel-wi">ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Filter -->
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;" id="cat-filter-row">
+    <button class="filter-chip active" data-cat="all" style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">ทั้งหมด</button>
+    <button class="filter-chip" data-cat="general"   style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">ทั่วไป</button>
+    <button class="filter-chip" data-cat="safety"    style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">ความปลอดภัย</button>
+    <button class="filter-chip" data-cat="quality"   style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">คุณภาพ</button>
+    <button class="filter-chip" data-cat="operation" style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">การปฏิบัติงาน</button>
+    <button class="filter-chip" data-cat="it"        style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">IT</button>
+  </div>
+
+  <!-- WI List -->
+  <div class="wi-grid" id="wi-list">
+    <div class="spinner-wrap"><div class="spinner"></div><span>กำลังโหลด...</span></div>
+  </div>
+
+</div>
+<div id="toast">—</div>
+
+<script type="module">
+  import { auth, db } from "./firebase-config.js";
+  import { requireAuth } from "./auth.js";
+  import {
+    collection, doc, getDocs, setDoc, deleteDoc,
+    query, orderBy, onSnapshot, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  let currentUser, currentProfile;
+  let allDocs = [];
+  let searchQ = "", catFilter = "all";
+
+  const { user, profile } = await requireAuth();
+  currentUser = user; currentProfile = profile;
+
+  document.getElementById("topbar-placeholder").innerHTML = `
+    <nav class="topbar">
+      <a class="topbar-back" href="index.html">←</a>
+      <div style="flex:1">
+        <div class="topbar-title">📄 คู่มือการทำงาน (WI)</div>
+        <div class="topbar-sub">Work Instructions</div>
+      </div>
+      <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
+    </nav>`;
+
+  if (profile.role === "admin") {
+    document.getElementById("admin-controls").style.display = "block";
+  }
+
+  const CAT_ICONS = { general:"📄", safety:"⛑️", quality:"✅", operation:"⚙️", it:"💻" };
+  const CAT_LABELS = { general:"ทั่วไป", safety:"ความปลอดภัย", quality:"คุณภาพ", operation:"การปฏิบัติงาน", it:"IT" };
+
+  function toast(msg, d=2500) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), d);
+  }
+
+  // ── Load WI Documents ─────────────────────────────────────
+  // Seed default WI if empty
+  async function seedDefaultWI() {
+    const defaults = [
+      { id: "RAPO-W001", title: "RAPO-W001 CCTV Control", desc: "การควบคุมระบบ CCTV", category: "it", link: "https://drive.google.com/file/d/1Cr18uIIyFomMzAuF1VLcu3PVdxVvr5p4/view?usp=sharing" }
+    ];
+    for (const d of defaults) {
+      await setDoc(doc(db, "wi_documents", d.id), {
+        title: d.title, desc: d.desc || "", category: d.category || "general",
+        link: d.link, sort_order: 0, created_at: serverTimestamp()
+      }, { merge: true });
+    }
+  }
+
+  onSnapshot(query(collection(db, "wi_documents"), orderBy("sort_order"), orderBy("title")), snap => {
+    if (snap.empty) {
+      seedDefaultWI();
+      return;
+    }
+    allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderList();
+  });
+
+  function renderList() {
+    const q = searchQ.toLowerCase();
+    let data = allDocs.filter(d =>
+      (d.title||"").toLowerCase().includes(q) || (d.desc||"").toLowerCase().includes(q)
+    );
+    if (catFilter !== "all") data = data.filter(d => d.category === catFilter);
+
+    const el = document.getElementById("wi-list");
+    if (!data.length) {
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>ไม่พบเอกสาร WI</p></div>`;
+      return;
+    }
+    el.innerHTML = data.map(d => {
+      const icon  = CAT_ICONS[d.category]  || "📄";
+      const label = CAT_LABELS[d.category] || "ทั่วไป";
+      const adminBtn = profile.role === "admin"
+        ? `<button onclick="deleteWI('${d.id}','${d.title.replace(/'/g,"")}')" style="background:#fef2f2; border:none; border-radius:7px; padding:0.3rem 0.5rem; cursor:pointer; color:var(--red); font-size:0.85rem; margin-left:0.25rem; flex-shrink:0;">🗑️</button>`
+        : "";
+      return `<div style="display:flex; align-items:center; gap:0.5rem;">
+        <a href="${d.link}" target="_blank" rel="noopener" class="wi-card" style="flex:1;">
+          <div class="wi-icon">${icon}</div>
+          <div>
+            <div class="wi-title">${d.title}</div>
+            <div class="wi-sub">${label}${d.desc ? " · " + d.desc : ""}</div>
+          </div>
+          <span class="wi-arrow">→</span>
+        </a>
+        ${adminBtn}
+      </div>`;
+    }).join("");
+  }
+
+  // ── Search & Filter ───────────────────────────────────────
+  document.getElementById("wi-search").addEventListener("input", e => { searchQ = e.target.value; renderList(); });
+
+  document.querySelectorAll(".filter-chip").forEach(c => {
+    c.addEventListener("click", () => {
+      document.querySelectorAll(".filter-chip").forEach(x => {
+        x.style.background = "white";
+        x.style.color      = "var(--gray)";
+        x.style.borderColor = "var(--border)";
+      });
+      c.style.background   = "var(--blue)";
+      c.style.color        = "white";
+      c.style.borderColor  = "var(--blue)";
+      catFilter = c.dataset.cat;
+      renderList();
+    });
+  });
+
+  // ── Admin: Add/Delete ─────────────────────────────────────
+  document.getElementById("btn-toggle-add").addEventListener("click", () => {
+    const form = document.getElementById("add-form");
+    form.style.display = form.style.display === "none" ? "block" : "none";
+  });
+  document.getElementById("btn-cancel-wi").addEventListener("click", () => {
+    document.getElementById("add-form").style.display = "none";
+  });
+
+  document.getElementById("btn-save-wi").addEventListener("click", async () => {
+    const code  = document.getElementById("wi-code").value.trim();
+    const title = document.getElementById("wi-title").value.trim();
+    const link  = document.getElementById("wi-link").value.trim();
+    if (!code || !title || !link) { toast("⚠️ กรุณากรอก รหัส, ชื่อ, และ Link"); return; }
+    await setDoc(doc(db, "wi_documents", code), {
+      title: `${code} ${title}`,
+      desc:  document.getElementById("wi-desc").value.trim(),
+      category: document.getElementById("wi-cat").value,
+      link, sort_order: allDocs.length, created_at: serverTimestamp()
+    });
+    toast(`✅ เพิ่มเอกสาร ${code} เรียบร้อย`);
+    ["wi-code","wi-title","wi-desc","wi-link"].forEach(id => document.getElementById(id).value = "");
+    document.getElementById("add-form").style.display = "none";
+  });
+
+  window.deleteWI = async (id, title) => {
+    if (!confirm(`ลบเอกสาร "${title}" แน่ใจหรือไม่?`)) return;
+    await deleteDoc(doc(db, "wi_documents", id));
+    toast(`🗑️ ลบ ${title} เรียบร้อย`);
+  };
+</script>
+</body>
+</html>
