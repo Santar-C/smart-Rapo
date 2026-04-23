@@ -9,98 +9,158 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared.css">
   <style>
-    .wi-card { background:white; border:1.5px solid var(--border); border-radius:14px; padding:1.25rem; display:flex; align-items:center; gap:1rem; text-decoration:none; color:inherit; transition:all 0.25s; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
-    .wi-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(0,0,0,0.1); border-color:var(--indigo); }
-    .wi-icon { width:52px; height:52px; background:#eef2ff; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.5rem; flex-shrink:0; }
-    .wi-title { font-weight:700; font-size:0.95rem; color:var(--blue); line-height:1.3; }
-    .wi-sub   { font-size:0.8rem; color:var(--gray); margin-top:2px; }
-    .wi-arrow { margin-left:auto; color:var(--indigo); font-size:1.2rem; flex-shrink:0; }
-    .wi-grid  { display:flex; flex-direction:column; gap:0.75rem; }
-    .add-form { display:none; }
-    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
+    .wi-card { background:white; border:1.5px solid var(--border); border-radius:14px; overflow:hidden; transition:all 0.2s; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+    .wi-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.08); border-color:var(--indigo); }
+    .wi-card-header { padding:0.75rem 1rem; display:flex; align-items:center; gap:0.75rem; border-bottom:1px solid var(--border); background:#fafafa; }
+    .wi-icon { width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0; }
+    .wi-icon.pdf   { background:#fef2f2; }
+    .wi-icon.link  { background:#eff6ff; }
+    .wi-icon.drive { background:#f0fdf4; }
+    .wi-card-body  { padding:0.75rem 1rem; }
+    .wi-card-title { font-weight:700; font-size:0.95rem; color:var(--blue); line-height:1.3; }
+    .wi-card-sub   { font-size:0.78rem; color:var(--gray); margin-top:2px; }
+    .wi-card-foot  { padding:0.6rem 1rem; border-top:1px solid var(--border); display:flex; gap:0.5rem; align-items:center; background:#fafafa; }
+    /* Upload progress */
+    .upload-bar { height:6px; background:#e2e8f0; border-radius:10px; overflow:hidden; margin-top:6px; }
+    .upload-bar-fill { height:100%; background:var(--indigo); border-radius:10px; transition:width 0.3s; }
+    /* PDF Viewer Modal */
+    .pdf-viewer-bg { position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:9998; display:flex; flex-direction:column; }
+    .pdf-viewer-toolbar { background:#1e293b; padding:0.75rem 1rem; display:flex; align-items:center; gap:0.75rem; flex-shrink:0; }
+    .pdf-viewer-toolbar span { color:white; font-size:0.9rem; font-weight:600; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pdf-viewer-toolbar button { background:rgba(255,255,255,0.15); border:none; color:white; padding:0.4rem 0.75rem; border-radius:7px; font-size:0.85rem; cursor:pointer; font-family:Sarabun,sans-serif; }
+    .pdf-viewer-toolbar button:hover { background:rgba(255,255,255,0.25); }
+    .pdf-frame { flex:1; border:none; background:white; }
+    /* Search/filter */
+    .filter-chip { padding:0.3rem 0.8rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s; }
+    .filter-chip.active { background:var(--blue); color:white; border-color:var(--blue); }
+    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); white-space:nowrap; }
     #toast.show { transform:translateX(-50%) translateY(0); }
+    #toast.ok  { background:#16a34a; }
+    #toast.err { background:#dc2626; }
   </style>
 </head>
 <body>
-
 <div id="topbar-placeholder"></div>
 <div class="page-body">
 
-  <!-- Search -->
-  <div class="search-bar" style="margin-bottom:1rem;">
+  <!-- Search + Filter -->
+  <div class="search-bar" style="margin-bottom:0.75rem;">
     <input type="text" id="wi-search" placeholder="ค้นหาคู่มือ...">
   </div>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;" id="cat-row">
+    <button class="filter-chip active" data-cat="all">ทั้งหมด</button>
+    <button class="filter-chip" data-cat="general">ทั่วไป</button>
+    <button class="filter-chip" data-cat="safety">ความปลอดภัย</button>
+    <button class="filter-chip" data-cat="quality">คุณภาพ</button>
+    <button class="filter-chip" data-cat="operation">การปฏิบัติงาน</button>
+    <button class="filter-chip" data-cat="it">IT</button>
+  </div>
 
-  <!-- Admin: Add/Manage -->
-  <div id="admin-controls" style="display:none; margin-bottom:1rem;">
-    <button class="btn btn-primary btn-sm" id="btn-toggle-add">➕ เพิ่มเอกสาร WI</button>
-    <div class="add-form card" id="add-form" style="margin-top:0.75rem;">
+  <!-- Admin Controls -->
+  <div id="admin-area" style="display:none; margin-bottom:1rem;">
+    <button class="btn btn-primary btn-sm" id="btn-toggle-form">➕ เพิ่มเอกสาร WI</button>
+
+    <!-- Add Form (2-in-1: Upload PDF หรือวาง Link) -->
+    <div id="add-form" class="card" style="display:none; margin-top:0.75rem;">
       <div class="card-title">➕ เพิ่มเอกสาร WI ใหม่</div>
-      <div class="form-group">
-        <label>รหัสเอกสาร (เช่น RAPO-W002)</label>
-        <input type="text" id="wi-code" placeholder="RAPO-W002">
+
+      <!-- เลือกประเภท -->
+      <div style="display:flex; background:#f1f5f9; border-radius:10px; padding:0.3rem; margin-bottom:1rem; gap:0.25rem;">
+        <label style="flex:1;text-align:center;padding:0.5rem;border-radius:8px;cursor:pointer;font-size:0.88rem;font-weight:700;transition:all 0.2s;" id="lbl-upload">
+          <input type="radio" name="wi-type" value="upload" checked style="display:none;" id="radio-upload"> 📄 อัปโหลด PDF
+        </label>
+        <label style="flex:1;text-align:center;padding:0.5rem;border-radius:8px;cursor:pointer;font-size:0.88rem;font-weight:700;transition:all 0.2s;" id="lbl-link">
+          <input type="radio" name="wi-type" value="link" style="display:none;" id="radio-link"> 🔗 วาง Link
+        </label>
       </div>
-      <div class="form-group">
-        <label>ชื่อเอกสาร</label>
-        <input type="text" id="wi-title" placeholder="ชื่อเอกสาร WI">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>รหัสเอกสาร (เช่น RAPO-W002) <span style="color:red">*</span></label>
+          <input type="text" id="wi-code" placeholder="RAPO-W002">
+        </div>
+        <div class="form-group">
+          <label>ชื่อเอกสาร <span style="color:red">*</span></label>
+          <input type="text" id="wi-title-input" placeholder="ชื่อเอกสาร">
+        </div>
+        <div class="form-group">
+          <label>หมวดหมู่</label>
+          <select id="wi-cat-sel">
+            <option value="general">ทั่วไป</option>
+            <option value="safety">ความปลอดภัย</option>
+            <option value="quality">คุณภาพ</option>
+            <option value="operation">การปฏิบัติงาน</option>
+            <option value="it">IT</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>คำอธิบาย (ไม่บังคับ)</label>
+          <input type="text" id="wi-desc" placeholder="คำอธิบายสั้นๆ">
+        </div>
       </div>
-      <div class="form-group">
-        <label>คำอธิบาย (ไม่บังคับ)</label>
-        <input type="text" id="wi-desc" placeholder="คำอธิบายสั้นๆ">
+
+      <!-- PDF Upload -->
+      <div id="upload-area">
+        <div class="form-group">
+          <label>เลือกไฟล์ PDF <span style="color:red">*</span></label>
+          <input type="file" id="wi-pdf-file" accept=".pdf,application/pdf">
+        </div>
+        <div id="upload-progress-wrap" style="display:none;">
+          <div style="font-size:0.82rem; color:var(--indigo); margin-bottom:4px;">กำลังอัปโหลด... <span id="upload-pct">0</span>%</div>
+          <div class="upload-bar"><div class="upload-bar-fill" id="upload-bar-fill" style="width:0%"></div></div>
+        </div>
       </div>
-      <div class="form-group">
-        <label>หมวดหมู่</label>
-        <select id="wi-cat">
-          <option value="general">ทั่วไป</option>
-          <option value="safety">ความปลอดภัย</option>
-          <option value="quality">คุณภาพ</option>
-          <option value="operation">การปฏิบัติงาน</option>
-          <option value="it">IT</option>
-        </select>
+
+      <!-- Link -->
+      <div id="link-area" style="display:none;">
+        <div class="form-group">
+          <label>URL / Google Drive Link <span style="color:red">*</span></label>
+          <input type="url" id="wi-link-input" placeholder="https://drive.google.com/...">
+        </div>
       </div>
-      <div class="form-group">
-        <label>ลิงก์เอกสาร (Google Drive / URL)</label>
-        <input type="url" id="wi-link" placeholder="https://drive.google.com/...">
-      </div>
-      <div style="display:flex; gap:0.75rem;">
+
+      <div style="display:flex; gap:0.75rem; margin-top:0.5rem;">
         <button class="btn btn-primary" id="btn-save-wi">💾 บันทึก</button>
         <button class="btn btn-outline" id="btn-cancel-wi">ยกเลิก</button>
       </div>
     </div>
   </div>
 
-  <!-- Category Filter -->
-  <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;" id="cat-filter-row">
-    <button class="filter-chip active" data-cat="all" style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">ทั้งหมด</button>
-    <button class="filter-chip" data-cat="general"   style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">ทั่วไป</button>
-    <button class="filter-chip" data-cat="safety"    style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">ความปลอดภัย</button>
-    <button class="filter-chip" data-cat="quality"   style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">คุณภาพ</button>
-    <button class="filter-chip" data-cat="operation" style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">การปฏิบัติงาน</button>
-    <button class="filter-chip" data-cat="it"        style="padding:0.35rem 0.85rem; border-radius:20px; border:1.5px solid var(--border); background:white; font-size:0.8rem; font-family:Sarabun,sans-serif; cursor:pointer; font-weight:600; color:var(--gray); transition:all 0.2s;">IT</button>
-  </div>
-
   <!-- WI List -->
-  <div class="wi-grid" id="wi-list">
+  <div id="wi-list" style="display:grid; gap:0.75rem;">
     <div class="spinner-wrap"><div class="spinner"></div><span>กำลังโหลด...</span></div>
   </div>
 
+</div><!-- end page-body -->
+
+<!-- PDF Viewer Modal -->
+<div id="pdf-viewer" class="pdf-viewer-bg" style="display:none;">
+  <div class="pdf-viewer-toolbar">
+    <span id="pdf-viewer-title">—</span>
+    <a id="pdf-open-tab" href="#" target="_blank" rel="noopener" style="background:rgba(255,255,255,0.15);border:none;color:white;padding:0.4rem 0.75rem;border-radius:7px;font-size:0.85rem;cursor:pointer;text-decoration:none;">↗ เปิดแท็บใหม่</a>
+    <button id="btn-close-pdf">✕ ปิด</button>
+  </div>
+  <iframe id="pdf-frame" class="pdf-frame" title="PDF Viewer"></iframe>
 </div>
+
 <div id="toast">—</div>
 
 <script type="module">
-  import { auth, db } from "./firebase-config.js";
+  import { db, storage } from "./firebase-config.js";
   import { requireAuth } from "./auth.js";
   import {
-    collection, doc, getDocs, setDoc, deleteDoc,
+    collection, doc, setDoc, deleteDoc,
     query, orderBy, onSnapshot, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import {
+    ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-  let currentUser, currentProfile;
-  let allDocs = [];
-  let searchQ = "", catFilter = "all";
+  let currentUser, profile;
+  let allDocs = [], searchQ = "", catFilter = "all";
 
-  const { user, profile } = await requireAuth();
-  currentUser = user; currentProfile = profile;
+  const { user, profile: prof } = await requireAuth();
+  currentUser = user; profile = prof;
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">
@@ -112,46 +172,53 @@
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
     </nav>`;
 
-  if (profile.role === "admin") {
-    document.getElementById("admin-controls").style.display = "block";
-  }
+  if (profile.role === "admin") document.getElementById("admin-area").style.display = "block";
 
-  const CAT_ICONS = { general:"📄", safety:"⛑️", quality:"✅", operation:"⚙️", it:"💻" };
-  const CAT_LABELS = { general:"ทั่วไป", safety:"ความปลอดภัย", quality:"คุณภาพ", operation:"การปฏิบัติงาน", it:"IT" };
-
-  function toast(msg, d=2500) {
+  let toastTimer;
+  function toast(msg, cls="", dur=2500) {
     const t = document.getElementById("toast");
-    t.textContent = msg; t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), d);
+    t.textContent=msg; t.className=cls?`show ${cls}`:"show";
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.className="",dur);
   }
 
-  // ── Load WI Documents ─────────────────────────────────────
-  // Seed default WI if empty
-  async function seedDefaultWI() {
-    const defaults = [
-      { id: "RAPO-W001", title: "RAPO-W001 CCTV Control", desc: "การควบคุมระบบ CCTV", category: "it", link: "https://drive.google.com/file/d/1Cr18uIIyFomMzAuF1VLcu3PVdxVvr5p4/view?usp=sharing" }
-    ];
-    for (const d of defaults) {
-      await setDoc(doc(db, "wi_documents", d.id), {
-        title: d.title, desc: d.desc || "", category: d.category || "general",
-        link: d.link, sort_order: 0, created_at: serverTimestamp()
-      }, { merge: true });
-    }
-  }
+  // ── Type Labels ─────────────────────────────────────────
+  const CAT_ICON  = { general:"📄", safety:"⛑️", quality:"✅", operation:"⚙️", it:"💻" };
+  const CAT_LABEL = { general:"ทั่วไป", safety:"ความปลอดภัย", quality:"คุณภาพ", operation:"การปฏิบัติงาน", it:"IT" };
 
-  onSnapshot(query(collection(db, "wi_documents"), orderBy("sort_order"), orderBy("title")), snap => {
-    if (snap.empty) {
-      seedDefaultWI();
-      return;
-    }
+  // ── IN/OUT Style for form type ──────────────────────────
+  function updateTypeStyle() {
+    const isUpload = document.getElementById("radio-upload").checked;
+    document.getElementById("lbl-upload").style.cssText = isUpload ? "flex:1;text-align:center;padding:0.5rem;border-radius:8px;cursor:pointer;font-size:0.88rem;font-weight:700;background:white;color:var(--indigo);box-shadow:0 2px 6px rgba(0,0,0,0.08);" : "flex:1;text-align:center;padding:0.5rem;border-radius:8px;cursor:pointer;font-size:0.88rem;font-weight:700;color:var(--gray);";
+    document.getElementById("lbl-link").style.cssText   = !isUpload ? "flex:1;text-align:center;padding:0.5rem;border-radius:8px;cursor:pointer;font-size:0.88rem;font-weight:700;background:white;color:var(--indigo);box-shadow:0 2px 6px rgba(0,0,0,0.08);" : "flex:1;text-align:center;padding:0.5rem;border-radius:8px;cursor:pointer;font-size:0.88rem;font-weight:700;color:var(--gray);";
+    document.getElementById("upload-area").style.display = isUpload ? "block" : "none";
+    document.getElementById("link-area").style.display   = !isUpload ? "block" : "none";
+  }
+  ["radio-upload","radio-link"].forEach(id => document.getElementById(id).addEventListener("change", updateTypeStyle));
+  updateTypeStyle();
+
+  // ── Load WI Documents ───────────────────────────────────
+  onSnapshot(query(collection(db,"wi_documents"), orderBy("sort_order"), orderBy("title")), snap => {
+    if (snap.empty) { seedDefault(); return; }
     allDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderList();
+    render();
   });
 
-  function renderList() {
+  async function seedDefault() {
+    await setDoc(doc(db,"wi_documents","RAPO-W001"), {
+      title: "RAPO-W001 CCTV Control", desc: "การควบคุมระบบ CCTV",
+      category: "it", type: "link",
+      link: "https://drive.google.com/file/d/1Cr18uIIyFomMzAuF1VLcu3PVdxVvr5p4/view?usp=sharing",
+      storage_path: null, sort_order: 0, created_at: serverTimestamp()
+    }, { merge: true });
+  }
+
+  // ── Render ──────────────────────────────────────────────
+  function render() {
     const q = searchQ.toLowerCase();
     let data = allDocs.filter(d =>
-      (d.title||"").toLowerCase().includes(q) || (d.desc||"").toLowerCase().includes(q)
+      (d.title||"").toLowerCase().includes(q) ||
+      (d.desc||"").toLowerCase().includes(q) ||
+      (d.id||"").toLowerCase().includes(q)
     );
     if (catFilter !== "all") data = data.filter(d => d.category === catFilter);
 
@@ -160,73 +227,165 @@
       el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>ไม่พบเอกสาร WI</p></div>`;
       return;
     }
+
     el.innerHTML = data.map(d => {
-      const icon  = CAT_ICONS[d.category]  || "📄";
-      const label = CAT_LABELS[d.category] || "ทั่วไป";
-      const adminBtn = profile.role === "admin"
-        ? `<button onclick="deleteWI('${d.id}','${d.title.replace(/'/g,"")}')" style="background:#fef2f2; border:none; border-radius:7px; padding:0.3rem 0.5rem; cursor:pointer; color:var(--red); font-size:0.85rem; margin-left:0.25rem; flex-shrink:0;">🗑️</button>`
+      const icon  = CAT_ICON[d.category] || "📄";
+      const label = CAT_LABEL[d.category] || "ทั่วไป";
+      const isPDF = d.type === "upload" && d.pdf_url;
+      const isLink = d.type === "link" && d.link;
+
+      const typeBadge = isPDF
+        ? `<span class="badge badge-red" style="font-size:0.68rem;">PDF</span>`
+        : isLink
+          ? `<span class="badge badge-blue" style="font-size:0.68rem;">LINK</span>`
+          : `<span class="badge badge-gray" style="font-size:0.68rem;">—</span>`;
+
+      const adminBtns = profile.role === "admin"
+        ? `<button onclick="deleteWI('${d.id}','${(d.storage_path||"").replace(/'/g,"")}')" class="btn btn-red btn-sm" style="margin-left:auto;">🗑️ ลบ</button>`
         : "";
-      return `<div style="display:flex; align-items:center; gap:0.5rem;">
-        <a href="${d.link}" target="_blank" rel="noopener" class="wi-card" style="flex:1;">
-          <div class="wi-icon">${icon}</div>
-          <div>
-            <div class="wi-title">${d.title}</div>
-            <div class="wi-sub">${label}${d.desc ? " · " + d.desc : ""}</div>
+
+      return `
+        <div class="wi-card">
+          <div class="wi-card-header">
+            <div class="wi-icon ${isPDF?"pdf":isLink?"link":"drive"}">${icon}</div>
+            <div style="flex:1;min-width:0;">
+              <div class="wi-card-title">${d.title}</div>
+              <div class="wi-card-sub">${label}${d.desc?" · "+d.desc:""}</div>
+            </div>
+            ${typeBadge}
           </div>
-          <span class="wi-arrow">→</span>
-        </a>
-        ${adminBtn}
-      </div>`;
+          <div class="wi-card-foot">
+            ${isPDF ? `
+              <button onclick="openPDF('${d.pdf_url.replace(/'/g,"\\'")}','${d.title.replace(/'/g,"\\'")}')"
+                class="btn btn-red btn-sm">📄 เปิดดู PDF</button>
+              <a href="${d.pdf_url}" download class="btn btn-outline btn-sm">⬇️ ดาวน์โหลด</a>
+            ` : isLink ? `
+              <a href="${d.link}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">🔗 เปิดเอกสาร</a>
+            ` : ""}
+            ${adminBtns}
+          </div>
+        </div>`;
     }).join("");
   }
 
-  // ── Search & Filter ───────────────────────────────────────
-  document.getElementById("wi-search").addEventListener("input", e => { searchQ = e.target.value; renderList(); });
-
+  // ── Search & Filter ─────────────────────────────────────
+  document.getElementById("wi-search").addEventListener("input", e => { searchQ=e.target.value; render(); });
   document.querySelectorAll(".filter-chip").forEach(c => {
     c.addEventListener("click", () => {
-      document.querySelectorAll(".filter-chip").forEach(x => {
-        x.style.background = "white";
-        x.style.color      = "var(--gray)";
-        x.style.borderColor = "var(--border)";
-      });
-      c.style.background   = "var(--blue)";
-      c.style.color        = "white";
-      c.style.borderColor  = "var(--blue)";
-      catFilter = c.dataset.cat;
-      renderList();
+      document.querySelectorAll(".filter-chip").forEach(x => x.classList.remove("active"));
+      c.classList.add("active");
+      catFilter = c.dataset.cat; render();
     });
   });
 
-  // ── Admin: Add/Delete ─────────────────────────────────────
-  document.getElementById("btn-toggle-add").addEventListener("click", () => {
-    const form = document.getElementById("add-form");
-    form.style.display = form.style.display === "none" ? "block" : "none";
+  // ── PDF Viewer ──────────────────────────────────────────
+  window.openPDF = (url, title) => {
+    document.getElementById("pdf-viewer-title").textContent = title;
+    document.getElementById("pdf-open-tab").href = url;
+    document.getElementById("pdf-frame").src = url;
+    document.getElementById("pdf-viewer").style.display = "flex";
+    document.body.style.overflow = "hidden";
+  };
+  document.getElementById("btn-close-pdf").addEventListener("click", () => {
+    document.getElementById("pdf-viewer").style.display = "none";
+    document.getElementById("pdf-frame").src = "";
+    document.body.style.overflow = "";
+  });
+
+  // ── Add Form Toggle ─────────────────────────────────────
+  document.getElementById("btn-toggle-form").addEventListener("click", () => {
+    const f = document.getElementById("add-form");
+    f.style.display = f.style.display === "none" ? "block" : "none";
   });
   document.getElementById("btn-cancel-wi").addEventListener("click", () => {
     document.getElementById("add-form").style.display = "none";
+    clearForm();
   });
 
+  function clearForm() {
+    ["wi-code","wi-title-input","wi-desc","wi-link-input"].forEach(id => document.getElementById(id).value="");
+    document.getElementById("wi-pdf-file").value = "";
+    document.getElementById("radio-upload").checked = true;
+    updateTypeStyle();
+  }
+
+  // ── Save WI ─────────────────────────────────────────────
   document.getElementById("btn-save-wi").addEventListener("click", async () => {
     const code  = document.getElementById("wi-code").value.trim();
-    const title = document.getElementById("wi-title").value.trim();
-    const link  = document.getElementById("wi-link").value.trim();
-    if (!code || !title || !link) { toast("⚠️ กรุณากรอก รหัส, ชื่อ, และ Link"); return; }
-    await setDoc(doc(db, "wi_documents", code), {
-      title: `${code} ${title}`,
-      desc:  document.getElementById("wi-desc").value.trim(),
-      category: document.getElementById("wi-cat").value,
-      link, sort_order: allDocs.length, created_at: serverTimestamp()
-    });
-    toast(`✅ เพิ่มเอกสาร ${code} เรียบร้อย`);
-    ["wi-code","wi-title","wi-desc","wi-link"].forEach(id => document.getElementById(id).value = "");
-    document.getElementById("add-form").style.display = "none";
+    const title = document.getElementById("wi-title-input").value.trim();
+    const cat   = document.getElementById("wi-cat-sel").value;
+    const desc  = document.getElementById("wi-desc").value.trim();
+    const type  = document.querySelector('input[name="wi-type"]:checked').value;
+
+    if (!code || !title) { toast("⚠️ กรอก รหัส และ ชื่อเอกสาร ก่อน"); return; }
+
+    const docId = code.toUpperCase().replace(/\s+/g,"-");
+
+    if (type === "upload") {
+      // ── อัปโหลด PDF ขึ้น Firebase Storage ──────────────
+      const file = document.getElementById("wi-pdf-file").files[0];
+      if (!file) { toast("⚠️ เลือกไฟล์ PDF ก่อน"); return; }
+      if (!file.type.includes("pdf")) { toast("⚠️ รองรับเฉพาะไฟล์ .pdf"); return; }
+
+      const storagePath = `wi_documents/${docId}_${Date.now()}.pdf`;
+      const storageRef  = sRef(storage, storagePath);
+      const uploadTask  = uploadBytesResumable(storageRef, file);
+
+      document.getElementById("upload-progress-wrap").style.display = "block";
+      document.getElementById("btn-save-wi").disabled = true;
+
+      uploadTask.on("state_changed",
+        snapshot => {
+          const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          document.getElementById("upload-pct").textContent = pct;
+          document.getElementById("upload-bar-fill").style.width = `${pct}%`;
+        },
+        () => {
+          toast("❌ อัปโหลดไม่สำเร็จ กรุณาลองใหม่", "err");
+          document.getElementById("upload-progress-wrap").style.display = "none";
+          document.getElementById("btn-save-wi").disabled = false;
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          await setDoc(doc(db, "wi_documents", docId), {
+            title: `${docId} ${title}`, desc, category: cat,
+            type: "upload", pdf_url: downloadURL, link: null,
+            storage_path: storagePath, sort_order: allDocs.length,
+            created_at: serverTimestamp()
+          });
+          document.getElementById("upload-progress-wrap").style.display = "none";
+          document.getElementById("btn-save-wi").disabled = false;
+          document.getElementById("add-form").style.display = "none";
+          clearForm();
+          toast(`✅ อัปโหลด ${title} เรียบร้อย`, "ok");
+        }
+      );
+
+    } else {
+      // ── วาง Link ──────────────────────────────────────
+      const link = document.getElementById("wi-link-input").value.trim();
+      if (!link) { toast("⚠️ กรอก URL ก่อน"); return; }
+      await setDoc(doc(db, "wi_documents", docId), {
+        title: `${docId} ${title}`, desc, category: cat,
+        type: "link", pdf_url: null, link,
+        storage_path: null, sort_order: allDocs.length,
+        created_at: serverTimestamp()
+      });
+      document.getElementById("add-form").style.display = "none";
+      clearForm();
+      toast(`✅ เพิ่มเอกสาร ${title} เรียบร้อย`, "ok");
+    }
   });
 
-  window.deleteWI = async (id, title) => {
-    if (!confirm(`ลบเอกสาร "${title}" แน่ใจหรือไม่?`)) return;
+  // ── Delete WI ───────────────────────────────────────────
+  window.deleteWI = async (id, storagePath) => {
+    if (!confirm(`ลบเอกสาร "${id}" แน่ใจหรือไม่?`)) return;
+    // ลบจาก Storage ถ้ามีไฟล์
+    if (storagePath) {
+      try { await deleteObject(sRef(storage, storagePath)); } catch(e) { /* ไม่เป็นไร */ }
+    }
     await deleteDoc(doc(db, "wi_documents", id));
-    toast(`🗑️ ลบ ${title} เรียบร้อย`);
+    toast(`🗑️ ลบ ${id} เรียบร้อย`);
   };
 </script>
 </body>
