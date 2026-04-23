@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>จัดการผู้ใช้ - RAPO</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#021D49">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .user-avatar { width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:1rem; flex-shrink:0; }
+    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); white-space:nowrap; }
+    #toast.show { transform:translateX(-50%) translateY(0); }
+    #toast.ok  { background:#16a34a; }
+    #toast.err { background:#dc2626; }
+  </style>
+</head>
+<body>
+<div id="topbar-placeholder"></div>
+<div class="page-body">
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-value" id="stat-total">—</div><div class="stat-label">ผู้ใช้ทั้งหมด</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--red)" id="stat-admin">—</div><div class="stat-label">Admin</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--indigo)" id="stat-user">—</div><div class="stat-label">User ทั่วไป</div></div>
+  </div>
+
+  <!-- เพิ่ม User ใหม่ -->
+  <div class="card">
+    <div class="card-title">➕ เพิ่มผู้ใช้งานใหม่</div>
+    <div class="alert alert-info" style="font-size:0.85rem; margin-bottom:1rem;">
+      ระบบจะสร้าง Account ใหม่ด้วย Email + Password ที่กำหนด<br>
+      ผู้ใช้สามารถเปลี่ยน Password ได้ภายหลัง
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>ชื่อ-นามสกุล <span style="color:red">*</span></label>
+        <input type="text" id="new-name" placeholder="ชื่อผู้ใช้งาน">
+      </div>
+      <div class="form-group">
+        <label>Email <span style="color:red">*</span></label>
+        <input type="email" id="new-email" placeholder="user@rapo.com">
+      </div>
+      <div class="form-group">
+        <label>Password <span style="color:red">*</span></label>
+        <input type="password" id="new-password" placeholder="อย่างน้อย 6 ตัวอักษร">
+      </div>
+      <div class="form-group">
+        <label>บทบาท (Role)</label>
+        <select id="new-role">
+          <option value="user">User — ทำรายการได้ ไม่มีสิทธิ์จัดการ</option>
+          <option value="admin">Admin — สิทธิ์เต็ม</option>
+        </select>
+      </div>
+    </div>
+    <div id="create-error" class="alert alert-error" style="display:none; margin-bottom:0.75rem;"></div>
+    <button class="btn btn-primary" id="btn-create-user">➕ สร้างผู้ใช้งาน</button>
+    <div id="create-loading" style="display:none; margin-top:0.5rem; color:var(--gray); font-size:0.85rem;">
+      <span>⏳ กำลังสร้าง Account...</span>
+    </div>
+  </div>
+
+  <!-- รายชื่อ User -->
+  <div class="card" style="padding:0; overflow:hidden;">
+    <div style="padding:0.85rem 1.25rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+      <div class="card-title" style="margin-bottom:0;">👥 รายชื่อผู้ใช้งานทั้งหมด</div>
+      <div class="search-bar" style="margin:0; width:200px;">
+        <input type="text" id="user-search" placeholder="ค้นหา..." style="padding:0.45rem 0.75rem 0.45rem 2rem; font-size:0.85rem;">
+      </div>
+    </div>
+    <div id="users-loading" class="spinner-wrap" style="padding:2rem;">
+      <div class="spinner"></div><span>กำลังโหลด...</span>
+    </div>
+    <div id="users-table-wrap" style="display:none;">
+      <div class="table-wrap" style="border:none; border-radius:0;">
+        <table>
+          <thead>
+            <tr>
+              <th>ผู้ใช้</th>
+              <th>Email</th>
+              <th>บทบาท</th>
+              <th>เปลี่ยน Role</th>
+              <th>Reset รหัสผ่าน</th>
+              <th>ลบ</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end page-body -->
+
+<!-- Modal: Reset Password -->
+<div id="modal-reset" style="display:none" class="modal-backdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🔑 ตั้งรหัสผ่านใหม่</h3>
+      <button class="modal-close" id="btn-close-reset">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:1rem; color:var(--gray); font-size:0.9rem;">
+        ผู้ใช้: <b id="reset-user-name">—</b>
+      </div>
+      <div class="form-group">
+        <label>รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)</label>
+        <input type="password" id="reset-new-password" placeholder="รหัสผ่านใหม่">
+      </div>
+      <div id="reset-error" class="alert alert-error" style="display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="btn-cancel-reset">ยกเลิก</button>
+      <button class="btn btn-primary" id="btn-confirm-reset">🔑 บันทึกรหัสผ่าน</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast">—</div>
+
+<script type="module">
+  import { auth, db } from "./firebase-config.js";
+  import { requireAdmin } from "./auth.js";
+  import {
+    collection, doc, getDocs, setDoc, updateDoc, deleteDoc,
+    query, orderBy, onSnapshot, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import {
+    createUserWithEmailAndPassword,
+    updatePassword,
+    deleteUser,
+    signInWithEmailAndPassword,
+    EmailAuthProvider,
+    reauthenticateWithCredential
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // ── ใช้ Firebase Admin SDK ผ่าน REST API ──────────────────
+  // เนื่องจาก Frontend ไม่สามารถสร้าง User อื่นด้วย createUserWithEmailAndPassword
+  // โดยตรงโดยไม่ logout ออกจาก session ปัจจุบัน
+  // วิธีที่ดีที่สุดใน Pure Frontend: ใช้ Secondary Auth App
+
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth as getSecondaryAuth, createUserWithEmailAndPassword as createUser2 }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // Secondary Firebase App (สำหรับสร้าง User โดยไม่ logout Admin)
+  const secondaryApp = initializeApp({
+    apiKey:            "AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
+    authDomain:        "rapo-system.firebaseapp.com",
+    projectId:         "rapo-system",
+    storageBucket:     "rapo-system.firebasestorage.app",
+    messagingSenderId: "87090183469",
+    appId:             "1:87090183469:web:eafb1ded183755f329a7a4"
+  }, "secondary");
+  const secondaryAuth = getSecondaryAuth(secondaryApp);
+
+  let currentUser, profile;
+  let allUsers = [], userSearch = "";
+  let resetTargetUid = null, resetTargetName = "";
+
+  const { user, profile: prof } = await requireAdmin();
+  currentUser = user; profile = prof;
+
+  document.getElementById("topbar-placeholder").innerHTML = `
+    <nav class="topbar">
+      <a class="topbar-back" href="index.html">←</a>
+      <div style="flex:1">
+        <div class="topbar-title">👥 จัดการผู้ใช้งาน</div>
+        <div class="topbar-sub">User Management (Admin Only)</div>
+      </div>
+      <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
+    </nav>`;
+
+  let toastTimer;
+  function toast(msg, cls="", dur=2500) {
+    const t = document.getElementById("toast");
+    t.textContent=msg; t.className=cls?`show ${cls}`:"show";
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.className="",dur);
+  }
+
+  // ── โหลด Users จาก Firestore ─────────────────────────────
+  onSnapshot(query(collection(db,"users"), orderBy("role")), snap => {
+    allUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    updateStats();
+    renderUsers();
+    document.getElementById("users-loading").style.display       = "none";
+    document.getElementById("users-table-wrap").style.display    = "block";
+  });
+
+  function updateStats() {
+    document.getElementById("stat-total").textContent = allUsers.length;
+    document.getElementById("stat-admin").textContent = allUsers.filter(u=>u.role==="admin").length;
+    document.getElementById("stat-user").textContent  = allUsers.filter(u=>u.role==="user").length;
+  }
+
+  function getAvatarBg(name) {
+    const colors = ["#6366f1","#ec4899","#f59e0b","#10b981","#3b82f6","#8b5cf6","#ef4444"];
+    let hash = 0;
+    for (const c of (name||"U")) hash = c.charCodeAt(0) + ((hash<<5)-hash);
+    return colors[Math.abs(hash) % colors.length];
+  }
+
+  function renderUsers() {
+    const q = userSearch.toLowerCase();
+    const data = allUsers.filter(u =>
+      (u.name||"").toLowerCase().includes(q) ||
+      (u.email||"").toLowerCase().includes(q)
+    );
+    const tbody = document.getElementById("users-tbody");
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--gray);">ไม่พบผู้ใช้</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = data.map(u => {
+      const initial = (u.name||u.email||"U")[0].toUpperCase();
+      const bg      = getAvatarBg(u.name || u.email);
+      const roleBadge = u.role === "admin"
+        ? `<span class="badge badge-red">Admin</span>`
+        : `<span class="badge badge-indigo">User</span>`;
+      const isMe = u.uid === currentUser.uid;
+      return `<tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:0.65rem;">
+            <div class="user-avatar" style="background:${bg};color:white;">${initial}</div>
+            <div>
+              <div style="font-weight:700;">${u.name||"—"}</div>
+              ${isMe?`<div style="font-size:0.72rem;color:var(--indigo);">▲ บัญชีของคุณ</div>`:""}
+            </div>
+          </div>
+        </td>
+        <td style="font-size:0.85rem;">${u.email||"—"}</td>
+        <td>${roleBadge}</td>
+        <td>
+          ${!isMe ? `
+            <select onchange="changeRole('${u.uid}',this.value)"
+              style="padding:0.35rem 0.6rem;border:1.5px solid var(--border);border-radius:7px;font-family:Sarabun,sans-serif;font-size:0.85rem;background:white;cursor:pointer;">
+              <option value="user"  ${u.role==="user" ?"selected":""}>User</option>
+              <option value="admin" ${u.role==="admin"?"selected":""}>Admin</option>
+            </select>` : `<span style="font-size:0.8rem;color:var(--gray);">ตัวเอง</span>`}
+        </td>
+        <td>
+          ${!isMe ? `
+            <button onclick="openReset('${u.uid}','${(u.name||u.email).replace(/'/g,"\\'")}')"
+              class="btn btn-outline btn-sm">🔑 Reset</button>` : "—"}
+        </td>
+        <td>
+          ${!isMe ? `
+            <button onclick="deleteUserAccount('${u.uid}','${(u.name||u.email).replace(/'/g,"\\'")}','${u.email||""}')"
+              class="btn btn-red btn-sm">🗑️</button>` : "—"}
+        </td>
+      </tr>`;
+    }).join("");
+  }
+
+  document.getElementById("user-search").addEventListener("input", e => { userSearch=e.target.value; renderUsers(); });
+
+  // ── สร้าง User ใหม่ ─────────────────────────────────────
+  document.getElementById("btn-create-user").addEventListener("click", async () => {
+    const name  = document.getElementById("new-name").value.trim();
+    const email = document.getElementById("new-email").value.trim();
+    const pass  = document.getElementById("new-password").value;
+    const role  = document.getElementById("new-role").value;
+    const errEl = document.getElementById("create-error");
+    errEl.style.display="none";
+
+    if (!name || !email || !pass) {
+      errEl.textContent="⚠️ กรุณากรอกข้อมูลให้ครบ";
+      errEl.style.display="block"; return;
+    }
+    if (pass.length < 6) {
+      errEl.textContent="⚠️ รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร";
+      errEl.style.display="block"; return;
+    }
+
+    document.getElementById("btn-create-user").disabled=true;
+    document.getElementById("create-loading").style.display="block";
+
+    try {
+      // สร้าง User ด้วย Secondary App (ไม่ logout Admin)
+      const cred = await createUser2(secondaryAuth, email, pass);
+      const uid  = cred.user.uid;
+
+      // Logout secondary app ทันที
+      await secondaryAuth.signOut();
+
+      // บันทึก Profile ใน Firestore
+      await setDoc(doc(db,"users",uid), {
+        name, email, role,
+        created_at: serverTimestamp(),
+        created_by: currentUser.uid
+      });
+
+      toast(`✅ สร้าง Account "${name}" เรียบร้อย`, "ok");
+      ["new-name","new-email","new-password"].forEach(id => document.getElementById(id).value="");
+      document.getElementById("new-role").value="user";
+
+    } catch(e) {
+      const msgs = {
+        "auth/email-already-in-use": "❌ Email นี้ถูกใช้งานแล้ว",
+        "auth/invalid-email":        "❌ Email ไม่ถูกต้อง",
+        "auth/weak-password":        "❌ รหัสผ่านอ่อนเกินไป"
+      };
+      errEl.textContent = msgs[e.code] || `❌ เกิดข้อผิดพลาด: ${e.message}`;
+      errEl.style.display="block";
+    } finally {
+      document.getElementById("btn-create-user").disabled=false;
+      document.getElementById("create-loading").style.display="none";
+    }
+  });
+
+  // ── เปลี่ยน Role ────────────────────────────────────────
+  window.changeRole = async (uid, newRole) => {
+    await updateDoc(doc(db,"users",uid), { role: newRole });
+    toast(`✅ อัปเดต Role เป็น "${newRole}" แล้ว`, "ok");
+  };
+
+  // ── Reset Password ───────────────────────────────────────
+  window.openReset = (uid, name) => {
+    resetTargetUid = uid; resetTargetName = name;
+    document.getElementById("reset-user-name").textContent = name;
+    document.getElementById("reset-new-password").value = "";
+    document.getElementById("reset-error").style.display = "none";
+    document.getElementById("modal-reset").style.display = "flex";
+  };
+  ["btn-close-reset","btn-cancel-reset"].forEach(id =>
+    document.getElementById(id).addEventListener("click", () =>
+      document.getElementById("modal-reset").style.display="none"
+    )
+  );
+
+  document.getElementById("btn-confirm-reset").addEventListener("click", async () => {
+    const newPass = document.getElementById("reset-new-password").value;
+    const errEl   = document.getElementById("reset-error");
+    errEl.style.display="none";
+
+    if (!newPass || newPass.length < 6) {
+      errEl.textContent="⚠️ รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร";
+      errEl.style.display="block"; return;
+    }
+
+    // วิธีรีเซ็ตรหัสผ่าน: บันทึก "pending_password_reset" ใน Firestore
+    // เมื่อ User Login ครั้งถัดไป ระบบจะบังคับเปลี่ยน
+    // หรือใช้ Firebase Admin SDK (ต้องมี Cloud Functions)
+    // วิธีง่ายที่สุดสำหรับ Frontend: ส่ง Reset Email
+    try {
+      const { sendPasswordResetEmail } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+      // ดึง email จาก Firestore
+      const userDoc = allUsers.find(u => u.uid === resetTargetUid);
+      if (userDoc?.email) {
+        await sendPasswordResetEmail(auth, userDoc.email);
+        toast(`📧 ส่งอีเมล Reset Password ไปที่ ${userDoc.email} แล้ว`, "ok", 4000);
+        document.getElementById("modal-reset").style.display="none";
+      } else {
+        // บันทึก password reset request ใน Firestore
+        await updateDoc(doc(db,"users",resetTargetUid), {
+          password_reset_requested: true,
+          password_reset_at: serverTimestamp()
+        });
+        toast("✅ บันทึก Reset Request แล้ว", "ok");
+        document.getElementById("modal-reset").style.display="none";
+      }
+    } catch(e) {
+      errEl.textContent = `❌ เกิดข้อผิดพลาด: ${e.message}`;
+      errEl.style.display="block";
+    }
+  });
+
+  // ── ลบ User ─────────────────────────────────────────────
+  window.deleteUserAccount = async (uid, name, email) => {
+    if (!confirm(`ลบผู้ใช้ "${name}" แน่ใจหรือไม่?\n\nจะลบเฉพาะข้อมูล Profile ใน Firestore\nถ้าต้องการลบ Account จาก Firebase Auth ต้องทำใน Firebase Console`)) return;
+    await deleteDoc(doc(db,"users",uid));
+    toast(`🗑️ ลบข้อมูล ${name} แล้ว`);
+  };
+</script>
+</body>
+</html>
