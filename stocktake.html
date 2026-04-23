@@ -8,358 +8,700 @@
   <meta name="theme-color" content="#021D49">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared.css">
+  <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    .progress-bar { height: 8px; background: #e2e8f0; border-radius: 10px; overflow: hidden; margin-top: 6px; }
-    .progress-fill { height: 100%; border-radius: 10px; background: var(--indigo); transition: width 0.4s; }
-    .sku-card { border: 1.5px solid var(--border); border-radius: 12px; padding: 1rem; margin-bottom: 0.75rem; background: white; }
-    .sku-card.counted { border-color: var(--green); background: #f0fdf4; }
-    .sku-card.missing { border-color: var(--red); background: #fef2f2; }
-    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
+    .zone-badge-normal   { background:#dbeafe; color:#1d4ed8; }
+    .zone-badge-zoneb    { background:#f3e8ff; color:#7e22ce; }
+    .zone-badge-overflow { background:#ffedd5; color:#c2410c; }
+    .scan-input-big { font-size:1.3rem !important; font-weight:700 !important; text-align:center; letter-spacing:0.06em; background:#f0fdf4 !important; border-color:var(--green) !important; }
+    .scan-input-big:focus { box-shadow:0 0 0 4px rgba(22,163,74,0.15) !important; }
+    .scanned-list { display:flex; flex-direction:column; gap:0.4rem; max-height:260px; overflow-y:auto; }
+    .scanned-item { display:flex; align-items:center; gap:0.6rem; padding:0.45rem 0.75rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; font-size:0.85rem; animation:slideDown 0.2s ease; }
+    .scanned-item .seq { width:22px; height:22px; border-radius:50%; background:var(--green); color:white; font-size:0.68rem; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .scanned-item .tag { font-weight:700; font-family:monospace; flex:1; }
+    .scanned-item .tm  { font-size:0.7rem; color:var(--gray); flex-shrink:0; }
+    @keyframes slideDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+    .shake { animation:shake 0.4s ease; }
+    .dup-bg { background:#fef2f2 !important; border-color:#fca5a5 !important; }
+    .job-card { border:2px solid var(--border); border-radius:14px; background:white; cursor:pointer; transition:all 0.2s; }
+    .job-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.08); }
+    .job-card.counting { border-color:var(--indigo); }
+    .job-card.finished { opacity:0.65; }
+    .progress-wrap { display:flex; align-items:center; gap:1.25rem; }
+    .ring-svg { transform:rotate(-90deg); }
+    .ring-num { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); white-space:nowrap; }
     #toast.show { transform:translateX(-50%) translateY(0); }
-    .loc-card { border:1.5px solid var(--border); border-radius:12px; padding:1rem; background:white; cursor:pointer; transition:all 0.2s; }
-    .loc-card:hover { border-color:var(--indigo); box-shadow:0 4px 12px rgba(99,102,241,0.1); }
-    .loc-card.active { border-color:var(--indigo); background:#eef2ff; }
-    .loc-card.finished { border-color:var(--green); background:#f0fdf4; }
+    #toast.err  { background:#dc2626; }
+    #toast.ok   { background:#16a34a; }
   </style>
 </head>
 <body>
-
 <div id="topbar-placeholder"></div>
 <div class="page-body">
 
-  <!-- Step 1: เลือก Location -->
-  <div id="step-location">
-    <div class="card">
-      <div class="card-title">🎯 เริ่มงานนับสต็อก</div>
-      <div class="alert alert-info" style="margin-bottom:1rem;">
-        สแกน QR Code หรือพิมพ์ Location เพื่อเริ่มนับสต็อก
-      </div>
-      <div class="form-group">
-        <label>Location</label>
-        <input type="text" id="loc-input" placeholder="เช่น Shelf A1, Zone B" autocomplete="off" style="font-size:1.1rem; text-transform:uppercase;">
-      </div>
-      <button class="btn btn-primary btn-full" id="btn-start-loc">เริ่มนับ Location นี้ ▶</button>
-    </div>
-
-    <div class="card">
-      <div class="card-title">📋 งานที่ได้รับมอบหมาย</div>
-      <div id="my-jobs-list">
-        <div class="spinner-wrap"><div class="spinner"></div><span>กำลังโหลด...</span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Step 2: หน้านับสต็อก -->
-  <div id="step-count" style="display:none">
-    <div class="card" style="position:sticky; top:60px; z-index:50; margin-bottom:0.75rem;">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-        <div>
-          <div style="font-size:0.8rem; color:var(--gray);">📍 Location</div>
-          <div style="font-size:1.2rem; font-weight:700; color:var(--blue)" id="current-loc-title">—</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:0.8rem; color:var(--gray);">ความคืบหน้า</div>
-          <div id="count-progress" style="font-weight:700; color:var(--indigo);">0 / 0</div>
-        </div>
-      </div>
-      <div class="progress-bar" style="margin-top:0.5rem;"><div class="progress-fill" id="count-progress-bar" style="width:0%"></div></div>
-    </div>
-
-    <!-- Mode Selector -->
+  <!-- ═══ SCREEN: HOME ═══ -->
+  <div id="screen-home">
     <div class="tab-bar">
-      <button class="tab-btn active" data-mode="tag">🏷️ โหมด Tag (สแกน)</button>
-      <button class="tab-btn" data-mode="normal">📝 โหมดกรอกจำนวน</button>
+      <button class="tab-btn active" data-tab="my-jobs">📋 งานของฉัน</button>
+      <button class="tab-btn" data-tab="new-job">➕ เริ่มงานใหม่</button>
+      <button class="tab-btn" data-tab="master" id="tab-master-btn">🗄️ Master</button>
     </div>
 
-    <!-- Mode: Tag -->
-    <div id="mode-tag">
+    <!-- งานของฉัน -->
+    <div id="tab-my-jobs">
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-value" id="sj-total">—</div><div class="stat-label">งานทั้งหมด</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--indigo)" id="sj-prog">—</div><div class="stat-label">กำลังนับ</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--green)" id="sj-done">—</div><div class="stat-label">เสร็จแล้ว</div></div>
+      </div>
+      <div id="jobs-list"><div class="spinner-wrap"><div class="spinner"></div><span>กำลังโหลด...</span></div></div>
+    </div>
+
+    <!-- เริ่มงานใหม่ -->
+    <div id="tab-new-job" style="display:none">
       <div class="card">
-        <div class="card-title" style="font-size:0.9rem">สแกน SKU → เลือก Tag</div>
+        <div class="card-title">🎯 เริ่มงานนับสต็อก</div>
+        <div class="alert alert-info" style="margin-bottom:1rem;font-size:0.85rem;">สแกน QR Code หน้าช่องเก็บของ หรือพิมพ์ Location Code เพื่อเริ่มนับ</div>
         <div class="form-group">
-          <label>SKU</label>
-          <input type="text" id="tag-sku" placeholder="สแกนหรือพิมพ์ SKU" autocomplete="off">
-          <div id="tag-sku-dd" style="display:none; border:1.5px solid var(--border); border-radius:10px; background:white; margin-top:4px; max-height:180px; overflow-y:auto; box-shadow:var(--shadow);"></div>
+          <label>Location Code</label>
+          <input type="text" id="loc-input" placeholder="สแกน หรือพิมพ์ เช่น A-01" autocomplete="off" style="text-transform:uppercase; font-size:1.1rem; font-weight:700;">
         </div>
-        <div id="tag-list" style="display:none;">
-          <div class="form-group">
-            <label>เลือก Tag ที่นับ</label>
-            <div id="tag-buttons" style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.25rem;"></div>
+        <button class="btn btn-outline btn-sm btn-full" id="btn-cam-loc" style="margin-bottom:0.75rem;">📷 เปิดกล้องสแกน QR Location</button>
+        <div id="cam-reader-loc" style="display:none; margin-bottom:0.75rem; border-radius:12px; overflow:hidden;"></div>
+        <div id="loc-info" style="display:none;" class="alert alert-info">
+          <div style="font-weight:700;font-size:1rem;" id="loc-info-name">—</div>
+          <div style="font-size:0.85rem;margin-top:4px;">Zone: <b id="loc-info-zone">—</b> &nbsp;|&nbsp; สินค้าใน Master: <b id="loc-info-count">—</b> ชิ้น</div>
+        </div>
+        <button class="btn btn-primary btn-full" id="btn-start-job" style="margin-top:0.75rem;">▶ เริ่มนับ Location นี้</button>
+      </div>
+    </div>
+
+    <!-- Master Stock -->
+    <div id="tab-master" style="display:none">
+      <div class="card">
+        <div class="card-title">🗄️ Import Master Stock</div>
+        <div class="alert alert-warning" style="font-size:0.82rem;margin-bottom:0.75rem;">
+          <b>Format CSV หัวคอลัมน์:</b> <code>location, zone, tag_barcode, item_name</code><br>
+          <small>zone = Normal | Zone B | Overflow</small>
+        </div>
+        <div class="form-group"><label>เลือกไฟล์ CSV</label><input type="file" id="master-csv" accept=".csv"></div>
+        <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;cursor:pointer;font-size:0.9rem;">
+          <input type="checkbox" id="master-clear"> ล้างข้อมูล Master เก่าก่อน Import
+        </label>
+        <button class="btn btn-primary btn-full" id="btn-import-master">📥 Import Master Stock</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;color:var(--blue);">Master Stock ปัจจุบัน</span>
+          <span class="badge badge-gray" id="master-count-badge">0 รายการ</span>
+        </div>
+        <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);">
+          <input type="text" id="master-search" placeholder="ค้นหา Location / Barcode..." style="width:100%;padding:0.55rem 0.9rem;border:1.5px solid var(--border);border-radius:9px;font-family:Sarabun,sans-serif;font-size:0.9rem;outline:none;">
+        </div>
+        <div class="table-wrap" style="border:none;border-radius:0;">
+          <table>
+            <thead><tr><th>Location</th><th>Zone</th><th>Barcode</th><th>ชื่อสินค้า</th><th>ลบ</th></tr></thead>
+            <tbody id="master-tbody"><tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div><!-- end screen-home -->
+
+  <!-- ═══ SCREEN: SCAN ═══ -->
+  <div id="screen-scan" style="display:none">
+    <!-- Header sticky -->
+    <div class="card" style="position:sticky;top:60px;z-index:50;margin-bottom:0.75rem;padding:0.85rem 1.25rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <div>
+          <div style="font-size:0.72rem;color:var(--gray);">📍 Location</div>
+          <div style="font-size:1.25rem;font-weight:900;color:var(--blue);" id="scan-loc-title">—</div>
+        </div>
+        <span class="badge" id="scan-zone-badge" style="font-size:0.8rem;padding:0.3rem 0.75rem;">—</span>
+        <div style="text-align:right;">
+          <div style="font-size:0.72rem;color:var(--gray);">Job</div>
+          <div style="font-size:0.72rem;font-weight:700;font-family:monospace;" id="scan-job-id">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="card" style="margin-bottom:0.75rem;padding:0.85rem 1.25rem;">
+      <div class="progress-wrap">
+        <div style="position:relative;width:100px;height:100px;flex-shrink:0;">
+          <svg width="100" height="100" viewBox="0 0 100 100" class="ring-svg">
+            <circle cx="50" cy="50" r="43" fill="none" stroke="#e2e8f0" stroke-width="9"/>
+            <circle cx="50" cy="50" r="43" fill="none" stroke="#16a34a" stroke-width="9"
+              id="ring-dash" stroke-dasharray="270" stroke-dashoffset="270"
+              stroke-linecap="round" style="transition:all 0.5s ease;"/>
+          </svg>
+          <div class="ring-num">
+            <div style="font-size:1.7rem;font-weight:900;line-height:1;color:var(--green);" id="ring-n">0</div>
+            <div style="font-size:0.72rem;color:var(--gray);">/<span id="ring-e">?</span></div>
           </div>
         </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:0.5rem;">
+          <div><div style="font-size:0.72rem;color:var(--gray);">สแกนแล้ว</div><div style="font-size:1.4rem;font-weight:900;color:var(--green);" id="p-scanned">0</div></div>
+          <div style="display:flex;gap:1.5rem;">
+            <div><div style="font-size:0.72rem;color:var(--gray);">Master</div><div style="font-weight:700;" id="p-expected">—</div></div>
+            <div><div style="font-size:0.72rem;color:var(--gray);">เหลือ</div><div style="font-weight:700;color:var(--amber);" id="p-remain">—</div></div>
+          </div>
+          <div id="zone-hint-normal" style="display:none;background:#eff6ff;border-radius:8px;padding:0.35rem 0.6rem;font-size:0.72rem;color:#1d4ed8;font-weight:700;">🔵 Normal — เด้งอัตโนมัติเมื่อครบ</div>
+          <div id="zone-hint-zoneb"  style="display:none;background:#fdf4ff;border-radius:8px;padding:0.35rem 0.6rem;font-size:0.72rem;color:#7e22ce;font-weight:700;">🟣 Zone B — สแกนได้เรื่อยๆ กดปิดเอง</div>
+          <div id="zone-hint-overflow" style="display:none;background:#fff7ed;border-radius:8px;padding:0.35rem 0.6rem;font-size:0.72rem;color:#c2410c;font-weight:700;">🟠 Overflow — ไม่จำกัด กดปิดเอง</div>
+        </div>
       </div>
     </div>
 
-    <!-- Mode: Normal -->
-    <div id="mode-normal" style="display:none">
-      <div id="normal-items"></div>
-      <button class="btn btn-primary btn-full" id="btn-save-normal">💾 บันทึกผลการนับ</button>
+    <!-- Scan Input -->
+    <div class="card" style="margin-bottom:0.75rem;">
+      <div class="card-title" style="font-size:0.9rem;margin-bottom:0.75rem;">📦 สแกน Barcode สินค้า</div>
+      <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+        <button class="btn btn-sm" id="btn-mode-text" style="flex:1;background:var(--green);color:white;border:none;">⌨️ พิมพ์ / ปืนยิง</button>
+        <button class="btn btn-outline btn-sm" id="btn-mode-cam" style="flex:1;">📷 กล้อง</button>
+      </div>
+      <!-- Text mode -->
+      <div id="mode-text-wrap">
+        <input type="text" id="tag-input" placeholder="สแกนหรือพิมพ์ Barcode แล้วกด Enter"
+          autocomplete="off" autocorrect="off" spellcheck="false" class="scan-input-big">
+        <div id="dup-error" style="display:none;color:var(--red);font-size:0.82rem;font-weight:700;margin-top:0.4rem;padding:0.4rem 0.75rem;background:#fef2f2;border-radius:8px;">
+          ⚠️ บาร์โค้ดนี้ถูกสแกนไปแล้วใน Job นี้!
+        </div>
+      </div>
+      <!-- Camera mode -->
+      <div id="mode-cam-wrap" style="display:none;">
+        <div id="cam-reader" style="width:100%;background:#1e293b;border-radius:12px;min-height:200px;"></div>
+        <button class="btn btn-outline btn-sm btn-full" id="btn-stop-cam" style="margin-top:0.5rem;display:none;">⏹ หยุดกล้อง</button>
+      </div>
+      <!-- No barcode -->
+      <div style="margin-top:0.75rem;border-top:1px dashed var(--border);padding-top:0.65rem;">
+        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--gray);cursor:pointer;">
+          <input type="checkbox" id="chk-no-bc"> บาร์โค้ดเสีย / ไม่มีบาร์โค้ด
+        </label>
+        <div id="no-bc-wrap" style="display:none;margin-top:0.5rem;">
+          <div class="form-row">
+            <div class="form-group" style="margin-bottom:0;"><input type="text" id="manual-tag" placeholder="ระบุรหัสเอง (หรือเว้นว่าง)"></div>
+            <div class="form-group" style="margin-bottom:0;"><input type="file" id="photo-file" accept="image/*" capture="environment" style="padding:0.45rem;font-size:0.8rem;"></div>
+          </div>
+          <button class="btn btn-sm btn-full" id="btn-add-manual" style="margin-top:0.4rem;background:var(--amber);color:white;border:none;">➕ เพิ่มรายการนี้</button>
+        </div>
+      </div>
     </div>
 
-    <!-- Actions -->
-    <div style="display:flex; gap:0.75rem; margin-top:0.5rem;">
-      <button class="btn btn-outline" id="btn-back-loc" style="flex:1">← กลับ</button>
-      <button class="btn btn-green" id="btn-finish-job" style="flex:1">🏁 จบงาน Location นี้</button>
+    <!-- Scanned list -->
+    <div class="card" style="margin-bottom:0.75rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
+        <div class="card-title" style="margin-bottom:0;font-size:0.9rem;">✅ รายการที่สแกนแล้ว</div>
+        <button class="btn btn-outline btn-sm" id="btn-export-scan">⬇️ Export</button>
+      </div>
+      <div class="scanned-list" id="scanned-list">
+        <div style="text-align:center;color:var(--gray);font-size:0.875rem;padding:1rem 0;">ยังไม่มีรายการ</div>
+      </div>
     </div>
 
-    <!-- นับแล้ว -->
-    <div class="card" style="margin-top:1rem;">
-      <div class="card-title" style="font-size:0.9rem">✅ นับแล้ว</div>
-      <div id="counted-items"></div>
+    <!-- Action buttons -->
+    <div style="display:flex;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
+      <button class="btn btn-outline" id="btn-back-home" style="flex:1;">← กลับ</button>
+      <button class="btn btn-green" id="btn-finish-job" style="flex:2;display:none;">🏁 เสร็จสิ้น — ปิด Job</button>
+      <button class="btn btn-primary" id="btn-done-normal" style="flex:2;display:none;">✅ นับครบ — ดูสรุป</button>
+    </div>
+  </div><!-- end screen-scan -->
+
+  <!-- ═══ SCREEN: SUMMARY ═══ -->
+  <div id="screen-summary" style="display:none">
+    <div class="card" style="text-align:center;padding:1.5rem;">
+      <div style="font-size:2.5rem;margin-bottom:0.4rem;" id="sum-icon">🎉</div>
+      <div style="font-size:1.2rem;font-weight:900;color:var(--blue);" id="sum-loc">—</div>
+      <div style="margin-top:0.4rem;"><span class="badge" id="sum-zone-badge" style="font-size:0.82rem;padding:0.3rem 0.75rem;">—</span></div>
+    </div>
+    <div class="stats-row" style="margin-bottom:1rem;">
+      <div class="stat-card"><div class="stat-value" style="color:var(--green);" id="sum-scanned">—</div><div class="stat-label">สแกนได้</div></div>
+      <div class="stat-card"><div class="stat-value" id="sum-expected">—</div><div class="stat-label">Master</div></div>
+      <div class="stat-card"><div class="stat-value" id="sum-diff">—</div><div class="stat-label">ส่วนต่าง</div></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);font-weight:700;color:var(--blue);">รายการบาร์โค้ดทั้งหมด</div>
+      <div class="table-wrap" style="border:none;border-radius:0;">
+        <table>
+          <thead><tr><th>#</th><th>Barcode</th><th>เวลา</th><th>หมายเหตุ</th></tr></thead>
+          <tbody id="sum-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap;">
+      <button class="btn btn-outline" id="btn-sum-back" style="flex:1;">← กลับ</button>
+      <button class="btn btn-primary" id="btn-sum-export" style="flex:1;">⬇️ Export CSV</button>
     </div>
   </div>
-
-</div>
+</div><!-- end page-body -->
 <div id="toast">—</div>
 
 <script type="module">
-  import { auth, db } from "./firebase-config.js";
+  import { db } from "./firebase-config.js";
   import { requireAuth } from "./auth.js";
   import {
-    collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
-    deleteDoc, query, orderBy, where, onSnapshot, serverTimestamp, writeBatch
+    collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
+    query, orderBy, where, onSnapshot, serverTimestamp, writeBatch, limit
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  let currentUser, currentProfile;
-  let currentJob = null, currentLoc = "", locationProducts = [];
+  const CIRC = 2 * Math.PI * 43; // ~270
 
-  const { user, profile } = await requireAuth();
-  currentUser = user; currentProfile = profile;
+  let currentUser, profile;
+  let masterStock = [], allJobs = [], masterSearch = "";
+  let curJob = null, scannedTags = new Set(), scannedDetails = [];
+  let camStarted = false, html5Cam = null, locCam = null, lastScan = 0;
+
+  const { user, prof } = await (async () => {
+    const r = await requireAuth();
+    return { user: r.user, prof: r.profile };
+  })();
+  currentUser = user; profile = prof;
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">
       <a class="topbar-back" href="index.html">←</a>
       <div style="flex:1">
         <div class="topbar-title">📝 Stock Take</div>
-        <div class="topbar-sub">นับสต็อกประจำรอบ</div>
+        <div class="topbar-sub">Multi-Zone Smart Scanner</div>
       </div>
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
     </nav>`;
 
-  function toast(msg, d=2500) {
+  if (profile.role !== "admin") document.getElementById("tab-master-btn").style.display = "none";
+
+  let toastTimer;
+  function toast(msg, cls="", dur=2500) {
     const t = document.getElementById("toast");
-    t.textContent = msg; t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), d);
+    t.textContent = msg; t.className = cls ? `show ${cls}` : "show";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.className="", dur);
   }
 
-  // ── Load My Jobs ──────────────────────────────────────────
-  onSnapshot(collection(db, "stock_take_jobs"), snap => {
-    const jobs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const myJobs = profile.role === "admin" ? jobs : jobs.filter(j => j.assigned_to === profile.name);
-    const el = document.getElementById("my-jobs-list");
-    if (!myJobs.length) {
-      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><p>ยังไม่มีงานที่ได้รับมอบหมาย</p></div>`;
-      return;
+  // ── Tabs ────────────────────────────────────────────────────
+  document.querySelectorAll("[data-tab]").forEach(b => {
+    b.addEventListener("click", () => {
+      document.querySelectorAll("[data-tab]").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      const tab = b.dataset.tab;
+      document.getElementById("tab-my-jobs").style.display = tab==="my-jobs" ? "block":"none";
+      document.getElementById("tab-new-job").style.display = tab==="new-job" ? "block":"none";
+      document.getElementById("tab-master").style.display  = tab==="master"  ? "block":"none";
+      if (tab==="master") renderMaster();
+    });
+  });
+
+  // ══ MASTER STOCK ══════════════════════════════════════════
+  async function loadMaster() {
+    const s = await getDocs(query(collection(db,"master_stock"), orderBy("location"), orderBy("tag_barcode")));
+    masterStock = s.docs.map(d => ({id:d.id,...d.data()}));
+    document.getElementById("master-count-badge").textContent = `${masterStock.length} รายการ`;
+    renderMaster();
+  }
+  loadMaster();
+
+  function renderMaster() {
+    const q = masterSearch.toLowerCase();
+    const data = masterStock.filter(m =>
+      (m.location||"").toLowerCase().includes(q) ||
+      (m.tag_barcode||"").toLowerCase().includes(q) ||
+      (m.item_name||"").toLowerCase().includes(q)
+    );
+    const Z = {"Normal":"zone-badge-normal","Zone B":"zone-badge-zoneb","Overflow":"zone-badge-overflow"};
+    const tbody = document.getElementById("master-tbody");
+    tbody.innerHTML = data.length
+      ? data.map(m => `<tr>
+          <td style="font-weight:700;">${m.location}</td>
+          <td><span class="badge ${Z[m.zone]||"badge-gray"}">${m.zone||"Normal"}</span></td>
+          <td style="font-family:monospace;font-size:0.85rem;">${m.tag_barcode}</td>
+          <td>${m.item_name||"—"}</td>
+          <td><button onclick="delMaster('${m.id}')" class="btn btn-red btn-sm">🗑️</button></td>
+        </tr>`).join("")
+      : `<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--gray);">ยังไม่มี Master</td></tr>`;
+  }
+  document.getElementById("master-search").addEventListener("input", e => { masterSearch=e.target.value; renderMaster(); });
+  window.delMaster = async id => {
+    if (!confirm("ลบ?")) return;
+    await deleteDoc(doc(db,"master_stock",id));
+    masterStock = masterStock.filter(m=>m.id!==id);
+    document.getElementById("master-count-badge").textContent = `${masterStock.length} รายการ`;
+    renderMaster(); toast("🗑️ ลบแล้ว");
+  };
+
+  document.getElementById("btn-import-master").addEventListener("click", async () => {
+    const file = document.getElementById("master-csv").files[0];
+    const clear = document.getElementById("master-clear").checked;
+    if (!file) { toast("⚠️ เลือกไฟล์ก่อน"); return; }
+    const text  = await file.text();
+    const lines = text.split("\n").filter(l=>l.trim());
+    const hdrs  = lines[0].split(",").map(h=>h.trim().replace(/^"|"$/g,"").toLowerCase());
+    const batch = writeBatch(db);
+    let count = 0;
+    if (clear) masterStock.forEach(m => batch.delete(doc(db,"master_stock",m.id)));
+    for (let i=1;i<lines.length;i++) {
+      const vals = lines[i].split(",").map(v=>v.trim().replace(/^"|"$/g,""));
+      const obj  = {}; hdrs.forEach((h,idx)=>{ obj[h]=vals[idx]||""; });
+      const loc  = (obj.location||"").toUpperCase().trim();
+      const tag  = (obj.tag_barcode||obj.barcode||"").trim();
+      if (!loc||!tag) continue;
+      batch.set(doc(collection(db,"master_stock")), {
+        location: loc, zone: obj.zone||"Normal",
+        tag_barcode: tag, item_name: obj.item_name||obj.name||"",
+        imported_at: serverTimestamp()
+      }); count++;
     }
-    el.innerHTML = myJobs.map(j => {
-      const cls = j.status === "Finished" ? "finished" : j.status === "Counting" ? "active" : "";
-      const badge = j.status === "Finished"
-        ? `<span class="badge badge-green">เสร็จแล้ว</span>`
-        : j.status === "Counting"
-          ? `<span class="badge badge-indigo">กำลังนับ</span>`
-          : `<span class="badge badge-gray">ยังไม่เริ่ม</span>`;
-      return `<div class="loc-card ${cls}" onclick="startLocation('${j.location}','${j.id}')">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div><div style="font-weight:700; font-size:1rem;">📍 ${j.location}</div>
-          <div style="font-size:0.8rem; color:var(--gray); margin-top:2px;">มอบหมาย: ${j.assigned_to || "ทุกคน"}</div></div>
-          ${badge}
+    await batch.commit(); await loadMaster();
+    toast(`✅ Import ${count} รายการ`, "ok");
+  });
+
+  // ══ JOBS ══════════════════════════════════════════════════
+  onSnapshot(query(collection(db,"count_jobs"), orderBy("start_time","desc"), limit(60)), snap => {
+    allJobs = snap.docs.map(d=>({id:d.id,...d.data()}));
+    const myJobs = profile.role==="admin" ? allJobs : allJobs.filter(j=>j.created_by===currentUser.uid);
+    renderJobList(myJobs);
+    document.getElementById("sj-total").textContent = myJobs.length;
+    document.getElementById("sj-prog").textContent  = myJobs.filter(j=>j.count_status==="In Progress").length;
+    document.getElementById("sj-done").textContent  = myJobs.filter(j=>j.count_status==="Completed").length;
+  });
+
+  function renderJobList(jobs) {
+    const el = document.getElementById("jobs-list");
+    if (!jobs.length) { el.innerHTML=`<div class="empty-state"><div class="empty-icon">📭</div><p>ยังไม่มีงาน — กด "เริ่มงานใหม่"</p></div>`; return; }
+    const Z = {"Normal":"zone-badge-normal","Zone B":"zone-badge-zoneb","Overflow":"zone-badge-overflow"};
+    el.innerHTML = jobs.map(j => {
+      const ts = j.start_time?.toDate ? j.start_time.toDate().toLocaleString("th-TH",{hour:"2-digit",minute:"2-digit",day:"numeric",month:"short"}) : "—";
+      const statusBadge = j.count_status==="Completed" ? `<span class="badge badge-green">เสร็จ</span>` : `<span class="badge badge-indigo">กำลังนับ</span>`;
+      return `<div class="job-card ${j.count_status==="Completed"?"finished":"counting"}" onclick="openJob('${j.id}')">
+        <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <div><div style="font-weight:700;">📍 ${j.location_scan}</div><div style="font-size:0.75rem;color:var(--gray);">${ts}</div></div>
+          <div style="display:flex;align-items:center;gap:0.4rem;"><span class="badge ${Z[j.zone_type]||"badge-gray"}">${j.zone_type}</span>${statusBadge}</div>
+        </div>
+        <div style="padding:0.55rem 1rem;display:flex;gap:1.5rem;font-size:0.82rem;color:var(--gray);">
+          <span>สแกน: <b style="color:var(--green);">${j.total_scanned||0}</b></span>
+          <span>Master: <b>${j.expected_target??'?'}</b></span>
+          ${j.count_status!=="Completed"?`<span style="margin-left:auto;color:var(--red);font-size:0.75rem;" onclick="event.stopPropagation();delJob('${j.id}')">🗑️ ลบ</span>`:""}
         </div>
       </div>`;
     }).join("");
-  });
+  }
 
-  // ── Start Location ────────────────────────────────────────
-  document.getElementById("btn-start-loc").addEventListener("click", async () => {
-    const loc = document.getElementById("loc-input").value.trim().toUpperCase();
-    if (!loc) { toast("⚠️ กรุณาระบุ Location"); return; }
-    await startLocation(loc, null);
-  });
+  window.openJob = async id => {
+    const j = allJobs.find(x=>x.id===id);
+    if (!j) return;
+    if (j.count_status==="Completed") { await showSummary(j); return; }
+    const s = await getDocs(query(collection(db,"count_details"),where("job_id","==",id),orderBy("timestamp")));
+    scannedDetails = s.docs.map(d=>({docId:d.id,...d.data()}));
+    scannedTags    = new Set(scannedDetails.map(d=>d.scanned_tag));
+    const exp      = await getExpected(j.location_scan);
+    curJob         = {id, location:j.location_scan, zone:j.zone_type, expected:exp};
+    showScanScreen();
+  };
 
-  window.startLocation = async (loc, jobId) => {
-    currentLoc = loc;
-    document.getElementById("current-loc-title").textContent = loc;
+  window.delJob = async id => {
+    if (!confirm("ลบ Job และข้อมูลสแกนทั้งหมด?")) return;
+    const s = await getDocs(query(collection(db,"count_details"),where("job_id","==",id)));
+    const b = writeBatch(db);
+    s.docs.forEach(d=>b.delete(d.ref));
+    b.delete(doc(db,"count_jobs",id));
+    await b.commit(); toast("🗑️ ลบแล้ว");
+  };
 
-    // หา Job หรือสร้างใหม่
-    const jobsSnap = await getDocs(query(collection(db, "stock_take_jobs"), where("location", "==", loc)));
-    if (jobsSnap.empty) {
-      // สร้าง Job ใหม่
-      const ref = await addDoc(collection(db, "stock_take_jobs"), {
-        location: loc,
-        assigned_to: profile.name,
-        status: "Counting",
-        start_time: serverTimestamp(),
-        end_time: null
-      });
-      currentJob = { id: ref.id, location: loc, status: "Counting" };
-    } else {
-      currentJob = { id: jobsSnap.docs[0].id, ...jobsSnap.docs[0].data() };
-      if (currentJob.status !== "Finished") {
-        await updateDoc(doc(db, "stock_take_jobs", currentJob.id), { status: "Counting", start_time: serverTimestamp() });
-      }
+  // ══ NEW JOB ════════════════════════════════════════════════
+  const locInput = document.getElementById("loc-input");
+
+  document.getElementById("btn-cam-loc").addEventListener("click", async () => {
+    const wrap = document.getElementById("cam-reader-loc");
+    if (locCam) {
+      await locCam.stop().catch(()=>{});
+      locCam = null; wrap.style.display="none";
+      document.getElementById("btn-cam-loc").textContent="📷 เปิดกล้องสแกน QR Location"; return;
     }
+    wrap.style.display="block"; wrap.innerHTML=`<div id="_loc_r"></div>`;
+    locCam = new Html5Qrcode("_loc_r");
+    await locCam.start({facingMode:"environment"},{fps:10,qrbox:{width:200,height:200}},
+      async text => {
+        locInput.value = text.toUpperCase();
+        locInput.dispatchEvent(new Event("input"));
+        await locCam.stop().catch(()=>{}); locCam=null; wrap.style.display="none";
+        document.getElementById("btn-cam-loc").textContent="📷 เปิดกล้องสแกน QR Location";
+      }, ()=>{}
+    ).catch(()=>toast("❌ ไม่สามารถเปิดกล้องได้","err"));
+  });
 
-    // โหลดสินค้าใน Location
-    const pSnap = await getDocs(query(collection(db, "products"), where("location", "==", loc)));
-    locationProducts = pSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => a.id.localeCompare(b.id));
+  locInput.addEventListener("input", async () => {
+    const loc = locInput.value.trim().toUpperCase();
+    if (!loc) { document.getElementById("loc-info").style.display="none"; return; }
+    const exp  = await getExpected(loc);
+    const zone = getZone(loc);
+    document.getElementById("loc-info").style.display="flex";
+    document.getElementById("loc-info-name").textContent  = `📍 ${loc}`;
+    document.getElementById("loc-info-zone").textContent  = zone;
+    document.getElementById("loc-info-count").textContent = exp ?? "ยังไม่มีใน Master";
+  });
 
-    document.getElementById("step-location").style.display = "none";
-    document.getElementById("step-count").style.display = "block";
-    renderCountView();
-    setupTagSearch();
-    renderNormalMode();
-  };
-
-  function renderCountView() {
-    const counted = locationProducts.filter(p => p.last_audit_date);
-    const pct = locationProducts.length > 0 ? Math.round((counted.length / locationProducts.length) * 100) : 0;
-    document.getElementById("count-progress").textContent = `${counted.length} / ${locationProducts.length}`;
-    document.getElementById("count-progress-bar").style.width = `${pct}%`;
-    // รายการที่นับแล้ว
-    const el = document.getElementById("counted-items");
-    if (!counted.length) { el.innerHTML = `<div style="color:var(--gray); font-size:0.875rem;">ยังไม่มีรายการ</div>`; return; }
-    el.innerHTML = counted.map(p => `
-      <div class="sku-card counted">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div><div style="font-weight:700">${p.id} — ${p.name}</div>
-          <div style="font-size:0.8rem; color:var(--gray);">Tag: ${p.tag||"—"}</div></div>
-          <div style="font-weight:700; color:var(--green);">✅ ${p.audit_qty_actual ?? "—"} ${p.unit}</div>
-        </div>
-      </div>`).join("");
+  function getExpected(loc) {
+    const rows = masterStock.filter(m=>m.location===loc.toUpperCase());
+    return rows.length ? rows.length : null;
+  }
+  function getZone(loc) {
+    return masterStock.find(m=>m.location===loc.toUpperCase())?.zone || "Normal";
   }
 
-  // ── Tag Mode ──────────────────────────────────────────────
-  function setupTagSearch() {
-    const input = document.getElementById("tag-sku");
-    const dd    = document.getElementById("tag-sku-dd");
-    input.addEventListener("input", () => {
-      const q = input.value.toLowerCase();
-      document.getElementById("tag-list").style.display = "none";
-      if (!q) { dd.style.display = "none"; return; }
-      const filtered = locationProducts.filter(p =>
-        p.id.toLowerCase().includes(q) || (p.name||"").toLowerCase().includes(q)
-      ).slice(0, 8);
-      if (!filtered.length) { dd.style.display = "none"; return; }
-      const skus = [...new Set(filtered.map(p => p.id))];
-      dd.innerHTML = skus.map(sku => {
-        const items = locationProducts.filter(p => p.id === sku);
-        return `<div style="padding:0.65rem 1rem; cursor:pointer; border-bottom:1px solid var(--border);"
-             onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''"
-             onclick="selectSKU('${sku}')">
-          <div style="font-weight:700;">${sku}</div>
-          <div style="font-size:0.78rem; color:var(--gray);">${items[0]?.name || ""} | Tags: ${items.map(i=>i.tag||"—").join(", ")}</div>
-        </div>`;
-      }).join("");
-      dd.style.display = "block";
+  document.getElementById("btn-start-job").addEventListener("click", async () => {
+    const loc  = locInput.value.trim().toUpperCase();
+    if (!loc) { toast("⚠️ ระบุ Location ก่อน"); return; }
+    const zone = getZone(loc);
+    const exp  = getExpected(loc);
+    const ref  = await addDoc(collection(db,"count_jobs"), {
+      location_scan: loc, zone_type: zone,
+      start_time: serverTimestamp(), count_status: "In Progress",
+      total_scanned: 0, expected_target: exp,
+      created_by: currentUser.uid, created_name: profile.name
     });
-    document.addEventListener("click", e => {
-      if (!input.contains(e.target) && !dd.contains(e.target)) dd.style.display = "none";
-    });
+    scannedDetails=[]; scannedTags=new Set();
+    curJob={id:ref.id, location:loc, zone, expected:exp};
+    locInput.value=""; document.getElementById("loc-info").style.display="none";
+    showScanScreen();
+  });
+
+  // ══ SCAN SCREEN ═══════════════════════════════════════════
+  function showScanScreen() {
+    document.getElementById("screen-home").style.display    = "none";
+    document.getElementById("screen-summary").style.display = "none";
+    document.getElementById("screen-scan").style.display    = "block";
+    document.getElementById("scan-loc-title").textContent   = curJob.location;
+    document.getElementById("scan-job-id").textContent      = curJob.id.slice(-6).toUpperCase();
+    const ZL = {"Normal":"Normal Zone","Zone B":"Zone B","Overflow":"Overflow"};
+    const ZC = {"Normal":"zone-badge-normal","Zone B":"zone-badge-zoneb","Overflow":"zone-badge-overflow"};
+    const badge = document.getElementById("scan-zone-badge");
+    badge.textContent = ZL[curJob.zone]||curJob.zone;
+    badge.className   = `badge ${ZC[curJob.zone]||"badge-gray"}`;
+    ["normal","zoneb","overflow"].forEach(z => document.getElementById(`zone-hint-${z}`).style.display="none");
+    const hintId = curJob.zone==="Normal"?"zone-hint-normal":curJob.zone==="Zone B"?"zone-hint-zoneb":"zone-hint-overflow";
+    document.getElementById(hintId).style.display = "block";
+    const isManual = curJob.zone !== "Normal";
+    document.getElementById("btn-finish-job").style.display  = isManual ? "flex" : "none";
+    document.getElementById("btn-done-normal").style.display = "none";
+    updateProgress(); renderScannedList();
+    setTimeout(() => document.getElementById("tag-input").focus(), 200);
   }
 
-  window.selectSKU = (sku) => {
-    document.getElementById("tag-sku").value = sku;
-    document.getElementById("tag-sku-dd").style.display = "none";
-    const items = locationProducts.filter(p => p.id === sku && !p.last_audit_date);
-    if (!items.length) { toast("✅ SKU นี้นับครบแล้ว"); return; }
-    const tags = [...new Set(items.map(p => p.tag).filter(Boolean))];
-    if (!tags.length) { window.confirmTagCount(sku, null); return; }
-    document.getElementById("tag-list").style.display = "block";
-    document.getElementById("tag-buttons").innerHTML = tags.map(tag => `
-      <button class="btn btn-indigo btn-sm" onclick="confirmTagCount('${sku}','${tag}')">${tag}</button>`).join("");
-  };
+  function updateProgress() {
+    const n = scannedDetails.length;
+    const e = curJob?.expected || 0;
+    const r = e > 0 ? Math.max(0, e-n) : null;
+    document.getElementById("ring-n").textContent    = n;
+    document.getElementById("ring-e").textContent    = e||"?";
+    document.getElementById("p-scanned").textContent = n;
+    document.getElementById("p-expected").textContent = e||"—";
+    document.getElementById("p-remain").textContent   = r!==null ? r : "—";
+    const pct  = e>0 ? Math.min(n/e,1) : 0;
+    const dash = CIRC - pct*CIRC;
+    const ring = document.getElementById("ring-dash");
+    ring.style.strokeDashoffset = dash;
+    ring.style.stroke = pct>=1 ? "#16a34a" : pct>=0.5 ? "#f59e0b" : "#6366f1";
+    if (curJob?.zone==="Normal" && e>0 && n>=e) {
+      document.getElementById("btn-done-normal").style.display="flex";
+    }
+  }
 
-  window.confirmTagCount = async (sku, tag) => {
-    const targets = locationProducts.filter(p =>
-      p.id === sku && (tag ? p.tag === tag : true) && !p.last_audit_date
-    );
-    if (!targets.length) { toast("✅ นับครบแล้ว"); return; }
-    const batch = writeBatch(db);
-    targets.forEach(p => {
-      batch.update(doc(db, "products", p.id), {
-        last_audit_date: new Date().toISOString(),
-        audit_qty_actual: p.quantity
-      });
-      p.last_audit_date = new Date().toISOString();
-      p.audit_qty_actual = p.quantity;
-    });
-    await batch.commit();
-    document.getElementById("tag-sku").value = "";
-    document.getElementById("tag-list").style.display = "none";
-    toast(`✅ นับ SKU ${sku} Tag ${tag||"—"} แล้ว (${targets.length} รายการ)`);
-    renderCountView();
-    renderNormalMode();
-  };
-
-  // ── Normal Mode ───────────────────────────────────────────
-  function renderNormalMode() {
-    const el = document.getElementById("normal-items");
-    const uncounted = locationProducts.filter(p => !p.last_audit_date);
-    if (!uncounted.length) {
-      el.innerHTML = `<div class="alert alert-success">✅ นับครบทุกรายการใน Location นี้แล้ว!</div>`;
+  function renderScannedList() {
+    const el = document.getElementById("scanned-list");
+    if (!scannedDetails.length) {
+      el.innerHTML=`<div style="text-align:center;color:var(--gray);font-size:0.875rem;padding:1rem 0;">ยังไม่มีรายการ — เริ่มสแกนได้เลย</div>`;
       return;
     }
-    el.innerHTML = uncounted.map(p => `
-      <div class="sku-card">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:0.75rem;">
-          <div style="flex:1;">
-            <div style="font-weight:700">${p.id}</div>
-            <div style="font-size:0.85rem; color:var(--gray);">${p.name} ${p.tag ? `| Tag: ${p.tag}` : ""}</div>
-            <div style="font-size:0.8rem; color:var(--gray);">ระบบ: ${p.quantity} ${p.unit}</div>
-          </div>
-          <input type="number" class="form-group" min="0" placeholder="จำนวน" style="width:90px; padding:0.5rem; border:1.5px solid var(--border); border-radius:8px; font-family:Sarabun,sans-serif; text-align:center;" data-sku="${p.id}" id="nqty-${p.id}">
-        </div>
+    el.innerHTML = [...scannedDetails].reverse().map((d,i) => `
+      <div class="scanned-item">
+        <div class="seq">${scannedDetails.length-i}</div>
+        <div class="tag">${d.scanned_tag}</div>
+        ${d.no_barcode?`<span class="badge badge-amber" style="font-size:0.65rem;">ไม่มีบาร์โค้ด</span>`:""}
+        <div class="tm">${d.scan_time||"—"}</div>
       </div>`).join("");
   }
 
-  document.getElementById("btn-save-normal").addEventListener("click", async () => {
-    const batch = writeBatch(db);
-    let count = 0;
-    locationProducts.filter(p => !p.last_audit_date).forEach(p => {
-      const input = document.getElementById(`nqty-${p.id}`);
-      if (!input || input.value === "") return;
-      const qty = parseInt(input.value);
-      batch.update(doc(db, "products", p.id), {
-        last_audit_date: new Date().toISOString(),
-        audit_qty_actual: qty
-      });
-      p.last_audit_date = new Date().toISOString();
-      p.audit_qty_actual = qty;
-      count++;
+  // ── CORE SCAN HANDLER ─────────────────────────────────────
+  async function handleScan(raw) {
+    if (!curJob) return;
+    const tag = raw.trim().toUpperCase();
+    if (!tag) return;
+    const now = Date.now();
+    if (now - lastScan < 500) return;
+    lastScan = now;
+
+    // ── ป้องกันซ้ำ (AppSheet: NOT IN existing scans) ──────
+    if (scannedTags.has(tag)) {
+      const inp = document.getElementById("tag-input");
+      inp.classList.add("shake","dup-bg");
+      document.getElementById("dup-error").style.display="block";
+      toast("⚠️ สแกนซ้ำ! บาร์โค้ดนี้ถูกสแกนไปแล้ว","err");
+      setTimeout(() => {
+        inp.classList.remove("shake","dup-bg");
+        document.getElementById("dup-error").style.display="none";
+        inp.value=""; inp.focus();
+      }, 1800);
+      return;
+    }
+
+    const timeStr = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+    const ref = await addDoc(collection(db,"count_details"), {
+      job_id: curJob.id, scanned_tag: tag,
+      scan_time: timeStr, no_barcode: false,
+      timestamp: serverTimestamp()
     });
-    if (!count) { toast("⚠️ ยังไม่ได้กรอกจำนวน"); return; }
-    await batch.commit();
-    toast(`✅ บันทึก ${count} รายการเรียบร้อย`);
-    renderCountView(); renderNormalMode();
+    scannedTags.add(tag);
+    scannedDetails.push({docId:ref.id, scanned_tag:tag, scan_time:timeStr, no_barcode:false});
+    await updateDoc(doc(db,"count_jobs",curJob.id), {total_scanned: scannedDetails.length});
+
+    document.getElementById("tag-input").value="";
+    document.getElementById("tag-input").focus();
+    document.getElementById("dup-error").style.display="none";
+    updateProgress(); renderScannedList();
+
+    // ── Zone Logic (AppSheet 3.1) ─────────────────────────
+    // Normal: เด้งอัตโนมัติเมื่อสแกนครบ expected
+    // Zone B / Overflow: ไม่เด้ง รอกดเอง
+    if (curJob.zone==="Normal" && curJob.expected>0 && scannedDetails.length>=curJob.expected) {
+      toast(`✅ นับครบ ${curJob.expected} ชิ้น!`, "ok", 1500);
+      setTimeout(() => finishJob(true), 1600);
+    }
+  }
+
+  document.getElementById("tag-input").addEventListener("keydown", e => {
+    if (e.key==="Enter") { e.preventDefault(); const v=e.target.value.trim(); if(v) handleScan(v); }
+  });
+  document.getElementById("tag-input").addEventListener("change", e => {
+    const v=e.target.value.trim(); if(v) handleScan(v);
   });
 
-  // ── Tab Mode Switch ───────────────────────────────────────
-  document.querySelectorAll("[data-mode]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll("[data-mode]").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      const mode = btn.dataset.mode;
-      document.getElementById("mode-tag").style.display    = mode === "tag"    ? "block" : "none";
-      document.getElementById("mode-normal").style.display = mode === "normal" ? "block" : "none";
-    });
+  // Camera
+  document.getElementById("btn-mode-text").addEventListener("click", () => {
+    document.getElementById("mode-text-wrap").style.display="block";
+    document.getElementById("mode-cam-wrap").style.display="none";
+    stopCam();
+    document.getElementById("btn-mode-text").style.cssText="flex:1;background:var(--green);color:white;border:none;";
+    document.getElementById("btn-mode-cam").style.cssText="flex:1;";
+    setTimeout(()=>document.getElementById("tag-input").focus(), 100);
+  });
+  document.getElementById("btn-mode-cam").addEventListener("click", async () => {
+    document.getElementById("mode-text-wrap").style.display="none";
+    document.getElementById("mode-cam-wrap").style.display="block";
+    document.getElementById("btn-mode-cam").style.cssText="flex:1;background:var(--indigo);color:white;border:none;";
+    document.getElementById("btn-mode-text").style.cssText="flex:1;";
+    await startCam();
   });
 
-  // ── Finish Job ────────────────────────────────────────────
-  document.getElementById("btn-finish-job").addEventListener("click", async () => {
-    if (!confirm(`จบงาน Location "${currentLoc}" แน่ใจหรือไม่?\nหลังจบแล้วจะไม่สามารถแก้ไขได้`)) return;
-    await updateDoc(doc(db, "stock_take_jobs", currentJob.id), {
-      status: "Finished",
-      end_time: serverTimestamp()
+  async function startCam() {
+    if (camStarted) return;
+    html5Cam = new Html5Qrcode("cam-reader");
+    await html5Cam.start({facingMode:"environment"},{fps:15,qrbox:{width:220,height:180}},
+      text=>handleScan(text), ()=>{}
+    ).then(()=>{ camStarted=true; document.getElementById("btn-stop-cam").style.display="block"; })
+    .catch(()=>toast("❌ เปิดกล้องไม่ได้","err"));
+  }
+  async function stopCam() {
+    if (html5Cam && camStarted) { await html5Cam.stop().catch(()=>{}); html5Cam=null; camStarted=false; document.getElementById("btn-stop-cam").style.display="none"; }
+  }
+  document.getElementById("btn-stop-cam").addEventListener("click", ()=>{ stopCam(); document.getElementById("btn-mode-text").click(); });
+
+  // No barcode
+  document.getElementById("chk-no-bc").addEventListener("change", e => {
+    document.getElementById("no-bc-wrap").style.display = e.target.checked?"block":"none";
+  });
+  document.getElementById("btn-add-manual").addEventListener("click", async () => {
+    const tag = (document.getElementById("manual-tag").value.trim().toUpperCase()) ||
+                `NOBC-${String(scannedDetails.length+1).padStart(3,"0")}`;
+    if (scannedTags.has(tag)) { toast("⚠️ รหัสซ้ำ","err"); return; }
+    const ts = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+    const ref = await addDoc(collection(db,"count_details"),{
+      job_id:curJob.id, scanned_tag:tag, scan_time:ts, no_barcode:true, timestamp:serverTimestamp()
     });
-    toast("🏁 จบงานเรียบร้อย!");
-    setTimeout(() => {
-      document.getElementById("step-count").style.display    = "none";
-      document.getElementById("step-location").style.display = "block";
-    }, 1000);
+    scannedTags.add(tag);
+    scannedDetails.push({docId:ref.id, scanned_tag:tag, scan_time:ts, no_barcode:true});
+    await updateDoc(doc(db,"count_jobs",curJob.id),{total_scanned:scannedDetails.length});
+    document.getElementById("manual-tag").value="";
+    document.getElementById("chk-no-bc").checked=false;
+    document.getElementById("no-bc-wrap").style.display="none";
+    updateProgress(); renderScannedList();
+    toast(`✅ เพิ่ม ${tag}`, "ok");
   });
 
-  document.getElementById("btn-back-loc").addEventListener("click", () => {
-    document.getElementById("step-count").style.display    = "none";
-    document.getElementById("step-location").style.display = "block";
+  // Finish
+  async function finishJob() {
+    if (!curJob) return;
+    await updateDoc(doc(db,"count_jobs",curJob.id), {
+      count_status:"Completed", end_time:serverTimestamp(), total_scanned:scannedDetails.length
+    });
+    await stopCam();
+    await showSummary({...curJob, location_scan:curJob.location, zone_type:curJob.zone, total_scanned:scannedDetails.length, expected_target:curJob.expected});
+  }
+  document.getElementById("btn-finish-job").addEventListener("click", ()=>finishJob());
+  document.getElementById("btn-done-normal").addEventListener("click", ()=>finishJob());
+
+  document.getElementById("btn-back-home").addEventListener("click", async ()=>{
+    await stopCam();
+    document.getElementById("screen-scan").style.display="none";
+    document.getElementById("screen-home").style.display="block";
+    curJob=null; scannedDetails=[]; scannedTags=new Set();
   });
+
+  document.getElementById("btn-export-scan").addEventListener("click", ()=>{
+    if (!scannedDetails.length) { toast("ไม่มีข้อมูล"); return; }
+    dlCSV([["#","Barcode","เวลา","หมายเหตุ"],...scannedDetails.map((d,i)=>[i+1,d.scanned_tag,d.scan_time,d.no_barcode?"ไม่มีบาร์โค้ด":""])],
+      `scan_${curJob?.location}_${new Date().toISOString().slice(0,10)}.csv`);
+    toast("✅ Export แล้ว","ok");
+  });
+
+  // ══ SUMMARY ═══════════════════════════════════════════════
+  async function showSummary(job) {
+    await stopCam();
+    document.getElementById("screen-scan").style.display    = "none";
+    document.getElementById("screen-home").style.display    = "none";
+    document.getElementById("screen-summary").style.display = "block";
+    const n = job.total_scanned ?? scannedDetails.length;
+    const e = job.expected_target ?? job.expected ?? 0;
+    const d = n-e;
+    document.getElementById("sum-icon").textContent    = d===0?"🎉":d>0?"📦":"⚠️";
+    document.getElementById("sum-loc").textContent     = job.location_scan||job.location;
+    const ZC = {"Normal":"zone-badge-normal","Zone B":"zone-badge-zoneb","Overflow":"zone-badge-overflow"};
+    const sb = document.getElementById("sum-zone-badge");
+    sb.textContent = job.zone_type||job.zone||"—";
+    sb.className   = `badge ${ZC[job.zone_type||job.zone]||"badge-gray"}`;
+    document.getElementById("sum-scanned").textContent  = n;
+    document.getElementById("sum-expected").textContent = e||"—";
+    const diffEl = document.getElementById("sum-diff");
+    diffEl.textContent = d===0?"0 ✅":d>0?`+${d} 📦`:`${d} ⚠️`;
+    diffEl.style.color = d===0?"var(--green)":d>0?"var(--amber)":"var(--red)";
+    let details = scannedDetails;
+    if (!details.length && job.id) {
+      const s = await getDocs(query(collection(db,"count_details"),where("job_id","==",job.id),orderBy("timestamp")));
+      details = s.docs.map(dd=>({docId:dd.id,...dd.data()}));
+    }
+    document.getElementById("sum-tbody").innerHTML = details.map((x,i)=>`
+      <tr><td>${i+1}</td><td style="font-family:monospace;">${x.scanned_tag}</td>
+      <td>${x.scan_time||"—"}</td>
+      <td>${x.no_barcode?`<span class="badge badge-amber">ไม่มีบาร์โค้ด</span>`:"—"}</td></tr>`).join("")
+      || `<tr><td colspan="4" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่มีข้อมูล</td></tr>`;
+    scannedDetails = details;
+  }
+  document.getElementById("btn-sum-back").addEventListener("click", ()=>{
+    document.getElementById("screen-summary").style.display="none";
+    document.getElementById("screen-home").style.display="block";
+    curJob=null; scannedDetails=[]; scannedTags=new Set();
+  });
+  document.getElementById("btn-sum-export").addEventListener("click", ()=>{
+    if (!scannedDetails.length) { toast("ไม่มีข้อมูล"); return; }
+    dlCSV([["#","Barcode","เวลา","หมายเหตุ"],...scannedDetails.map((d,i)=>[i+1,d.scanned_tag,d.scan_time,d.no_barcode?"ไม่มีบาร์โค้ด":""])],
+      `summary_${new Date().toISOString().slice(0,10)}.csv`);
+    toast("✅ Export แล้ว","ok");
+  });
+
+  function dlCSV(rows, name) {
+    const csv = rows.map(r=>r.map(v=>`"${v}"`).join(",")).join("\n");
+    const a   = Object.assign(document.createElement("a"),{href:URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"})),download:name});
+    a.click();
+  }
 </script>
 </body>
 </html>
