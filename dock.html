@@ -82,7 +82,7 @@ const TIMENOW = ()=>new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-
 const safe = v=>{ if(!v)return[]; if(Array.isArray(v))return v.filter(Boolean); return Object.values(v).filter(Boolean); };
 
 const STATUSES  = ['Pending','Arrived','Loading','WaitingDoc','Completed'];
-const STAT_LBL  = {Pending:'รอเข้าท่า',Arrived:'1.รถมาถึง',Loading:'2.โหลดงาน',WaitingDoc:'3.รอเอกสาร',Completed:'4.เสร็จสิ้น'};
+const STAT_LBL  = {Pending:'รอเข้าท่า',Arrived:'1.รถมาดึง',Loading:'2.โหลดงาน',WaitingDoc:'3.รอเอกสาร',Completed:'4.เสร็จสิ้น'};
 const STAT_CLS  = {
   Pending:'bg-slate-100 text-slate-600 border-slate-300',
   Arrived:'bg-sky-100 text-sky-700 border-sky-300',
@@ -131,7 +131,7 @@ const printQR = bay=>{
   <div class="qw"><img class="qi" src="${qrUrl}" onload="window.print();window.close()"><div class="qc">${code}</div></div>
   <div class="ins">📱 สแกน QR Code เพื่ออัปเดตสถานะ<br>Scan this QR Code to update dock status</div>
   <div class="chips">
-    <div class="chip" style="background:#dbeafe;color:#1d4ed8">1. รถมาถึง</div>
+    <div class="chip" style="background:#dbeafe;color:#1d4ed8">1. รถมาดึง</div>
     <div class="chip" style="background:#ede9fe;color:#6d28d9">2. โหลดงาน</div>
     <div class="chip" style="background:#fff7ed;color:#c2410c">3. รอเอกสาร</div>
     <div class="chip" style="background:#dcfce7;color:#15803d">4. เสร็จสิ้น</div>
@@ -626,7 +626,7 @@ const ScanView = ({scanOn, setScanOn, scanMsg})=>(
     <div className="w-full max-w-md">
       <h3 className="font-black text-2xl text-slate-800 text-center mb-3">📷 สแกนคิวอัตโนมัติ</h3>
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-sm text-amber-800">
-        💡 ลำดับสแกน: 1.รถมาถึง → 2.โหลดงาน → 3.รอเอกสาร → 4.เสร็จสิ้น
+        💡 ลำดับสแกน: 1.รถมาดึง → 2.โหลดงาน → 3.รอเอกสาร → 4.เสร็จสิ้น
       </div>
       {scanMsg.text && (
         <div className={`rounded-xl p-4 mb-4 text-center font-bold ${scanMsg.ok?'bg-emerald-50 text-emerald-800 border border-emerald-200':'bg-red-50 text-red-800 border border-red-200'}`}>
@@ -648,14 +648,15 @@ const ScanView = ({scanOn, setScanOn, scanMsg})=>(
 // ════════════════════════════════════════════════════════════
 // APP — state & logic only, no sub-component definitions here
 // ════════════════════════════════════════════════════════════
-const BLANK = {
+const getBlank = ()=>({
   date:TODAY(), startTime:'', endTime:'',
   shipmentNo:'', doNumber:'', vendor:'',
   license:'', vehicle:'6WT', jobType:'OUT',
   allocation:'Waitlist', driverName:'',
   bookingNo:'', containerNo:'', sealNo:'',
   origin:'CEVA WAREHOUSE', destination:'PAT WAREHOUSE',
-};
+});
+const BLANK = getBlank();
 
 function App() {
   const [bays,     setBays]     = React.useState(INIT_BAYS);
@@ -665,7 +666,7 @@ function App() {
   const [tab,      setTab]      = React.useState('board');
   const [role,     setRole]     = React.useState('Admin');
   const [editId,   setEditId]   = React.useState(null);
-  const [form,     setForm]     = React.useState({...BLANK});
+  const [form,     setForm]     = React.useState(getBlank());
   const [scanOn,   setScanOn]   = React.useState(false);
   const [scanMsg,  setScanMsg]  = React.useState({text:'',ok:false});
   const lastScan = React.useRef({text:'',t:0});
@@ -723,7 +724,7 @@ function App() {
         if(next==='WaitingDoc') upd.timeWaitingDoc=t;
         if(next==='Completed')  upd.timeCompleted=t;
         const nb=bookings.map(x=>x.id===booking.id?upd:x);
-        setBookings(nb); rtdb.ref('smartdock/bookings').set(nb);
+        rtdb.ref('smartdock/bookings').set(nb);
         setScanMsg({text:`✅ ${booking.shipmentNo} → ${STAT_LBL[next]}`,ok:true});
         setTimeout(()=>setScanMsg({text:'',ok:false}),3000);
       },()=>{}).catch(()=>setScanOn(false));
@@ -731,8 +732,8 @@ function App() {
   },[scanOn,bays,bookings]);
 
   // ── Helpers ───────────────────────────────────────────
-  const syncBookings = nb=>{ setBookings(nb); rtdb.ref('smartdock/bookings').set(nb); };
-  const syncBays     = nd=>{ setBays(nd);     rtdb.ref('smartdock/bays').set(nd); };
+  const syncBookings = nb=>{ rtdb.ref('smartdock/bookings').set(nb); };
+  const syncBays     = nd=>{ rtdb.ref('smartdock/bays').set(nd); };
 
   const isDelay = b=>{
     if(!b||b.status==='Completed'||b.status==='Pending') return false;
@@ -742,7 +743,7 @@ function App() {
 
   const handleEdit = b=>{ if(!isPower)return; setForm({...BLANK,...b}); setEditId(b.id); window.scrollTo({top:0,behavior:'smooth'}); };
   const handleDelete = id=>{ if(!isPower||!confirm('ลบรายการนี้?'))return; syncBookings(bookings.filter(b=>b.id!==id)); };
-  const cancelEdit = ()=>{ setEditId(null); setForm({...BLANK}); };
+  const cancelEdit = ()=>{ setEditId(null); setForm(getBlank()); };
   const handleCycle = b=>{
     if(!isPower){alert('ต้องสแกนบาร์โค้ดที่หน้างาน');return;}
     const i=STATUSES.indexOf(b.status);
@@ -764,10 +765,26 @@ function App() {
   };
   const handleSubmit=()=>{
     if(!isPower)return;
-    if(!form.startTime||!form.endTime||!form.vendor||!form.license){alert('กรุณากรอกข้อมูลให้ครบ');return;}
+    if(!form.startTime||!form.endTime||!form.vendor||!form.license){
+      alert('กรุณากรอกข้อมูลให้ครบ (เวลา, บริษัท, ทะเบียน)');return;
+    }
     if(form.startTime>=form.endTime){alert('เวลาออกต้องมากกว่าเวลาเข้า');return;}
-    const nb=editId?bookings.map(b=>b.id===editId?{...b,...form}:b):[...bookings,{...form,status:'Pending',id:Date.now()}];
-    syncBookings(nb); setEditId(null); setForm({...BLANK});
+    const newEntry={
+      ...form,
+      status: editId ? (bookings.find(b=>b.id===editId)?.status||'Pending') : 'Pending',
+      id: editId || Date.now(),
+      updatedAt: Date.now()
+    };
+    let nb;
+    if(editId){
+      nb=bookings.map(b=>b.id===editId?newEntry:b);
+    } else {
+      nb=[...bookings, newEntry];
+    }
+    rtdb.ref('smartdock/bookings').set(nb).then(()=>{
+      setEditId(null);
+      setForm(getBlank());
+    }).catch(err=>alert('บันทึกไม่สำเร็จ: '+err.message));
   };
   const exportCSV=()=>{
     const done=bookings.filter(b=>b.status==='Completed'&&b.date===viewDate);
