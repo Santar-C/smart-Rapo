@@ -4,93 +4,86 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Dock Pro — RAPO</title>
-
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- React & ReactDOM -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
-  <!-- Babel -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Html5Qrcode -->
   <script src="https://unpkg.com/html5-qrcode"></script>
-
-  <!-- Firebase v8 -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 
   <style>
-    body { font-family:'Sarabun','Inter',sans-serif; background:#f8fafc; }
-    .scroll-hide::-webkit-scrollbar { display:none; }
-    .scroll-hide { -ms-overflow-style:none; scrollbar-width:none; }
-    .dock-scroll::-webkit-scrollbar { width:5px; height:5px; }
-    .dock-scroll::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:10px; }
-    @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
-    .fade-in { animation:fadeIn 0.25s ease; }
-    @keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:0.5} }
-    .pulse-red { animation:pulse-red 1s ease-in-out infinite; }
+    body { font-family:'Sarabun',sans-serif; background:#f8fafc; }
+    .sh::-webkit-scrollbar{display:none} .sh{-ms-overflow-style:none;scrollbar-width:none}
+    .ds::-webkit-scrollbar{width:5px;height:5px} .ds::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:10px}
+    @keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}} .fi{animation:fi .25s ease}
+    @keyframes pr{0%,100%{opacity:1}50%{opacity:.5}} .pr{animation:pr 1s ease-in-out infinite}
 
-    /* ── PRINT: Truck Manifest A4 Landscape ── */
+    /* ══ PRINT: Truck Manifest A4 Landscape ══════════════════
+       Fix #3: Force A4 landscape, full-width, hide all UI
+    ══════════════════════════════════════════════════════════ */
     @media print {
-      html, body { margin:0; padding:0; }
-      body > #root { display:none !important; }
-      #manifest-print-area {
-        display:block !important;
-        position:fixed; inset:0;
-        width:297mm; min-height:210mm;
-        background:white;
-        font-family:'Sarabun','Inter',sans-serif;
-        -webkit-print-color-adjust:exact;
-        print-color-adjust:exact;
+      @page { size: A4 landscape; margin: 8mm; }
+
+      /* ── ซ่อนทุกอย่างยกเว้น manifest ── */
+      html, body { margin:0!important; padding:0!important; overflow:visible!important; height:auto!important; }
+      body > * { display:none!important; }
+      #mp { display:flex!important; }
+
+      #mp {
+        position:fixed!important;
+        inset:0!important;
+        width:100%!important;
+        min-height:100%!important;
+        background:white!important;
+        z-index:99999!important;
+        flex-direction:column!important;
+        padding:0!important;
+        margin:0!important;
+        box-sizing:border-box!important;
+        -webkit-print-color-adjust:exact!important;
+        print-color-adjust:exact!important;
       }
-      @page { size:A4 landscape; margin:10mm; }
     }
-    #manifest-print-area { display:none; }
 
-    /* QR A5 print */
-    #qr-print-frame { display:none; }
-    @media print {
-      #qr-print-frame { display:block !important; }
-      @page { size:A5 portrait; margin:0; }
-    }
+    /* ── Manifest screen preview (hidden) ── */
+    #mp { display:none; }
   </style>
 </head>
 <body class="h-[100dvh] overflow-hidden text-slate-800">
+
 <div id="root" class="h-full flex flex-col"></div>
 
-<!-- Hidden Manifest Print Area -->
-<div id="manifest-print-area"></div>
+<!-- ══ Truck Manifest Print Area ══════════════════════════ -->
+<div id="mp"></div>
 
 <script type="text/babel">
-// ══════════════════════════════════════════════════════════
-// FIREBASE CONFIG — rapo-system (ถูกต้อง)
-// ══════════════════════════════════════════════════════════
-const FB_CONFIG = {
-  apiKey:            "AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
-  authDomain:        "rapo-system.firebaseapp.com",
-  databaseURL:       "https://rapo-system-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId:         "rapo-system",
-  storageBucket:     "rapo-system.firebasestorage.app",
-  messagingSenderId: "87090183469",
-  appId:             "1:87090183469:web:eafb1ded183755f329a7a4"
+// ════════════════════════════════════════════════════════════
+// FIREBASE — rapo-system
+// ════════════════════════════════════════════════════════════
+const FB = {
+  apiKey:"AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
+  authDomain:"rapo-system.firebaseapp.com",
+  databaseURL:"https://rapo-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"rapo-system",
+  storageBucket:"rapo-system.firebasestorage.app",
+  messagingSenderId:"87090183469",
+  appId:"1:87090183469:web:eafb1ded183755f329a7a4"
 };
-if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+if(!firebase.apps.length) firebase.initializeApp(FB);
 const rtdb = firebase.database();
 
-// ══════════════════════════════════════════════════════════
-// CONSTANTS
-// ══════════════════════════════════════════════════════════
-const TODAY = () => new Date().toISOString().split('T')[0];
-const TIME_NOW = () => new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
+// ════════════════════════════════════════════════════════════
+// CONSTANTS & HELPERS
+// ════════════════════════════════════════════════════════════
+const TODAY   = ()=>new Date().toISOString().split('T')[0];
+const TIMENOW = ()=>new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
+const safe = v=>{ if(!v)return[]; if(Array.isArray(v))return v.filter(Boolean); return Object.values(v).filter(Boolean); };
 
-const STATUSES = ['Pending','Arrived','Loading','WaitingDoc','Completed'];
-const STATUS_LABEL = { Pending:'รอเข้าท่า', Arrived:'1.รถมาดึง', Loading:'2.โหลดงาน', WaitingDoc:'3.รอเอกสาร', Completed:'4.เสร็จสิ้น' };
-const STATUS_CLS = {
+const STATUSES  = ['Pending','Arrived','Loading','WaitingDoc','Completed'];
+const STAT_LBL  = {Pending:'รอเข้าท่า',Arrived:'1.รถมาถึง',Loading:'2.โหลดงาน',WaitingDoc:'3.รอเอกสาร',Completed:'4.เสร็จสิ้น'};
+const STAT_CLS  = {
   Pending:'bg-slate-100 text-slate-600 border-slate-300',
   Arrived:'bg-sky-100 text-sky-700 border-sky-300',
   Loading:'bg-purple-100 text-purple-700 border-purple-300',
@@ -98,803 +91,713 @@ const STATUS_CLS = {
   Completed:'bg-emerald-100 text-emerald-700 border-emerald-300',
 };
 const INIT_BAYS = Array.from({length:9},(_,i)=>({name:`Dock ${String(i+1).padStart(2,'0')}`,status:'Available'}));
+const VEHICLES  = ['4WT','6WT','20FT','40FT','40HQ'];
 
-// Auto-generate shipment number
-const genShipmentNo = (date, type, bookings) => {
-  if (!date) return '';
-  const d = new Date(date);
-  const prefix = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-  const code = type === 'OUT' ? 'RCEX' : 'RCIM';
-  const existing = bookings.filter(b => b.shipmentNo?.startsWith(`${prefix}-${code}`));
-  let max = 0;
-  existing.forEach(b => {
-    const m = b.shipmentNo?.match(new RegExp(`-${code}(\\d+)$`));
-    if (m) max = Math.max(max, parseInt(m[1]));
-  });
-  return `${prefix}-${code}${String(max+1).padStart(2,'0')}`;
+const genDocNo = (date,type,bookings)=>{
+  if(!date) return '';
+  const d=new Date(date);
+  const pre=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  const code=type==='OUT'?'RCEX':'RCIM';
+  const existing=bookings.filter(b=>b.shipmentNo?.startsWith(`${pre}-${code}`));
+  let max=0; existing.forEach(b=>{ const m=b.shipmentNo?.match(new RegExp(`-${code}(\\d+)$`)); if(m)max=Math.max(max,parseInt(m[1])); });
+  return `${pre}-${code}${String(max+1).padStart(2,'0')}`;
 };
 
-const safe = v => {
-  if (!v) return [];
-  if (Array.isArray(v)) return v.filter(Boolean);
-  return Object.values(v).filter(Boolean);
+// Print QR A5 in new window
+const printQR = bay=>{
+  const code = bay.name.toUpperCase().replace(/\s+/g,'-');
+  const qrUrl= `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(code)}&color=021D49&margin=10`;
+  const today= new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+  const w = window.open('','_blank','width=600,height=850');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    @page{size:A5 portrait;margin:0}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Sarabun',sans-serif;width:148mm;height:210mm;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8mm;background:white}
+    .hdr{width:100%;display:flex;justify-content:space-between;align-items:center;padding-bottom:5mm;border-bottom:1.5px solid #e2e8f0;margin-bottom:6mm}
+    .logo{width:10mm;height:10mm;background:#021D49;border-radius:2mm;display:flex;align-items:center;justify-content:center;color:white;font-weight:900;font-size:5mm}
+    .co{font-size:4mm;font-weight:700;color:#021D49} .sub{font-size:2.5mm;color:#64748b}
+    .dn{font-size:20mm;font-weight:900;color:#021D49;text-align:center;margin:4mm 0 3mm;line-height:1}
+    .qw{background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:4mm;padding:6mm;display:flex;flex-direction:column;align-items:center;gap:3mm;width:100%;max-width:90mm}
+    .qi{width:55mm;height:55mm} .qc{font-family:monospace;font-size:5mm;font-weight:700;color:#374151;background:#e2e8f0;padding:1.5mm 4mm;border-radius:2mm;letter-spacing:.08em}
+    .ins{font-size:2.8mm;color:#64748b;text-align:center;margin-top:4mm;line-height:1.5}
+    .chips{display:flex;gap:2mm;flex-wrap:wrap;justify-content:center;margin-top:3mm}
+    .chip{font-size:2.3mm;padding:1mm 3mm;border-radius:2mm;font-weight:700}
+    .ft{margin-top:auto;padding-top:4mm;border-top:1px solid #e2e8f0;width:100%;display:flex;justify-content:space-between;font-size:2.3mm;color:#94a3b8}
+  </style></head><body>
+  <div class="hdr"><div style="display:flex;align-items:center;gap:3mm"><div class="logo">R</div><div><div class="co">RAPO — Smart Dock</div><div class="sub">ป้ายประจำช่องจอด / Dock Badge</div></div></div><div style="text-align:right;font-size:2.5mm;color:#94a3b8">${today}</div></div>
+  <div class="dn">${bay.name}</div>
+  <div class="qw"><img class="qi" src="${qrUrl}" onload="window.print();window.close()"><div class="qc">${code}</div></div>
+  <div class="ins">📱 สแกน QR Code เพื่ออัปเดตสถานะ<br>Scan this QR Code to update dock status</div>
+  <div class="chips">
+    <div class="chip" style="background:#dbeafe;color:#1d4ed8">1. รถมาถึง</div>
+    <div class="chip" style="background:#ede9fe;color:#6d28d9">2. โหลดงาน</div>
+    <div class="chip" style="background:#fff7ed;color:#c2410c">3. รอเอกสาร</div>
+    <div class="chip" style="background:#dcfce7;color:#15803d">4. เสร็จสิ้น</div>
+  </div>
+  <div class="ft"><span>RAPO Stock & Dock System</span><span>santar-c.github.io/smart-Rapo</span></div>
+  </body></html>`);
+  w.document.close();
 };
 
-const { useState, useEffect, useRef, useCallback } = React;
+// Print Truck Manifest A4 Landscape
+const printManifest = b=>{
+  const fd=s=>{ if(!s)return''; const d=new Date(s); return `${d.getDate()}-${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}-${d.getFullYear().toString().slice(-2)}`; };
+  const vb=(lbl,match)=>`<span style="font-family:monospace">__${match?'X':'_'}__</span> ${lbl}`;
+  document.getElementById('mp').innerHTML=`
+  <div style="width:100%;height:100%;background:white;padding:8mm 10mm;font-family:'Sarabun',sans-serif;display:flex;flex-direction:column;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact">
 
-// ══════════════════════════════════════════════════════════
-// APP
-// ══════════════════════════════════════════════════════════
-function App() {
-  const [bays,     setBays]     = useState(INIT_BAYS);
-  const [bookings, setBookings] = useState([]);
-  const [online,   setOnline]   = useState(false);
-  const [viewDate, setViewDate] = useState(TODAY());
-  const [tab,      setTab]      = useState('board');
-  const [role,     setRole]     = useState('Admin');
-  const [editId,   setEditId]   = useState(null);
-  const [manifest, setManifest] = useState(null); // for print
-  const [scanOn,   setScanOn]   = useState(false);
-  const [scanMsg,  setScanMsg]  = useState({text:'',ok:false});
-  const lastScan = useRef({text:'',t:0});
-
-  const isPower  = ['Admin','Ship Co'].includes(role);
-  const isAdmin  = role === 'Admin';
-  const canDock  = ['Admin','Sup'].includes(role);
-
-  const BLANK_FORM = {
-    date:TODAY(), startTime:'', endTime:'',
-    shipmentNo:'', doNumber:'', vendor:'',
-    license:'', vehicle:'6WT', jobType:'OUT',
-    allocation:'Waitlist', driverName:'',
-    bookingNo:'', containerNo:'', sealNo:'',
-    origin:'CEVA WAREHOUSE', destination:'PAT WAREHOUSE',
-  };
-  const [form, setForm] = useState(BLANK_FORM);
-
-  // ── Firebase realtime sync ────────────────────────────
-  useEffect(() => {
-    const bRef = rtdb.ref('smartdock/bookings');
-    const dRef = rtdb.ref('smartdock/bays');
-    bRef.on('value', snap => {
-      setBookings(safe(snap.val()));
-      setOnline(true);
-    }, () => setOnline(false));
-    dRef.on('value', snap => {
-      const d = safe(snap.val());
-      setBays(d.length ? d.map(x => typeof x==='string' ? {name:x,status:'Available'} : x) : INIT_BAYS);
-    });
-    return () => { bRef.off(); dRef.off(); };
-  }, []);
-
-  // ── Auto-generate shipment no ─────────────────────────
-  useEffect(() => {
-    if (editId) return;
-    const auto = genShipmentNo(form.date, form.jobType, bookings);
-    setForm(p => p.shipmentNo !== auto ? {...p, shipmentNo:auto} : p);
-  }, [form.date, form.jobType, bookings, editId]);
-
-  // ── Sync helpers ──────────────────────────────────────
-  const syncBookings = b => { setBookings(b); rtdb.ref('smartdock/bookings').set(b); };
-  const syncBays     = d => { setBays(d);     rtdb.ref('smartdock/bays').set(d); };
-
-  // ── Computed ──────────────────────────────────────────
-  const todayBooks = bookings.filter(b => b.date===viewDate && b.status!=='Completed');
-  const waitlist   = todayBooks.filter(b => b.allocation==='Waitlist');
-  const dockBooks  = todayBooks.filter(b => b.allocation!=='Waitlist');
-
-  const isDelay = b => {
-    if (!b || b.status==='Completed'||b.status==='Pending') return false;
-    if (b.date !== TODAY()) return false;
-    return TIME_NOW() > b.endTime;
-  };
-
-  // ── Form submit ───────────────────────────────────────
-  const handleSubmit = e => {
-    e.preventDefault();
-    if (!isPower) return;
-    if (form.startTime >= form.endTime) { alert('เวลาออกต้องมากกว่าเวลาเข้า'); return; }
-    const data = {...form, status:'Pending'};
-    let next;
-    if (editId) {
-      next = bookings.map(b => b.id===editId ? {...b,...data} : b);
-    } else {
-      next = [...bookings, {...data, id:Date.now()}];
-    }
-    syncBookings(next);
-    setEditId(null);
-    setForm({...BLANK_FORM});
-  };
-
-  const handleEdit = b => {
-    if (!isPower) return;
-    setForm({...BLANK_FORM,...b});
-    setEditId(b.id);
-    window.scrollTo({top:0,behavior:'smooth'});
-  };
-
-  const handleDelete = id => {
-    if (!isPower) return;
-    if (!confirm('ลบรายการนี้?')) return;
-    syncBookings(bookings.filter(b=>b.id!==id));
-  };
-
-  const cycleStatus = b => {
-    if (!isPower) { alert('ต้องสแกนบาร์โค้ดที่หน้างาน'); return; }
-    const i = STATUSES.indexOf(b.status);
-    const next = STATUSES[(i+1)%STATUSES.length];
-    const now  = TIME_NOW();
-    const upd  = {...b, status:next};
-    if (next==='Arrived'    && !upd.timeArrived)    upd.timeArrived    = now;
-    if (next==='Loading'    && !upd.timeLoading)    upd.timeLoading    = now;
-    if (next==='WaitingDoc' && !upd.timeWaitingDoc) upd.timeWaitingDoc = now;
-    if (next==='Completed'  && !upd.timeCompleted)  upd.timeCompleted  = now;
-    syncBookings(bookings.map(x=>x.id===b.id?upd:x));
-  };
-
-  const toggleBay = (name, cur) => {
-    if (!canDock) return;
-    let next = 'Available';
-    if (cur==='Available') next='Busy';
-    else if (cur==='Busy') next = isAdmin ? 'Maintenance' : 'Available';
-    syncBays(bays.map(d=>d.name===name?{...d,status:next}:d));
-  };
-
-  // ── QR A5 Print ───────────────────────────────────────
-  const printQR = bay => {
-    const code  = bay.name.toUpperCase().replace(/\s+/g,'-');
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(code)}&color=021D49&margin=10`;
-    const today = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
-    const printWin = window.open('','_blank','width=600,height=850');
-    printWin.document.write(`<!DOCTYPE html><html><head>
-      <meta charset="UTF-8">
-      <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;900&display=swap" rel="stylesheet">
-      <style>
-        @page { size:A5 portrait; margin:0; }
-        * { box-sizing:border-box; margin:0; padding:0; }
-        body { font-family:'Sarabun',sans-serif; width:148mm; height:210mm; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8mm; background:white; }
-        .header { width:100%; display:flex; justify-content:space-between; align-items:center; padding-bottom:5mm; border-bottom:1.5px solid #e2e8f0; margin-bottom:6mm; }
-        .logo   { width:10mm; height:10mm; background:#021D49; border-radius:2mm; display:flex; align-items:center; justify-content:center; color:white; font-weight:900; font-size:5mm; }
-        .company { font-size:4mm; font-weight:700; color:#021D49; }
-        .sub     { font-size:2.5mm; color:#64748b; }
-        .dock-name { font-size:20mm; font-weight:900; color:#021D49; text-align:center; margin:4mm 0 3mm; line-height:1; }
-        .qr-wrap { background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:4mm; padding:6mm; display:flex; flex-direction:column; align-items:center; gap:3mm; width:100%; max-width:90mm; }
-        .qr-img  { width:55mm; height:55mm; }
-        .qr-code { font-family:monospace; font-size:5mm; font-weight:700; color:#374151; background:#e2e8f0; padding:1.5mm 4mm; border-radius:2mm; letter-spacing:0.08em; }
-        .inst    { font-size:2.8mm; color:#64748b; text-align:center; margin-top:4mm; line-height:1.5; }
-        .chips   { display:flex; gap:2mm; flex-wrap:wrap; justify-content:center; margin-top:3mm; }
-        .chip    { font-size:2.3mm; padding:1mm 3mm; border-radius:2mm; font-weight:700; }
-        .footer  { margin-top:auto; padding-top:4mm; border-top:1px solid #e2e8f0; width:100%; display:flex; justify-content:space-between; font-size:2.3mm; color:#94a3b8; }
-      </style>
-    </head><body>
-      <div class="header">
-        <div style="display:flex;align-items:center;gap:3mm;">
-          <div class="logo">R</div>
-          <div><div class="company">RAPO — Smart Dock</div><div class="sub">ป้ายประจำช่องจอด / Dock Badge</div></div>
-        </div>
-        <div style="text-align:right;font-size:2.5mm;color:#94a3b8;">${today}</div>
+    <!-- HEADER -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5mm">
+      <div style="font-size:8.5px;font-weight:700;line-height:1.55;text-transform:uppercase;width:195px">
+        INVOICE TO:<br>CEVA LOGISTICS (THAILAND) LTD<br>
+        JASMINE CITY BUILDING, 21ST FLOOR ZONE B,<br>
+        SOI SUKHUMVIT 23 (PRASARNMITR), SUKHUMVIT RD,<br>
+        KLONGTOEY NUE, WATTANA, 10110 THAILAND<br>
+        TAX ID : 0105538105741 (HEAD OFFICE)
       </div>
-      <div class="dock-name">${bay.name}</div>
-      <div class="qr-wrap">
-        <img class="qr-img" src="${qrUrl}" alt="QR ${bay.name}" onload="window.print();window.close();">
-        <div class="qr-code">${code}</div>
+      <div style="text-align:center;flex:1;padding:0 10px">
+        <div style="font-size:28px;font-weight:900;color:#002f6c;letter-spacing:1px;line-height:1">Truck Manifest</div>
+        <div style="font-size:14px;font-weight:700;color:#002f6c;margin-top:2px">(เอกสารควบคุมการรับ-ส่งสินค้า)</div>
       </div>
-      <div class="inst">📱 สแกน QR Code เพื่ออัปเดตสถานะ<br>Scan this QR Code to update dock status</div>
-      <div class="chips">
-        <div class="chip" style="background:#dbeafe;color:#1d4ed8;">1. รถมาดึง</div>
-        <div class="chip" style="background:#ede9fe;color:#6d28d9;">2. โหลดงาน</div>
-        <div class="chip" style="background:#fff7ed;color:#c2410c;">3. รอเอกสาร</div>
-        <div class="chip" style="background:#dcfce7;color:#15803d;">4. เสร็จสิ้น</div>
-      </div>
-      <div class="footer"><span>RAPO Stock & Dock System</span><span>santar-c.github.io/smart-Rapo</span></div>
-    </body></html>`);
-    printWin.document.close();
-  };
-
-  // ── Truck Manifest Print ──────────────────────────────
-  const printManifest = useCallback(b => {
-    const fmtDate = s => {
-      if(!s) return '';
-      const d=new Date(s);
-      return `${d.getDate()}-${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]}-${d.getFullYear().toString().slice(-2)}`;
-    };
-    const vehicleBox = (label, match) =>
-      `<span style="font-family:monospace;">__${match?'X':'_'}__</span> ${label}`;
-    const area = document.getElementById('manifest-print-area');
-    area.innerHTML = `
-      <div style="width:297mm;min-height:210mm;background:white;padding:10mm;font-family:'Sarabun',sans-serif;display:flex;flex-direction:column;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-
-        <!-- HEADER -->
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6mm;">
-          <div style="font-size:9px;font-weight:700;line-height:1.5;text-transform:uppercase;width:200px;">
-            INVOICE TO:<br>CEVA LOGISTICS (THAILAND) LTD<br>
-            JASMINE CITY BUILDING, 21ST FLOOR ZONE B,<br>
-            SOI SUKHUMVIT 23, WATTANA, 10110 THAILAND<br>
-            TAX ID : 0105538105741 (HEAD OFFICE)
-          </div>
-          <div style="text-align:center;flex:1;padding-top:4px;">
-            <div style="font-size:30px;font-weight:900;color:#002f6c;letter-spacing:1px;">Truck Manifest</div>
-            <div style="font-size:16px;font-weight:700;color:#002f6c;">(เอกสารควบคุมการรับ-ส่งสินค้าขาออก)</div>
-          </div>
-          <div style="width:200px;display:flex;justify-content:flex-end;align-items:flex-start;">
-            <div style="font-size:22px;font-weight:900;color:#002f6c;letter-spacing:2px;">CEVA<br><span style="font-size:11px;font-weight:600;letter-spacing:3px;">LOGISTICS</span></div>
-          </div>
-        </div>
-
-        <!-- SECTION 1: พนักงานขับรถ -->
-        <div style="background:#6b6b6b;color:white;font-size:13px;font-weight:700;padding:5px 10px;text-transform:uppercase;border:1px solid black;border-bottom:none;">ข้อมูลพนักงานขับรถ</div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);text-align:center;font-size:12px;font-weight:700;background:#c5e0b4;padding:6px 0;border:1px solid black;border-bottom:none;">
-          <div style="border-right:1px solid black;">วันที่รับ-ส่งสินค้า</div>
-          <div style="border-right:1px solid black;">ชื่อพนักงานขับรถ</div>
-          <div style="border-right:1px solid black;">ทะเบียนรถ</div>
-          <div style="border-right:1px solid black;">ซัพพลายเออร์</div>
-          <div>หมายเลขเอกสาร</div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);text-align:center;font-size:15px;font-weight:700;padding:10px 0;margin-bottom:5mm;border:1px solid black;">
-          <div style="border-right:1px solid black;">${fmtDate(b.date)}</div>
-          <div style="border-right:1px solid black;">${b.driverName||'-'}</div>
-          <div style="border-right:1px solid black;">${b.license||'-'}</div>
-          <div style="border-right:1px solid black;">${b.vendor||'-'}</div>
-          <div style="color:#4338ca;font-weight:900;letter-spacing:1px;">${b.shipmentNo||'-'}</div>
-        </div>
-
-        <!-- SECTION 2: ข้อมูลการรับ-ส่ง -->
-        <div style="background:#6b6b6b;color:white;font-size:13px;font-weight:700;padding:5px 10px;text-transform:uppercase;border:1px solid black;margin-bottom:5mm;">ข้อมูลการรับ-ส่งสินค้า</div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 30px;flex:1;padding:0 10px;">
-          <!-- LEFT -->
-          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;">
-            <div style="display:flex;align-items:flex-end;">
-              <span style="width:180px;flex-shrink:0;">รูปแบบการขนส่ง</span>
-              <span style="font-weight:700;font-size:12px;">${b.jobType==='OUT'?'OUTBOUND (RCEX) from CEVA W/H':'INBOUND (RCIM) to CEVA W/H'}</span>
-            </div>
-            <div style="display:flex;align-items:flex-end;">
-              <span style="width:180px;flex-shrink:0;line-height:1.3;">หมายเลขการจอง<br><i style="font-size:10px;color:#888;">Booking number</i></span>
-              <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;font-size:15px;padding-bottom:2px;">${b.bookingNo||'-'}</div>
-            </div>
-            <div style="display:flex;align-items:flex-end;">
-              <span style="width:180px;flex-shrink:0;line-height:1.3;">หมายเลขเอกสาร<br><i style="font-size:10px;color:#888;">Import reference number</i></span>
-              <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:900;font-size:15px;color:#4338ca;padding-bottom:2px;">${b.shipmentNo||'-'}</div>
-            </div>
-            <div style="display:flex;align-items:flex-end;">
-              <span style="width:180px;flex-shrink:0;line-height:1.3;">CY Place (Origin)<br><i style="font-size:10px;color:#888;">สถานที่รับสินค้า</i></span>
-              <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;padding-bottom:2px;">${b.origin||'CEVA WAREHOUSE'}</div>
-            </div>
-            <div style="display:flex;align-items:flex-end;">
-              <span style="width:180px;flex-shrink:0;line-height:1.3;">Return Container<br><i style="font-size:10px;color:#888;">สถานที่ส่งสินค้า</i></span>
-              <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;padding-bottom:2px;">${b.destination||'-'}</div>
-            </div>
-            <div style="display:flex;align-items:flex-end;">
-              <span style="width:180px;flex-shrink:0;line-height:1.3;">หมายเลขตู้คอนเทนเนอร์<br><i style="font-size:10px;color:#888;">Container number</i></span>
-              <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;padding-bottom:2px;">${b.containerNo||'-'}</div>
-            </div>
-          </div>
-
-          <!-- RIGHT -->
-          <div style="display:flex;flex-direction:column;gap:12px;font-size:13px;">
-            <div style="display:flex;align-items:flex-end;justify-content:flex-end;gap:8px;">
-              <span>เวลารับ-ส่งสินค้า</span>
-              <div style="width:140px;border-bottom:1px solid black;text-align:center;font-weight:700;">${b.startTime||'—'} - ${b.endTime||'—'}</div>
-            </div>
-            <div style="display:flex;align-items:flex-end;justify-content:flex-end;gap:8px;">
-              <span>เวลาจริงที่รับ-ส่งสินค้า</span>
-              <div style="width:140px;border-bottom:1px solid black;min-height:20px;">&nbsp;</div>
-            </div>
-            <div style="display:flex;align-items:flex-end;gap:8px;">
-              <span style="line-height:1.3;">หมายเลขคำสั่งซื้อ<br><i style="font-size:10px;color:#888;">DO Number</i></span>
-              <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;font-size:15px;padding-bottom:2px;">${b.doNumber||'-'}</div>
-            </div>
-            <div style="display:flex;align-items:flex-end;gap:8px;">
-              <span style="width:80px;flex-shrink:0;">ชนิดรถ</span>
-              <div style="flex:1;display:flex;justify-content:space-around;font-weight:700;letter-spacing:1px;">
-                ${vehicleBox('4WT', b.vehicle==='4WT')}
-                ${vehicleBox('6WT', b.vehicle==='6WT')}
-                ${vehicleBox('หัวลาก', ['20FT','40FT','40HQ'].includes(b.vehicle))}
-              </div>
-            </div>
-            <div style="display:flex;align-items:flex-end;gap:8px;">
-              <span style="width:80px;flex-shrink:0;">ตู้คอนเทนเนอร์</span>
-              <div style="flex:1;display:flex;justify-content:space-around;font-weight:700;letter-spacing:1px;">
-                ${vehicleBox('20"', b.vehicle==='20FT')}
-                ${vehicleBox('40"', b.vehicle==='40FT')}
-                ${vehicleBox('40HQ', b.vehicle==='40HQ')}
-              </div>
-            </div>
-            <div style="display:flex;align-items:flex-end;gap:8px;">
-              <span style="width:130px;flex-shrink:0;line-height:1.3;">หมายเลขซีลล็อกตู้<br><i style="font-size:10px;color:#888;">Seal number</i></span>
-              <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;padding-bottom:2px;">${b.sealNo||'-'}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- SIGNATURES -->
-        <div style="margin-top:auto;border-top:2px solid black;padding-top:6mm;padding-left:20px;padding-right:20px;display:flex;flex-direction:column;gap:8mm;">
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;font-size:14px;font-weight:700;">
-            <div style="display:flex;align-items:flex-end;flex:1;gap:8px;">
-              <span>ลงชื่อ</span>
-              <div style="width:200px;border-bottom:1px solid black;height:20px;"></div>
-              <span>พนักงานตรวจเช็คสินค้า CEVA</span>
-            </div>
-            <div style="display:flex;align-items:flex-end;gap:8px;width:200px;">
-              <span>วันที่</span>
-              <div style="flex:1;border-bottom:1px solid black;text-align:center;color:#555;">${fmtDate(b.date)}</div>
-            </div>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:flex-end;font-size:14px;font-weight:700;">
-            <div style="display:flex;align-items:flex-end;flex:1;gap:8px;">
-              <span>ลงชื่อ</span>
-              <div style="width:200px;border-bottom:1px solid black;height:20px;"></div>
-              <span>พนักงานขับรถรับ-ส่งสินค้า</span>
-            </div>
-            <div style="display:flex;align-items:flex-end;gap:8px;width:200px;">
-              <span>วันที่</span>
-              <div style="flex:1;border-bottom:1px solid black;height:20px;"></div>
-            </div>
-          </div>
-        </div>
-      </div>`;
-
-    const prev = document.title;
-    document.title = b.shipmentNo || 'Truck Manifest';
-    setTimeout(() => { window.print(); setTimeout(() => { document.title = prev; }, 1000); }, 200);
-  }, []);
-
-  // ── QR Scanner ────────────────────────────────────────
-  useEffect(() => {
-    if (tab !== 'scan') { setScanOn(false); return; }
-  }, [tab]);
-
-  useEffect(() => {
-    let qr = null;
-    if (scanOn) {
-      qr = new Html5Qrcode('scan-reader');
-      qr.start(
-        {facingMode:'environment'},
-        {fps:12, qrbox:{width:220,height:160}},
-        async text => {
-          const now = Date.now();
-          if (text===lastScan.current.text && now-lastScan.current.t < 3500) return;
-          lastScan.current = {text,t:now};
-          const todayStr = TODAY();
-          const bay = bays.find(b => b.name.replace(/\s/g,'').toUpperCase() === text.replace(/\s/g,'-').toUpperCase() || b.name.toUpperCase()===text.toUpperCase());
-          let booking;
-          if (bay) {
-            booking = bookings.find(b=>b.allocation===bay.name&&b.status!=='Completed'&&b.date===todayStr);
-            if (!booking) { setScanMsg({text:`ไม่มีคิวใน ${bay.name} วันนี้`,ok:false}); setTimeout(()=>setScanMsg({text:'',ok:false}),3000); return; }
-          } else {
-            booking = bookings.find(b=>(b.shipmentNo?.toUpperCase()===text.toUpperCase()||b.license===text)&&b.date===todayStr&&b.status!=='Completed');
-            if (!booking) { setScanMsg({text:'ไม่พบบาร์โค้ดนี้ในระบบ',ok:false}); setTimeout(()=>setScanMsg({text:'',ok:false}),3000); return; }
-          }
-          const i   = STATUSES.indexOf(booking.status);
-          if (i >= STATUSES.length-1) { setScanMsg({text:`${booking.shipmentNo} เสร็จสิ้นแล้ว`,ok:false}); setTimeout(()=>setScanMsg({text:'',ok:false}),3000); return; }
-          const next = STATUSES[i+1];
-          const t    = TIME_NOW();
-          const upd  = {...booking, status:next};
-          if (next==='Arrived')    upd.timeArrived    = t;
-          if (next==='Loading')    upd.timeLoading    = t;
-          if (next==='WaitingDoc') upd.timeWaitingDoc = t;
-          if (next==='Completed')  upd.timeCompleted  = t;
-          syncBookings(bookings.map(x=>x.id===booking.id?upd:x));
-          setScanMsg({text:`✅ ${booking.shipmentNo} → ${STATUS_LABEL[next]}`,ok:true});
-          setTimeout(()=>setScanMsg({text:'',ok:false}),3000);
-        },
-        ()=>{}
-      ).catch(()=>setScanOn(false));
-    }
-    return () => { qr?.stop().catch(()=>{}); };
-  }, [scanOn, bays, bookings]);
-
-  // ── Export CSV ────────────────────────────────────────
-  const exportCSV = () => {
-    const done = bookings.filter(b=>b.status==='Completed'&&b.date===viewDate);
-    if (!done.length) { alert('ไม่มีข้อมูลที่เสร็จสิ้น'); return; }
-    const rows=[['วันที่','ช่องจอด','Doc No','IN/OUT','บริษัท','ทะเบียน','ขนาดรถ','Plan เข้า','Plan ออก','มาถึง','โหลด','รอเอกสาร','เสร็จ']];
-    done.forEach(b=>rows.push([b.date,b.allocation,b.shipmentNo,b.jobType,b.vendor,b.license,b.vehicle,b.startTime,b.endTime,b.timeArrived||'',b.timeLoading||'',b.timeWaitingDoc||'',b.timeCompleted||'']));
-    const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
-    const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'})),download:`dock_${viewDate}.csv`});
-    a.click();
-  };
-
-  // ── STATUS BADGE ──────────────────────────────────────
-  const StatusBadge = ({booking}) => (
-    <span onClick={e=>{e.stopPropagation();cycleStatus(booking);}}
-      className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer select-none transition-colors ${STATUS_CLS[booking.status]}`}>
-      {STATUS_LABEL[booking.status]}
-    </span>
-  );
-
-  // ── FORM PANEL ────────────────────────────────────────
-  const FormPanel = () => (
-    <div className="w-full md:w-[380px] shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-auto md:h-full fade-in">
-      <div className="p-4 border-b border-slate-100 bg-indigo-50/60">
-        <h2 className="font-bold text-indigo-900 text-sm">{editId?'✏️ แก้ไขข้อมูลคิว':'📝 จองคิว / นัดหมายหน้าท่า'}</h2>
-      </div>
-      <div className="p-4 flex-1 overflow-y-auto dock-scroll text-sm">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* IN/OUT */}
-          <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200 gap-1">
-            {['IN','OUT'].map(t=>(
-              <label key={t} className={`flex-1 text-center py-2 rounded-lg cursor-pointer font-bold text-sm transition-all ${form.jobType===t ? (t==='IN'?'bg-white text-sky-600 shadow-sm':'bg-white text-orange-600 shadow-sm') : 'text-slate-500'}`}>
-                <input type="radio" name="jobType" value={t} checked={form.jobType===t} onChange={e=>setForm(p=>({...p,jobType:e.target.value}))} className="hidden"/>
-                {t==='IN'?'📥 รับเข้า':'📤 จ่ายออก'}
-              </label>
-            ))}
-          </div>
-
-          {/* Date/Time */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">วันที่ และ เวลา</label>
-            <input type="date" value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))} className="w-full border border-slate-200 rounded-xl p-2.5 mb-2 bg-slate-50 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all" required/>
-            <div className="flex gap-2">
-              <input type="time" value={form.startTime} onChange={e=>setForm(p=>({...p,startTime:e.target.value}))} className="w-1/2 border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500 transition-all" required/>
-              <input type="time" value={form.endTime} onChange={e=>setForm(p=>({...p,endTime:e.target.value}))} className="w-1/2 border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500 transition-all" required/>
-            </div>
-          </div>
-
-          {/* Doc / DO */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Doc No. (Auto)</label>
-              <input readOnly value={form.shipmentNo} className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-100 text-indigo-700 font-bold text-xs outline-none cursor-not-allowed tracking-wide"/>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">DO Number</label>
-              <input type="text" value={form.doNumber||''} onChange={e=>setForm(p=>({...p,doNumber:e.target.value}))} placeholder="DO ซัพฯ" className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500 text-xs"/>
-            </div>
-          </div>
-
-          {/* Vendor / License / Vehicle */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">บริษัท / Vendor</label>
-            <input type="text" value={form.vendor} onChange={e=>setForm(p=>({...p,vendor:e.target.value}))} className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500" required/>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">ทะเบียนรถ</label>
-              <input type="text" value={form.license} onChange={e=>setForm(p=>({...p,license:e.target.value}))} className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500" required/>
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">ขนาดรถ</label>
-              <select value={form.vehicle} onChange={e=>setForm(p=>({...p,vehicle:e.target.value}))} className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500">
-                {['4WT','6WT','20FT','40FT','40HQ'].map(v=><option key={v}>{v}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Manifest Extra */}
-          <div className="border border-indigo-100 bg-indigo-50/30 rounded-xl p-3 space-y-2.5">
-            <h3 className="text-[10px] font-bold text-indigo-700 uppercase border-b border-indigo-100 pb-2 flex items-center gap-1">🖨️ ข้อมูล Truck Manifest</h3>
-            <input type="text" value={form.driverName||''} onChange={e=>setForm(p=>({...p,driverName:e.target.value}))} placeholder="ชื่อพนักงานขับรถ" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
-            <div className="grid grid-cols-2 gap-2">
-              <input type="text" value={form.bookingNo||''} onChange={e=>setForm(p=>({...p,bookingNo:e.target.value}))} placeholder="Booking No." className="border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
-              <input type="text" value={form.containerNo||''} onChange={e=>setForm(p=>({...p,containerNo:e.target.value}))} placeholder="Container No." className="border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
-            </div>
-            <input type="text" value={form.origin||''} onChange={e=>setForm(p=>({...p,origin:e.target.value}))} placeholder="CY Place / Origin" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
-            <input type="text" value={form.destination||''} onChange={e=>setForm(p=>({...p,destination:e.target.value}))} placeholder="Return Container / Destination" className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
-            <input type="text" value={form.sealNo||''} onChange={e=>setForm(p=>({...p,sealNo:e.target.value}))} placeholder="Seal No." className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
-          </div>
-
-          {/* Allocation */}
-          <div>
-            <label className="block text-[10px] font-bold text-indigo-600 mb-1 uppercase">ช่องจอด (Allocation)</label>
-            <select value={form.allocation} onChange={e=>setForm(p=>({...p,allocation:e.target.value}))} className="w-full border border-indigo-200 rounded-xl p-2.5 bg-indigo-50/50 font-bold text-indigo-900 outline-none focus:border-indigo-500">
-              <option value="Waitlist">🅿️ ขอจองคิวรอก่อน (Waitlist)</option>
-              {bays.map(d=><option key={d.name} value={d.name}>📍 ลง {d.name}</option>)}
-            </select>
-          </div>
-
-          <button type="submit" className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md">
-            {editId ? 'บันทึกอัปเดต' : 'เพิ่มคิวเข้าตาราง'}
-          </button>
-          {editId && (
-            <button type="button" onClick={()=>{setEditId(null);setForm({...BLANK_FORM});}}
-              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-colors">
-              ยกเลิกแก้ไข
-            </button>
-          )}
-        </form>
+      <div style="width:195px;display:flex;justify-content:flex-end;align-items:flex-start">
+        <div style="font-size:20px;font-weight:900;color:#002f6c;letter-spacing:2px;text-align:right">CEVA<br><span style="font-size:10px;font-weight:600;letter-spacing:3px">LOGISTICS</span></div>
       </div>
     </div>
-  );
 
-  // ── BOARD VIEW ────────────────────────────────────────
-  const BoardView = () => (
-    <>
-      {/* Waitlist */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 shrink-0 fade-in">
-        <div className="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-2xl">
-          <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">🅿️ Waitlist</h3>
-          <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">{waitlist.length}</span>
+    <!-- SEC 1: พนักงานขับรถ -->
+    <div style="background:#6b6b6b;color:white;font-size:12px;font-weight:700;padding:4px 10px;text-transform:uppercase;border:1px solid black;border-bottom:none">ข้อมูลพนักงานขับรถ</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);text-align:center;font-size:11.5px;font-weight:700;background:#c5e0b4;padding:5px 0;border:1px solid black;border-bottom:none">
+      <div style="border-right:1px solid black">วันที่รับ-ส่งสินค้า</div>
+      <div style="border-right:1px solid black">ชื่อพนักงานขับรถ</div>
+      <div style="border-right:1px solid black">ทะเบียนรถ</div>
+      <div style="border-right:1px solid black">ซัพพลายเออร์</div>
+      <div>หมายเลขเอกสาร</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);text-align:center;font-size:14px;font-weight:700;padding:8px 0;margin-bottom:4mm;border:1px solid black">
+      <div style="border-right:1px solid black">${fd(b.date)}</div>
+      <div style="border-right:1px solid black">${b.driverName||'-'}</div>
+      <div style="border-right:1px solid black">${b.license||'-'}</div>
+      <div style="border-right:1px solid black">${b.vendor||'-'}</div>
+      <div style="color:#4338ca;font-weight:900;letter-spacing:.5px">${b.shipmentNo||'-'}</div>
+    </div>
+
+    <!-- SEC 2: ข้อมูลการรับ-ส่ง -->
+    <div style="background:#6b6b6b;color:white;font-size:12px;font-weight:700;padding:4px 10px;text-transform:uppercase;border:1px solid black;margin-bottom:4mm">ข้อมูลการรับ-ส่งสินค้า</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 25px;flex:1;padding:0 8px">
+      <!-- LEFT -->
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px">
+        <div style="display:flex;align-items:flex-end">
+          <span style="width:175px;flex-shrink:0">รูปแบบการขนส่ง</span>
+          <span style="font-weight:700;font-size:11.5px">${b.jobType==='OUT'?'OUTBOUND (RCEX) from CEVA W/H':'INBOUND (RCIM) to CEVA W/H'}</span>
         </div>
-        <div className="p-4 flex overflow-x-auto scroll-hide gap-3">
-          {waitlist.map((b,i) => (
-            <div key={b.id} className="w-[260px] shrink-0 border border-slate-200 rounded-xl shadow-sm bg-white hover:border-indigo-300 transition-all group">
-              <div className="px-3 py-2 bg-slate-50 flex justify-between items-center border-b border-slate-100 rounded-t-xl">
-                <span className="font-bold text-slate-700 text-sm">คิว{i+1} <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ml-1 ${b.jobType==='OUT'?'bg-orange-100 text-orange-600':'bg-sky-100 text-sky-600'}`}>{b.jobType}</span></span>
-                <StatusBadge booking={b}/>
-              </div>
-              <div className="p-3 text-xs text-slate-600 space-y-1">
-                <div className="font-bold text-slate-800">{b.license} <span className="text-slate-400 font-normal">({b.vehicle})</span></div>
-                <div className="text-indigo-600 font-bold text-[11px]">{b.shipmentNo}</div>
-                <div className="text-slate-500">{b.vendor}</div>
-                <div className="font-semibold text-indigo-600 bg-indigo-50 inline-block px-2 py-0.5 rounded">{b.startTime} - {b.endTime}</div>
-              </div>
-              {isPower && (
-                <div className="flex border-t border-slate-100 rounded-b-xl overflow-hidden">
-                  <button onClick={()=>handleEdit(b)} className="flex-1 py-2.5 bg-slate-50 text-indigo-600 text-xs font-bold hover:bg-indigo-50 transition-colors">แก้ไข / ลงท่า</button>
-                  <button onClick={()=>printManifest(b)} className="px-4 py-2.5 bg-sky-50 text-sky-700 border-l border-slate-100 hover:bg-sky-100 text-xs font-bold transition-colors" title="พิมพ์ Manifest">🖨️</button>
-                </div>
-              )}
-            </div>
-          ))}
-          {!waitlist.length && <div className="w-full text-center py-6 text-slate-400 text-sm">Waitlist ว่าง</div>}
+        <div style="display:flex;align-items:flex-end">
+          <span style="width:175px;flex-shrink:0;line-height:1.3">หมายเลขการจอง<br><i style="font-size:10px;color:#888">Booking number</i></span>
+          <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;font-size:14px;padding-bottom:1px">${b.bookingNo||'-'}</div>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <span style="width:175px;flex-shrink:0;line-height:1.3">หมายเลขเอกสาร<br><i style="font-size:10px;color:#888">Import reference number</i></span>
+          <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:900;font-size:14px;color:#4338ca;padding-bottom:1px">${b.shipmentNo||'-'}</div>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <span style="width:175px;flex-shrink:0;line-height:1.3">CY Place (Origin)<br><i style="font-size:10px;color:#888">สถานที่รับสินค้า</i></span>
+          <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;padding-bottom:1px">${b.origin||'CEVA WAREHOUSE'}</div>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <span style="width:175px;flex-shrink:0;line-height:1.3">Return Container<br><i style="font-size:10px;color:#888">สถานที่ส่งสินค้า</i></span>
+          <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;padding-bottom:1px">${b.destination||'-'}</div>
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <span style="width:175px;flex-shrink:0;line-height:1.3">หมายเลขตู้คอนเทนเนอร์<br><i style="font-size:10px;color:#888">Container number</i></span>
+          <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;padding-bottom:1px">${b.containerNo||'-'}</div>
         </div>
       </div>
 
-      {/* Dock Board */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden min-h-[400px] fade-in">
-        <div className="p-4 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3 bg-white">
-          <div className="flex items-center gap-3">
-            <h2 className="font-bold text-lg text-slate-800">🏭 Live Dock Board</h2>
-            {isAdmin && (
-              <button onClick={()=>setTab('qr')} className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg font-bold transition-colors border border-slate-200">
-                🖨️ พิมพ์ QR
-              </button>
-            )}
-          </div>
-          <div className="flex gap-3 text-[11px] font-bold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>ว่าง</div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>มีรถ</div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>ปิด</div>
-            <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 pulse-red"></span>Delay</div>
+      <!-- RIGHT -->
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px">
+        <div style="display:flex;align-items:flex-end;justify-content:flex-end;gap:8px">
+          <span>เวลารับ-ส่งสินค้า</span>
+          <div style="width:130px;border-bottom:1px solid black;text-align:center;font-weight:700">${b.startTime||'—'} - ${b.endTime||'—'}</div>
+        </div>
+        <div style="display:flex;align-items:flex-end;justify-content:flex-end;gap:8px">
+          <span>เวลาจริงที่รับ-ส่งสินค้า</span>
+          <div style="width:130px;border-bottom:1px solid black;min-height:18px">&nbsp;</div>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <span style="line-height:1.3">หมายเลขคำสั่งซื้อ<br><i style="font-size:10px;color:#888">DO Number</i></span>
+          <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;font-size:14px;padding-bottom:1px">${b.doNumber||'-'}</div>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <span style="width:70px;flex-shrink:0">ชนิดรถ</span>
+          <div style="flex:1;display:flex;justify-content:space-around;font-weight:700;font-size:12px">
+            ${vb('4WT',b.vehicle==='4WT')} ${vb('6WT',b.vehicle==='6WT')} ${vb('หัวลาก',['20FT','40FT','40HQ'].includes(b.vehicle))}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto dock-scroll p-5 bg-slate-50/50">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {bays.map(dock => {
-              const ab = dockBooks.find(b=>b.allocation===dock.name);
-              const delay = ab && isDelay(ab);
-              if (ab) return (
-                <div key={dock.name} className={`bg-white rounded-2xl shadow-sm border flex flex-col h-[290px] transition-all hover:shadow-md ${delay?'border-red-400 ring-2 ring-red-100':'border-slate-200 hover:border-indigo-300'}`}>
-                  {delay && <div className="bg-red-500 text-white text-[11px] font-bold py-1 text-center pulse-red rounded-t-2xl">⚠️ DELAY — เกินเวลา Plan ออก</div>}
-                  <div className={`px-4 py-2.5 flex justify-between items-center font-bold text-sm rounded-t-2xl ${delay?'bg-red-50 text-red-800 border-b border-red-100':'bg-indigo-50/50 text-indigo-900 border-b border-indigo-50'}`}>
-                    <span className="flex items-center gap-2">
-                      {dock.name}
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${ab.jobType==='OUT'?'bg-orange-100 text-orange-600':'bg-sky-100 text-sky-600'}`}>{ab.jobType}</span>
-                    </span>
-                    {isPower && <button onClick={()=>handleEdit(ab)} className="p-1.5 bg-white/80 text-indigo-600 rounded-lg hover:bg-white text-xs">✏️</button>}
-                  </div>
-                  <div className="p-4 text-xs text-slate-700 flex-1 flex flex-col gap-2">
-                    <div className="flex justify-between items-center">
-                      <StatusBadge booking={ab}/>
-                      <span className="text-[10px] text-slate-400">{ab.timeArrived ? `มาถึง ${ab.timeArrived}` : ''}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex"><span className="w-12 text-slate-400">Doc:</span><span className="font-bold text-indigo-700">{ab.shipmentNo}</span></div>
-                      <div className="flex"><span className="w-12 text-slate-400">Truck:</span><span className="font-bold">{ab.license} <span className="text-slate-400 font-normal">({ab.vehicle})</span></span></div>
-                      <div className="flex"><span className="w-12 text-slate-400">Vendor:</span><span className="truncate">{ab.vendor}</span></div>
-                    </div>
-                    <div className="bg-slate-50 rounded-xl p-2.5 mt-auto flex justify-between border border-slate-100 text-center">
-                      <div className="flex-1 border-r border-slate-200"><div className="text-[9px] text-slate-400 font-bold uppercase">Plan Out</div><div className="font-bold text-indigo-600">{ab.endTime}</div></div>
-                      <div className="flex-1"><div className="text-[9px] text-slate-400 font-bold uppercase">มาถึง</div><div className="font-bold text-slate-700">{ab.timeArrived||'—'}</div></div>
-                    </div>
-                    {isPower && (
-                      <div className="flex gap-2">
-                        <button onClick={()=>printManifest(ab)} className="flex-1 bg-sky-50 hover:bg-sky-100 text-sky-700 py-1.5 rounded-lg font-bold transition-colors text-[11px] flex items-center justify-center gap-1">🖨️ Manifest</button>
-                        <button onClick={()=>handleDelete(ab.id)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-bold transition-colors text-[11px]">🗑️</button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-              const isBusy = dock.status==='Busy'||dock.status==='Maintenance';
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <span style="width:70px;flex-shrink:0">ตู้คอนเทนเนอร์</span>
+          <div style="flex:1;display:flex;justify-content:space-around;font-weight:700;font-size:12px">
+            ${vb('20"',b.vehicle==='20FT')} ${vb('40"',b.vehicle==='40FT')} ${vb('40HQ',b.vehicle==='40HQ')}
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px">
+          <span style="width:125px;flex-shrink:0;line-height:1.3">หมายเลขซีลล็อกตู้<br><i style="font-size:10px;color:#888">Seal number</i></span>
+          <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;padding-bottom:1px">${b.sealNo||'-'}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIGNATURES -->
+    <div style="margin-top:auto;border-top:2px solid black;padding-top:5mm;padding-left:15px;padding-right:15px;display:flex;flex-direction:column;gap:7mm">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;font-size:13px;font-weight:700">
+        <div style="display:flex;align-items:flex-end;flex:1;gap:8px">
+          <span>ลงชื่อ</span><div style="width:190px;border-bottom:1px solid black;height:18px"></div><span>พนักงานตรวจเช็คสินค้า CEVA</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px;width:180px">
+          <span>วันที่</span><div style="flex:1;border-bottom:1px solid black;text-align:center;color:#555">${fd(b.date)}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;font-size:13px;font-weight:700">
+        <div style="display:flex;align-items:flex-end;flex:1;gap:8px">
+          <span>ลงชื่อ</span><div style="width:190px;border-bottom:1px solid black;height:18px"></div><span>พนักงานขับรถรับ-ส่งสินค้า</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px;width:180px">
+          <span>วันที่</span><div style="flex:1;border-bottom:1px solid black;height:18px"></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+  const prev=document.title;
+  document.title=b.shipmentNo||'Manifest';
+  setTimeout(()=>{window.print();setTimeout(()=>{document.title=prev;},1000);},250);
+};
+
+// ════════════════════════════════════════════════════════════
+// ✅ FIX #2 — Sub-components defined OUTSIDE App()
+//    ไม่ re-create ทุก render → input ไม่ lose focus
+// ════════════════════════════════════════════════════════════
+
+// ── Status Badge ───────────────────────────────────────────
+const StatusBadge = ({booking, onCycle})=>(
+  <span onClick={e=>{e.stopPropagation();onCycle(booking);}}
+    className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer select-none transition-colors ${STAT_CLS[booking.status]}`}>
+    {STAT_LBL[booking.status]}
+  </span>
+);
+
+// ── Form Panel ─────────────────────────────────────────────
+const FormPanel = React.memo(({form, setForm, bays, onSubmit, editId, onCancelEdit})=>(
+  <div className="w-full md:w-[380px] shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-auto md:h-full fi">
+    <div className="p-4 border-b border-slate-100 bg-indigo-50/60">
+      <h2 className="font-bold text-indigo-900 text-sm">{editId?'✏️ แก้ไขข้อมูลคิว':'📝 จองคิว / นัดหมายหน้าท่า'}</h2>
+    </div>
+    <div className="p-4 flex-1 overflow-y-auto ds text-sm space-y-4">
+      {/* IN/OUT */}
+      <div className="flex bg-slate-100 rounded-xl p-1 border border-slate-200 gap-1">
+        {['IN','OUT'].map(t=>(
+          <label key={t} className={`flex-1 text-center py-2 rounded-lg cursor-pointer font-bold text-sm transition-all ${form.jobType===t?(t==='IN'?'bg-white text-sky-600 shadow-sm':'bg-white text-orange-600 shadow-sm'):'text-slate-500'}`}>
+            <input type="radio" name="jobType" value={t} checked={form.jobType===t}
+              onChange={e=>setForm(p=>({...p,jobType:e.target.value}))} className="hidden"/>
+            {t==='IN'?'📥 รับเข้า':'📤 จ่ายออก'}
+          </label>
+        ))}
+      </div>
+      {/* Date / Time */}
+      <div>
+        <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wide">วันที่ และ เวลา</label>
+        <input type="date" value={form.date}
+          onChange={e=>setForm(p=>({...p,date:e.target.value}))}
+          className="w-full border border-slate-200 rounded-xl p-2.5 mb-2 bg-slate-50 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 transition-all"/>
+        <div className="flex gap-2">
+          <input type="time" value={form.startTime}
+            onChange={e=>setForm(p=>({...p,startTime:e.target.value}))}
+            className="w-1/2 border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500 transition-all" required/>
+          <input type="time" value={form.endTime}
+            onChange={e=>setForm(p=>({...p,endTime:e.target.value}))}
+            className="w-1/2 border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500 transition-all" required/>
+        </div>
+      </div>
+      {/* Doc / DO */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">Doc No. (Auto)</label>
+          <input readOnly value={form.shipmentNo}
+            className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-100 text-indigo-700 font-bold text-xs outline-none cursor-not-allowed tracking-wide"/>
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">DO Number</label>
+          <input type="text" value={form.doNumber}
+            onChange={e=>setForm(p=>({...p,doNumber:e.target.value}))}
+            placeholder="DO ซัพฯ"
+            className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500 text-xs"/>
+        </div>
+      </div>
+      {/* Vendor */}
+      <div>
+        <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">บริษัท / Vendor</label>
+        <input type="text" value={form.vendor}
+          onChange={e=>setForm(p=>({...p,vendor:e.target.value}))}
+          className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500" required/>
+      </div>
+      {/* License / Vehicle */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">ทะเบียนรถ</label>
+          <input type="text" value={form.license}
+            onChange={e=>setForm(p=>({...p,license:e.target.value}))}
+            className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500" required/>
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">ขนาดรถ</label>
+          <select value={form.vehicle}
+            onChange={e=>setForm(p=>({...p,vehicle:e.target.value}))}
+            className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500">
+            {VEHICLES.map(v=><option key={v}>{v}</option>)}
+          </select>
+        </div>
+      </div>
+      {/* Manifest Extra */}
+      <div className="border border-indigo-100 bg-indigo-50/30 rounded-xl p-3 space-y-2.5">
+        <div className="text-[10px] font-bold text-indigo-700 uppercase border-b border-indigo-100 pb-2">🖨️ ข้อมูล Truck Manifest</div>
+        <input type="text" value={form.driverName}
+          onChange={e=>setForm(p=>({...p,driverName:e.target.value}))}
+          placeholder="ชื่อพนักงานขับรถ"
+          className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
+        <div className="grid grid-cols-2 gap-2">
+          <input type="text" value={form.bookingNo}
+            onChange={e=>setForm(p=>({...p,bookingNo:e.target.value}))}
+            placeholder="Booking No."
+            className="border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
+          <input type="text" value={form.containerNo}
+            onChange={e=>setForm(p=>({...p,containerNo:e.target.value}))}
+            placeholder="Container No."
+            className="border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
+        </div>
+        <input type="text" value={form.origin}
+          onChange={e=>setForm(p=>({...p,origin:e.target.value}))}
+          placeholder="CY Place / Origin"
+          className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
+        <input type="text" value={form.destination}
+          onChange={e=>setForm(p=>({...p,destination:e.target.value}))}
+          placeholder="Return Container / Destination"
+          className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
+        <input type="text" value={form.sealNo}
+          onChange={e=>setForm(p=>({...p,sealNo:e.target.value}))}
+          placeholder="Seal No."
+          className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
+      </div>
+      {/* Allocation */}
+      <div>
+        <label className="block text-[10px] font-bold text-indigo-600 mb-1 uppercase">ช่องจอด (Allocation)</label>
+        <select value={form.allocation}
+          onChange={e=>setForm(p=>({...p,allocation:e.target.value}))}
+          className="w-full border border-indigo-200 rounded-xl p-2.5 bg-indigo-50/50 font-bold text-indigo-900 outline-none focus:border-indigo-500">
+          <option value="Waitlist">🅿️ ขอจองคิวรอก่อน (Waitlist)</option>
+          {bays.map(d=><option key={d.name} value={d.name}>📍 ลง {d.name}</option>)}
+        </select>
+      </div>
+      {/* Submit */}
+      <button onClick={onSubmit}
+        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md">
+        {editId?'บันทึกอัปเดต':'เพิ่มคิวเข้าตาราง'}
+      </button>
+      {editId && (
+        <button onClick={onCancelEdit}
+          className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-colors">
+          ยกเลิกแก้ไข
+        </button>
+      )}
+    </div>
+  </div>
+));
+
+// ── Waitlist Card ──────────────────────────────────────────
+const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle})=>(
+  <div className="w-[265px] shrink-0 border border-slate-200 rounded-xl shadow-sm bg-white hover:border-indigo-300 transition-all">
+    <div className="px-3 py-2 bg-slate-50 flex justify-between items-center border-b border-slate-100 rounded-t-xl">
+      <span className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
+        คิว{idx+1}
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${booking.jobType==='OUT'?'bg-orange-100 text-orange-600':'bg-sky-100 text-sky-600'}`}>{booking.jobType}</span>
+      </span>
+      <StatusBadge booking={booking} onCycle={onCycle}/>
+    </div>
+    <div className="p-3 text-xs text-slate-600 space-y-1">
+      <div className="font-bold text-slate-800">{booking.license} <span className="text-slate-400 font-normal">({booking.vehicle})</span></div>
+      <div className="text-indigo-600 font-bold text-[11px]">{booking.shipmentNo}</div>
+      <div className="text-slate-500">{booking.vendor}</div>
+      <div className="font-semibold text-indigo-600 bg-indigo-50 inline-block px-2 py-0.5 rounded">{booking.startTime} - {booking.endTime}</div>
+    </div>
+    {isPower && (
+      <div className="flex border-t border-slate-100 rounded-b-xl overflow-hidden">
+        <button onClick={()=>onEdit(booking)} className="flex-1 py-2.5 bg-slate-50 text-indigo-600 text-xs font-bold hover:bg-indigo-50 transition-colors">แก้ไข / ลงท่า</button>
+        <button onClick={()=>onManifest(booking)} className="px-4 py-2.5 bg-sky-50 text-sky-700 border-l border-slate-100 hover:bg-sky-100 font-bold text-xs transition-colors" title="Manifest">🖨️</button>
+      </div>
+    )}
+  </div>
+);
+
+// ── Dock Card (occupied) ───────────────────────────────────
+const DockCardOccupied = ({dock, booking, delay, isPower, onEdit, onManifest, onDelete, onCycle})=>(
+  <div className={`bg-white rounded-2xl shadow-sm border flex flex-col transition-all hover:shadow-md ${delay?'border-red-400 ring-2 ring-red-100':'border-slate-200 hover:border-indigo-300'}`} style={{minHeight:'270px'}}>
+    {delay && <div className="bg-red-500 text-white text-[10px] font-bold py-1 text-center pr rounded-t-2xl">⚠️ DELAY — เกินเวลา Plan ออก</div>}
+    <div className={`px-4 py-2.5 flex justify-between items-center font-bold text-sm ${delay?'bg-red-50 text-red-800 border-b border-red-100':'bg-indigo-50/50 text-indigo-900 border-b border-indigo-50'} ${!delay?'rounded-t-2xl':''}`}>
+      <span className="flex items-center gap-2">
+        {dock.name}
+        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${booking.jobType==='OUT'?'bg-orange-100 text-orange-600':'bg-sky-100 text-sky-600'}`}>{booking.jobType}</span>
+      </span>
+      {isPower && <button onClick={()=>onEdit(booking)} className="p-1.5 bg-white/80 text-indigo-600 rounded-lg hover:bg-white text-xs">✏️</button>}
+    </div>
+    <div className="p-4 text-xs text-slate-700 flex-1 flex flex-col gap-2">
+      <div className="flex justify-between items-center">
+        <StatusBadge booking={booking} onCycle={onCycle}/>
+        {booking.timeArrived && <span className="text-[10px] text-slate-400">มาถึง {booking.timeArrived}</span>}
+      </div>
+      <div className="space-y-1">
+        <div className="flex"><span className="w-12 text-slate-400">Doc:</span><span className="font-bold text-indigo-700 truncate">{booking.shipmentNo}</span></div>
+        <div className="flex"><span className="w-12 text-slate-400">Truck:</span><span className="font-bold">{booking.license} <span className="text-slate-400 font-normal">({booking.vehicle})</span></span></div>
+        <div className="flex"><span className="w-12 text-slate-400">Vendor:</span><span className="truncate">{booking.vendor}</span></div>
+      </div>
+      <div className="bg-slate-50 rounded-xl p-2.5 mt-auto flex justify-between border border-slate-100 text-center">
+        <div className="flex-1 border-r border-slate-200"><div className="text-[9px] text-slate-400 font-bold">PLAN OUT</div><div className="font-bold text-indigo-600">{booking.endTime}</div></div>
+        <div className="flex-1"><div className="text-[9px] text-slate-400 font-bold">มาถึง</div><div className="font-bold text-slate-700">{booking.timeArrived||'—'}</div></div>
+      </div>
+      {isPower && (
+        <div className="flex gap-2">
+          <button onClick={()=>onManifest(booking)} className="flex-1 bg-sky-50 hover:bg-sky-100 text-sky-700 py-1.5 rounded-lg font-bold transition-colors text-[11px]">🖨️ Manifest</button>
+          <button onClick={()=>onDelete(booking.id)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-bold transition-colors text-[11px]">🗑️</button>
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+// ── Dock Card (empty) ──────────────────────────────────────
+const DockCardEmpty = ({dock, canDock, isAdmin, onToggle, onPrintQR})=>{
+  const isBusy = dock.status==='Busy'||dock.status==='Maintenance';
+  return (
+    <div className={`rounded-2xl shadow-sm border border-dashed flex flex-col transition-all bg-white ${isBusy?'border-amber-200 bg-amber-50/30':'border-emerald-100 bg-emerald-50/30'} ${canDock?'cursor-pointer hover:scale-[1.01] hover:shadow-md':''}`}
+      style={{minHeight:'270px'}}
+      onClick={()=>canDock&&onToggle(dock.name,dock.status)}>
+      <div className={`px-4 py-3 flex justify-between items-center font-bold text-sm rounded-t-2xl ${isBusy?'text-amber-800':'text-emerald-800'}`}>
+        <span>{dock.name}</span>
+        {canDock && <span className="text-[9px] bg-white/70 px-1.5 py-0.5 rounded text-slate-500">คลิกเปลี่ยน</span>}
+      </div>
+      <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-75">
+        <span className="text-3xl">{isBusy?'⚠️':'✅'}</span>
+        <span className="font-bold text-sm">{isBusy?(dock.status==='Maintenance'?'ซ่อมบำรุง':'ปิดชั่วคราว'):'ว่าง (Available)'}</span>
+      </div>
+      {isAdmin && (
+        <div className="px-4 pb-3 flex justify-center">
+          <button onClick={e=>{e.stopPropagation();onPrintQR(dock);}}
+            className="text-[11px] bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-50 transition-colors shadow-sm">
+            🖨️ Print QR A5
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── QR Grid View ───────────────────────────────────────────
+const QRView = ({bays})=>(
+  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fi">
+    <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+      <h3 className="font-bold text-lg text-slate-800">🖨️ พิมพ์ QR Code ป้ายช่องจอด (A5)</h3>
+      <button onClick={()=>bays.forEach((b,i)=>setTimeout(()=>printQR(b),i*900))}
+        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">
+        🖨️ พิมพ์ทุกช่อง
+      </button>
+    </div>
+    <div className="flex-1 p-5 overflow-auto bg-slate-50/50">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        {bays.map(bay=>{
+          const code=bay.name.toUpperCase().replace(/\s+/g,'-');
+          const url=`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(code)}&color=021D49&margin=8`;
+          return (
+            <div key={bay.name} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col items-center gap-3 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all">
+              <div className="font-black text-xl text-indigo-900">{bay.name}</div>
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-100"><img src={url} alt={bay.name} className="w-24 h-24"/></div>
+              <div className="text-[10px] text-slate-500 font-mono bg-slate-100 px-2 py-1 rounded">{code}</div>
+              <button onClick={()=>printQR(bay)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl font-bold text-xs transition-colors">🖨️ Print A5</button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+);
+
+// ── Schedule View ──────────────────────────────────────────
+const ScheduleView = ({bays,bookings,viewDate,isPower,onEdit})=>{
+  const hours=Array.from({length:13},(_,i)=>i+7);
+  const data=bookings.filter(b=>b.date===viewDate&&b.allocation!=='Waitlist'&&b.status!=='Completed');
+  const COLORS={Pending:'#94a3b8',Arrived:'#38bdf8',Loading:'#a78bfa',WaitingDoc:'#fb923c',Completed:'#4ade80'};
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fi">
+      <div className="p-4 border-b border-slate-100"><h3 className="font-bold text-lg">📅 ตารางเวลาหน้าท่า ({viewDate})</h3></div>
+      <div className="flex-1 overflow-auto p-4 bg-slate-50/50">
+        <div className="min-w-[800px] bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+          <div className="flex ml-28 border-b border-slate-200 pb-2 mb-3">
+            {hours.map(h=><div key={h} className="flex-1 text-[10px] text-slate-400 font-bold">{String(h).padStart(2,'0')}:00</div>)}
+          </div>
+          <div className="space-y-3">
+            {bays.map(dock=>{
+              const bk=data.filter(b=>b.allocation===dock.name);
               return (
-                <div key={dock.name} className={`rounded-2xl shadow-sm border border-dashed flex flex-col h-[290px] transition-all bg-white cursor-pointer hover:scale-[1.01] hover:shadow-md ${isBusy?'border-amber-200 bg-amber-50/30':'border-emerald-100 bg-emerald-50/30'}`}
-                  onClick={()=>canDock&&toggleBay(dock.name,dock.status)}>
-                  <div className={`px-4 py-3 flex justify-between items-center font-bold text-sm rounded-t-2xl ${isBusy?'text-amber-800':'text-emerald-800'}`}>
-                    <span>{dock.name}</span>
-                    {canDock && <span className="text-[9px] bg-white/70 px-1.5 py-0.5 rounded text-slate-500">คลิกเปลี่ยน</span>}
+                <div key={dock.name} className="flex items-center h-14 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="w-28 shrink-0 text-xs font-bold text-slate-700 px-3 border-r border-slate-200 h-full flex items-center">{dock.name}</div>
+                  <div className="flex-1 relative h-full">
+                    {hours.map((_,i)=><div key={i} className="absolute" style={{left:`${(i/hours.length)*100}%`,top:0,bottom:0,width:'1px',background:'#e2e8f0'}}/>)}
+                    {bk.map(b=>{
+                      const [sh,sm]=(b.startTime||'08:00').split(':').map(Number);
+                      const [eh,em]=(b.endTime||'09:00').split(':').map(Number);
+                      const tot=hours.length*60;
+                      const l=Math.max(0,((sh-hours[0])*60+sm)/tot*100);
+                      const w=Math.min(100-l,((eh*60+em)-(sh*60+sm))/tot*100);
+                      return (
+                        <div key={b.id} className="absolute top-1.5 bottom-1.5 rounded-lg flex items-center px-2 text-[10px] font-bold text-white overflow-hidden shadow-sm cursor-pointer hover:opacity-85 transition-opacity"
+                          style={{left:`${l}%`,width:`${w}%`,background:COLORS[b.status]||'#94a3b8'}}
+                          onClick={()=>isPower&&onEdit(b)}
+                          title={`${b.shipmentNo} | ${b.vendor}`}>
+                          {b.jobType==='OUT'?'📤':'📥'} {b.shipmentNo}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-75">
-                    <span className="text-3xl">{isBusy?'⚠️':'✅'}</span>
-                    <span className="font-bold text-sm">{isBusy?(dock.status==='Maintenance'?'ซ่อมบำรุง':'ปิดชั่วคราว'):'ว่าง (Available)'}</span>
-                  </div>
-                  {isAdmin && (
-                    <div className="px-4 pb-3 flex justify-center">
-                      <button onClick={e=>{e.stopPropagation();printQR(dock);}} className="text-[11px] bg-white border border-slate-200 text-slate-600 px-3 py-1.5 rounded-lg font-bold hover:bg-slate-50 transition-colors shadow-sm">
-                        🖨️ Print QR A5
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
         </div>
       </div>
-    </>
-  );
-
-  // ── QR PRINT VIEW ─────────────────────────────────────
-  const QRView = () => (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fade-in">
-      <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white">
-        <h3 className="font-bold text-lg text-slate-800">🖨️ พิมพ์ QR Code ป้ายช่องจอด (A5)</h3>
-        <button onClick={()=>{bays.forEach((b,i)=>setTimeout(()=>printQR(b),i*900));}} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">
-          🖨️ พิมพ์ทุกช่อง
-        </button>
-      </div>
-      <div className="flex-1 p-6 overflow-auto bg-slate-50/50">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {bays.map(bay => {
-            const code  = bay.name.toUpperCase().replace(/\s+/g,'-');
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(code)}&color=021D49&margin=8`;
-            return (
-              <div key={bay.name} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col items-center gap-3 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all">
-                <div className="font-black text-xl text-indigo-900">{bay.name}</div>
-                <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                  <img src={qrUrl} alt={bay.name} className="w-24 h-24 object-contain"/>
-                </div>
-                <div className="text-[10px] text-slate-500 font-mono bg-slate-100 px-2 py-1 rounded">{code}</div>
-                <button onClick={()=>printQR(bay)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-xl font-bold text-xs transition-colors">
-                  🖨️ Print A5
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
+};
 
-  // ── LIST / REPORT VIEW ────────────────────────────────
-  const ListView = ({completed}) => {
-    const data = bookings.filter(b => completed ? b.status==='Completed'&&b.date===viewDate : b.status!=='Completed');
-    return (
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fade-in">
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-white">
-          <h3 className="font-bold text-lg text-slate-800">{completed?'📊 รายงาน Completed':'📋 คิวทั้งหมด'}</h3>
-          {completed && <button onClick={exportCSV} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors flex items-center gap-2">⬇️ Export CSV</button>}
-        </div>
-        <div className="flex-1 overflow-auto dock-scroll p-4">
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-            <table className="w-full text-left text-xs md:text-sm min-w-[900px]">
-              <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-[10px] uppercase tracking-wider">
-                <tr>
-                  <th className="p-4 font-bold">วันที่ / เวลา</th>
-                  <th className="p-4 font-bold">Doc No. / ซัพฯ</th>
-                  <th className="p-4 font-bold">ทะเบียน / ขนาด</th>
-                  <th className="p-4 font-bold">ช่องจอด</th>
-                  <th className="p-4 font-bold">สถานะ</th>
-                  <th className="p-4 font-bold text-center">จัดการ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.sort((a,b)=>(a.date+a.startTime).localeCompare(b.date+b.startTime)).map(b=>(
-                  <tr key={b.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="p-4">
-                      <div className="font-bold text-slate-800">{b.date}</div>
-                      <div className="text-indigo-600 font-bold text-[11px]">{b.startTime} - {b.endTime}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="font-bold text-indigo-700">{b.shipmentNo}</div>
-                      <div className="text-slate-500 text-[11px]">{b.vendor}</div>
-                    </td>
-                    <td className="p-4"><div className="font-bold">{b.license}</div><div className="text-slate-500 text-[11px]">{b.vehicle}</div></td>
-                    <td className="p-4 font-bold text-indigo-600">{b.allocation}</td>
-                    <td className="p-4"><StatusBadge booking={b}/></td>
-                    <td className="p-4">
-                      <div className="flex justify-center gap-2">
-                        {isPower && <button onClick={()=>handleEdit(b)} className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors" title="แก้ไข">✏️</button>}
-                        <button onClick={()=>printManifest(b)} className="p-1.5 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-lg transition-colors" title="Manifest">🖨️</button>
-                        {isPower && <button onClick={()=>handleDelete(b.id)} className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors" title="ลบ">🗑️</button>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {!data.length && <tr><td colSpan="6" className="p-12 text-center text-slate-400">ไม่มีข้อมูล</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
+// ── List / Report View ─────────────────────────────────────
+const ListView = ({bookings,viewDate,completed,isPower,onEdit,onDelete,onManifest,onCycle,onExport})=>{
+  const data=bookings.filter(b=>completed?(b.status==='Completed'&&b.date===viewDate):b.status!=='Completed');
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fi">
+      <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+        <h3 className="font-bold text-lg">{completed?'📊 รายงาน Completed':'📋 คิวทั้งหมด'}</h3>
+        {completed && <button onClick={onExport} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors">⬇️ Export CSV</button>}
       </div>
-    );
-  };
-
-  // ── SCAN VIEW ─────────────────────────────────────────
-  const ScanView = () => (
-    <div className="flex-1 flex flex-col items-center justify-start p-6 fade-in">
-      <div className="w-full max-w-md">
-        <h3 className="font-black text-2xl text-slate-800 text-center mb-3">📷 สแกนคิวอัตโนมัติ</h3>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-sm text-amber-800">
-          💡 ลำดับสแกน: 1.รถมาดึง → 2.โหลดงาน → 3.รอเอกสาร → 4.เสร็จสิ้น
-        </div>
-        {scanMsg.text && (
-          <div className={`rounded-xl p-4 mb-4 text-center font-bold ${scanMsg.ok?'bg-emerald-50 text-emerald-800 border border-emerald-200':'bg-red-50 text-red-800 border border-red-200'}`}>
-            {scanMsg.text}
-          </div>
-        )}
-        <div className="relative w-full rounded-2xl overflow-hidden shadow-sm bg-slate-900 min-h-[260px] flex items-center justify-center mb-4">
-          <div id="scan-reader" className="w-full"></div>
-          {!scanOn && <div className="absolute text-white/40 text-sm">กล้องยังไม่เปิด</div>}
-        </div>
-        <button onClick={()=>setScanOn(!scanOn)}
-          className={`w-full py-3.5 rounded-xl font-bold text-white transition-all shadow-md ${scanOn?'bg-red-500 hover:bg-red-600':'bg-indigo-600 hover:bg-indigo-700'}`}>
-          {scanOn?'🔴 ปิดกล้อง':'📷 เปิดกล้องสแกน'}
-        </button>
-      </div>
-    </div>
-  );
-
-  // ── SCHEDULE VIEW ─────────────────────────────────────
-  const ScheduleView = () => {
-    const hours = Array.from({length:12},(_,i)=>i+7);
-    const todayAll = bookings.filter(b=>b.date===viewDate&&b.allocation!=='Waitlist'&&b.status!=='Completed');
-    const COLORS = {Pending:'#94a3b8',Arrived:'#38bdf8',Loading:'#a78bfa',WaitingDoc:'#fb923c',Completed:'#4ade80'};
-    return (
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fade-in">
-        <div className="p-4 border-b border-slate-100 bg-white">
-          <h3 className="font-bold text-lg text-slate-800">📅 ตารางเวลาหน้าท่า</h3>
-        </div>
-        <div className="flex-1 overflow-auto p-4 bg-slate-50/50">
-          <div className="min-w-[800px] bg-white border border-slate-200 rounded-xl shadow-sm p-4">
-            <div className="flex ml-28 border-b border-slate-200 pb-2 mb-3">
-              {hours.map(h=><div key={h} className="flex-1 text-[10px] text-slate-400 font-bold">{String(h).padStart(2,'0')}:00</div>)}
-            </div>
-            <div className="space-y-3">
-              {bays.map(dock=>{
-                const bk = todayAll.filter(b=>b.allocation===dock.name);
-                return (
-                  <div key={dock.name} className="flex items-center h-14 bg-slate-50 rounded-xl border border-slate-100 hover:border-indigo-100 transition-colors">
-                    <div className="w-28 shrink-0 text-xs font-bold text-slate-700 px-3 border-r border-slate-200 h-full flex items-center">{dock.name}</div>
-                    <div className="flex-1 relative h-full">
-                      {hours.map((_,i)=><div key={i} className="absolute" style={{left:`${(i/hours.length)*100}%`,top:0,bottom:0,width:'1px',background:'#e2e8f0'}}/>)}
-                      {bk.map(b=>{
-                        const [sh,sm]=(b.startTime||'08:00').split(':').map(Number);
-                        const [eh,em]=(b.endTime||'09:00').split(':').map(Number);
-                        const totalMin=hours.length*60;
-                        const startMin=(sh-hours[0])*60+sm;
-                        const durMin=(eh*60+em)-(sh*60+sm);
-                        const l=Math.max(0,(startMin/totalMin)*100);
-                        const w=Math.min(100-l,(durMin/totalMin)*100);
-                        return (
-                          <div key={b.id} className="absolute top-1.5 bottom-1.5 rounded-lg flex items-center px-2 text-[10px] font-bold text-white overflow-hidden shadow-sm cursor-pointer hover:opacity-85 transition-opacity"
-                            style={{left:`${l}%`,width:`${w}%`,background:COLORS[b.status]||'#94a3b8'}}
-                            onClick={()=>isPower&&handleEdit(b)}
-                            title={`${b.shipmentNo} | ${b.vendor}`}>
-                            {b.jobType==='OUT'?'📤':'📥'} {b.shipmentNo}
-                          </div>
-                        );
-                      })}
+      <div className="flex-1 overflow-auto ds p-4">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+          <table className="w-full text-left text-xs md:text-sm min-w-[900px]">
+            <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-[10px] uppercase tracking-wider">
+              <tr>
+                <th className="p-4 font-bold">วันที่ / เวลา</th><th className="p-4 font-bold">Doc No. / ซัพฯ</th>
+                <th className="p-4 font-bold">ทะเบียน / ขนาด</th><th className="p-4 font-bold">ช่องจอด</th>
+                <th className="p-4 font-bold">สถานะ</th><th className="p-4 font-bold text-center">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.sort((a,b)=>(a.date+a.startTime).localeCompare(b.date+b.startTime)).map(b=>(
+                <tr key={b.id} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="p-4"><div className="font-bold">{b.date}</div><div className="text-indigo-600 font-bold text-[11px]">{b.startTime} - {b.endTime}</div></td>
+                  <td className="p-4"><div className="font-bold text-indigo-700">{b.shipmentNo}</div><div className="text-slate-500 text-[11px]">{b.vendor}</div></td>
+                  <td className="p-4"><div className="font-bold">{b.license}</div><div className="text-slate-500 text-[11px]">{b.vehicle}</div></td>
+                  <td className="p-4 font-bold text-indigo-600">{b.allocation}</td>
+                  <td className="p-4"><StatusBadge booking={b} onCycle={onCycle}/></td>
+                  <td className="p-4">
+                    <div className="flex justify-center gap-2">
+                      {isPower&&<button onClick={()=>onEdit(b)} className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors" title="แก้ไข">✏️</button>}
+                      <button onClick={()=>onManifest(b)} className="p-1.5 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-lg transition-colors" title="Manifest">🖨️</button>
+                      {isPower&&<button onClick={()=>onDelete(b.id)} className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors" title="ลบ">🗑️</button>}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+                  </td>
+                </tr>
+              ))}
+              {!data.length && <tr><td colSpan="6" className="p-12 text-center text-slate-400">ไม่มีข้อมูล</td></tr>}
+            </tbody>
+          </table>
         </div>
       </div>
-    );
+    </div>
+  );
+};
+
+// ── Scan View ──────────────────────────────────────────────
+const ScanView = ({scanOn, setScanOn, scanMsg})=>(
+  <div className="flex-1 flex flex-col items-center justify-start p-6 fi">
+    <div className="w-full max-w-md">
+      <h3 className="font-black text-2xl text-slate-800 text-center mb-3">📷 สแกนคิวอัตโนมัติ</h3>
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-sm text-amber-800">
+        💡 ลำดับสแกน: 1.รถมาถึง → 2.โหลดงาน → 3.รอเอกสาร → 4.เสร็จสิ้น
+      </div>
+      {scanMsg.text && (
+        <div className={`rounded-xl p-4 mb-4 text-center font-bold ${scanMsg.ok?'bg-emerald-50 text-emerald-800 border border-emerald-200':'bg-red-50 text-red-800 border border-red-200'}`}>
+          {scanMsg.text}
+        </div>
+      )}
+      <div className="relative w-full rounded-2xl overflow-hidden shadow-sm bg-slate-900 min-h-[260px] flex items-center justify-center mb-4">
+        <div id="scan-reader" className="w-full"></div>
+        {!scanOn && <div className="absolute text-white/40 text-sm">กล้องยังไม่เปิด</div>}
+      </div>
+      <button onClick={()=>setScanOn(!scanOn)}
+        className={`w-full py-3.5 rounded-xl font-bold text-white transition-all shadow-md ${scanOn?'bg-red-500 hover:bg-red-600':'bg-indigo-600 hover:bg-indigo-700'}`}>
+        {scanOn?'🔴 ปิดกล้อง':'📷 เปิดกล้องสแกน'}
+      </button>
+    </div>
+  </div>
+);
+
+// ════════════════════════════════════════════════════════════
+// APP — state & logic only, no sub-component definitions here
+// ════════════════════════════════════════════════════════════
+const BLANK = {
+  date:TODAY(), startTime:'', endTime:'',
+  shipmentNo:'', doNumber:'', vendor:'',
+  license:'', vehicle:'6WT', jobType:'OUT',
+  allocation:'Waitlist', driverName:'',
+  bookingNo:'', containerNo:'', sealNo:'',
+  origin:'CEVA WAREHOUSE', destination:'PAT WAREHOUSE',
+};
+
+function App() {
+  const [bays,     setBays]     = React.useState(INIT_BAYS);
+  const [bookings, setBookings] = React.useState([]);
+  const [online,   setOnline]   = React.useState(false);
+  const [viewDate, setViewDate] = React.useState(TODAY());
+  const [tab,      setTab]      = React.useState('board');
+  const [role,     setRole]     = React.useState('Admin');
+  const [editId,   setEditId]   = React.useState(null);
+  const [form,     setForm]     = React.useState({...BLANK});
+  const [scanOn,   setScanOn]   = React.useState(false);
+  const [scanMsg,  setScanMsg]  = React.useState({text:'',ok:false});
+  const lastScan = React.useRef({text:'',t:0});
+
+  const isPower = ['Admin','Ship Co'].includes(role);
+  const isAdmin = role==='Admin';
+  const canDock = ['Admin','Sup'].includes(role);
+
+  // ── Firebase realtime ─────────────────────────────────
+  React.useEffect(()=>{
+    const bRef=rtdb.ref('smartdock/bookings');
+    const dRef=rtdb.ref('smartdock/bays');
+    bRef.on('value',s=>{ setBookings(safe(s.val())); setOnline(true); }, ()=>setOnline(false));
+    dRef.on('value',s=>{ const d=safe(s.val()); setBays(d.length?d.map(x=>typeof x==='string'?{name:x,status:'Available'}:x):INIT_BAYS); });
+    return ()=>{ bRef.off(); dRef.off(); };
+  },[]);
+
+  // ── Auto generate Doc No ──────────────────────────────
+  React.useEffect(()=>{
+    if(editId) return;
+    const auto=genDocNo(form.date,form.jobType,bookings);
+    setForm(p=>p.shipmentNo!==auto?{...p,shipmentNo:auto}:p);
+  },[form.date,form.jobType,bookings,editId]);
+
+  // ── Stop scanner when leaving scan tab ────────────────
+  React.useEffect(()=>{ if(tab!=='scan') setScanOn(false); },[tab]);
+
+  // ── Scanner ───────────────────────────────────────────
+  React.useEffect(()=>{
+    let qr=null;
+    if(!scanOn) return;
+    qr=new Html5Qrcode('scan-reader');
+    qr.start({facingMode:'environment'},{fps:12,qrbox:{width:220,height:160}},
+      text=>{
+        const now=Date.now();
+        if(text===lastScan.current.text&&now-lastScan.current.t<3500) return;
+        lastScan.current={text,t:now};
+        const todayStr=TODAY();
+        const bay=bays.find(b=>b.name.replace(/\s/g,'').toUpperCase()===text.replace(/[\s-]/g,'').toUpperCase());
+        let booking;
+        if(bay){
+          booking=bookings.find(b=>b.allocation===bay.name&&b.status!=='Completed'&&b.date===todayStr);
+          if(!booking){setScanMsg({text:`ไม่มีคิวใน ${bay.name} วันนี้`,ok:false});setTimeout(()=>setScanMsg({text:'',ok:false}),3000);return;}
+        } else {
+          booking=bookings.find(b=>(b.shipmentNo?.toUpperCase()===text.toUpperCase()||b.license===text)&&b.date===todayStr&&b.status!=='Completed');
+          if(!booking){setScanMsg({text:'ไม่พบบาร์โค้ดนี้',ok:false});setTimeout(()=>setScanMsg({text:'',ok:false}),3000);return;}
+        }
+        const i=STATUSES.indexOf(booking.status);
+        if(i>=STATUSES.length-1){setScanMsg({text:`${booking.shipmentNo} เสร็จสิ้นแล้ว`,ok:false});setTimeout(()=>setScanMsg({text:'',ok:false}),3000);return;}
+        const next=STATUSES[i+1];
+        const t=TIMENOW();
+        const upd={...booking,status:next};
+        if(next==='Arrived')    upd.timeArrived=t;
+        if(next==='Loading')    upd.timeLoading=t;
+        if(next==='WaitingDoc') upd.timeWaitingDoc=t;
+        if(next==='Completed')  upd.timeCompleted=t;
+        const nb=bookings.map(x=>x.id===booking.id?upd:x);
+        setBookings(nb); rtdb.ref('smartdock/bookings').set(nb);
+        setScanMsg({text:`✅ ${booking.shipmentNo} → ${STAT_LBL[next]}`,ok:true});
+        setTimeout(()=>setScanMsg({text:'',ok:false}),3000);
+      },()=>{}).catch(()=>setScanOn(false));
+    return()=>{ qr?.stop().catch(()=>{}); };
+  },[scanOn,bays,bookings]);
+
+  // ── Helpers ───────────────────────────────────────────
+  const syncBookings = nb=>{ setBookings(nb); rtdb.ref('smartdock/bookings').set(nb); };
+  const syncBays     = nd=>{ setBays(nd);     rtdb.ref('smartdock/bays').set(nd); };
+
+  const isDelay = b=>{
+    if(!b||b.status==='Completed'||b.status==='Pending') return false;
+    if(b.date!==TODAY()) return false;
+    return TIMENOW()>b.endTime;
   };
 
-  // ══ RENDER ════════════════════════════════════════════
-  const TABS = [
-    {id:'board',label:'🏭 หน้าท่า'},
-    {id:'schedule',label:'📅 ตาราง',hidden:!isPower},
-    {id:'list',label:'📋 คิวทั้งหมด',hidden:!isPower},
-    {id:'scan',label:'📷 สแกน'},
-    {id:'reports',label:'📊 รายงาน',hidden:!isPower},
-    {id:'qr',label:'🖨️ QR',hidden:!isAdmin},
+  const handleEdit = b=>{ if(!isPower)return; setForm({...BLANK,...b}); setEditId(b.id); window.scrollTo({top:0,behavior:'smooth'}); };
+  const handleDelete = id=>{ if(!isPower||!confirm('ลบรายการนี้?'))return; syncBookings(bookings.filter(b=>b.id!==id)); };
+  const cancelEdit = ()=>{ setEditId(null); setForm({...BLANK}); };
+  const handleCycle = b=>{
+    if(!isPower){alert('ต้องสแกนบาร์โค้ดที่หน้างาน');return;}
+    const i=STATUSES.indexOf(b.status);
+    const next=STATUSES[(i+1)%STATUSES.length];
+    const t=TIMENOW();
+    const upd={...b,status:next};
+    if(next==='Arrived'&&!upd.timeArrived)       upd.timeArrived=t;
+    if(next==='Loading'&&!upd.timeLoading)       upd.timeLoading=t;
+    if(next==='WaitingDoc'&&!upd.timeWaitingDoc) upd.timeWaitingDoc=t;
+    if(next==='Completed'&&!upd.timeCompleted)   upd.timeCompleted=t;
+    syncBookings(bookings.map(x=>x.id===b.id?upd:x));
+  };
+  const handleToggleBay=(name,cur)=>{
+    if(!canDock)return;
+    let next='Available';
+    if(cur==='Available')next='Busy';
+    else if(cur==='Busy')next=isAdmin?'Maintenance':'Available';
+    syncBays(bays.map(d=>d.name===name?{...d,status:next}:d));
+  };
+  const handleSubmit=()=>{
+    if(!isPower)return;
+    if(!form.startTime||!form.endTime||!form.vendor||!form.license){alert('กรุณากรอกข้อมูลให้ครบ');return;}
+    if(form.startTime>=form.endTime){alert('เวลาออกต้องมากกว่าเวลาเข้า');return;}
+    const nb=editId?bookings.map(b=>b.id===editId?{...b,...form}:b):[...bookings,{...form,status:'Pending',id:Date.now()}];
+    syncBookings(nb); setEditId(null); setForm({...BLANK});
+  };
+  const exportCSV=()=>{
+    const done=bookings.filter(b=>b.status==='Completed'&&b.date===viewDate);
+    if(!done.length){alert('ไม่มีข้อมูล');return;}
+    const rows=[['วันที่','ช่องจอด','Doc No','IN/OUT','บริษัท','ทะเบียน','ขนาดรถ','Plan เข้า','Plan ออก','มาถึง','โหลด','รอเอกสาร','เสร็จ']];
+    done.forEach(b=>rows.push([b.date,b.allocation,b.shipmentNo,b.jobType,b.vendor,b.license,b.vehicle,b.startTime,b.endTime,b.timeArrived||'',b.timeLoading||'',b.timeWaitingDoc||'',b.timeCompleted||'']));
+    const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+    Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'})),download:`dock_${viewDate}.csv`}).click();
+  };
+
+  const todayBooks = bookings.filter(b=>b.date===viewDate&&b.status!=='Completed');
+  const waitlist   = todayBooks.filter(b=>b.allocation==='Waitlist');
+  const dockBooks  = todayBooks.filter(b=>b.allocation!=='Waitlist');
+
+  const TABS=[
+    {id:'board',lbl:'🏭 หน้าท่า'},
+    {id:'schedule',lbl:'📅 ตาราง',h:!isPower},
+    {id:'list',lbl:'📋 คิวทั้งหมด',h:!isPower},
+    {id:'scan',lbl:'📷 สแกน'},
+    {id:'reports',lbl:'📊 รายงาน',h:!isPower},
+    {id:'qr',lbl:'🖨️ QR',h:!isAdmin},
   ];
 
   return (
-    <div className="flex flex-col h-full w-full bg-slate-50">
-
+    <div className="flex flex-col h-full bg-slate-50">
       {/* HEADER */}
-      <header className="bg-slate-900 text-white flex flex-col md:flex-row items-center justify-between px-6 py-3 shrink-0 shadow-lg z-10 border-b border-slate-800 gap-3">
+      <header className="bg-slate-900 text-white flex flex-col md:flex-row items-center justify-between px-5 py-3 shrink-0 shadow-lg border-b border-slate-800 gap-3">
         <div className="flex items-center gap-3">
-          <a href="index.html" className="w-9 h-9 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center text-white font-bold transition-colors">←</a>
-          <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-500/30">S</div>
+          <a href="index.html" className="w-9 h-9 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center font-bold transition-colors">←</a>
+          <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center font-black text-xl shadow-lg">S</div>
           <div>
             <h1 className="font-bold text-lg leading-tight">Smart Dock Pro</h1>
             <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
@@ -904,16 +807,14 @@ function App() {
           </div>
         </div>
         <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-          {/* Tabs */}
-          <div className="flex gap-1 overflow-x-auto scroll-hide bg-slate-800/50 p-1 rounded-full border border-slate-700/50">
-            {TABS.filter(t=>!t.hidden).map(t=>(
+          <div className="flex gap-1 overflow-x-auto sh bg-slate-800/50 p-1 rounded-full border border-slate-700/50">
+            {TABS.filter(t=>!t.h).map(t=>(
               <button key={t.id} onClick={()=>setTab(t.id)}
                 className={`whitespace-nowrap text-xs font-semibold py-2 px-3 rounded-full transition-all ${tab===t.id?'bg-white text-indigo-700 shadow-md':'text-slate-300 hover:bg-slate-700 hover:text-white'}`}>
-                {t.label}
+                {t.lbl}
               </button>
             ))}
           </div>
-          {/* Controls */}
           <div className="flex items-center gap-2">
             <div className="flex items-center border border-slate-700 rounded-lg bg-slate-800 px-3 py-1.5">
               <span className="text-[11px] text-slate-400 mr-2">📅</span>
@@ -921,9 +822,7 @@ function App() {
                 className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer [&::-webkit-calendar-picker-indicator]:invert"/>
             </div>
             <button onClick={()=>window.open(`dock-tv.html?date=${viewDate}`,'_blank')}
-              className="bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 rounded-lg px-3 py-1.5 text-xs font-bold text-white transition-colors">
-              🖥️ TV
-            </button>
+              className="bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors">🖥️ TV</button>
             <div className="flex items-center border border-slate-700 rounded-lg bg-slate-800 px-3 py-1.5">
               <span className="text-[11px] text-slate-400 mr-2">สิทธิ์:</span>
               <select value={role} onChange={e=>setRole(e.target.value)} className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer">
@@ -936,14 +835,66 @@ function App() {
 
       {/* MAIN */}
       <div className="flex-1 overflow-hidden flex flex-col md:flex-row p-4 gap-4">
-        {isPower && tab==='board' && <FormPanel/>}
-        <div className={`flex-1 flex flex-col min-w-0 h-full overflow-hidden gap-4`}>
-          {tab==='board'     && <BoardView/>}
-          {tab==='schedule'  && <ScheduleView/>}
-          {tab==='list'      && <ListView completed={false}/>}
-          {tab==='reports'   && <ListView completed={true}/>}
-          {tab==='scan'      && <ScanView/>}
-          {tab==='qr'        && <QRView/>}
+        {/* Form Panel — only on board tab */}
+        {isPower && tab==='board' && (
+          <FormPanel form={form} setForm={setForm} bays={bays}
+            onSubmit={handleSubmit} editId={editId} onCancelEdit={cancelEdit}/>
+        )}
+
+        {/* Right content */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden gap-4">
+
+          {/* BOARD */}
+          {tab==='board' && (<>
+            {/* Waitlist */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 shrink-0 fi">
+              <div className="p-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-2xl">
+                <h3 className="font-bold text-slate-800 text-sm">🅿️ Waitlist</h3>
+                <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">{waitlist.length}</span>
+              </div>
+              <div className="p-4 flex overflow-x-auto sh gap-3">
+                {waitlist.map((b,i)=>(
+                  <WaitlistCard key={b.id} booking={b} idx={i} isPower={isPower}
+                    onEdit={handleEdit} onManifest={printManifest} onCycle={handleCycle}/>
+                ))}
+                {!waitlist.length && <div className="w-full text-center py-6 text-slate-400 text-sm">Waitlist ว่าง</div>}
+              </div>
+            </div>
+
+            {/* Dock Board */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fi">
+              <div className="p-4 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-bold text-lg text-slate-800">🏭 Live Dock Board</h2>
+                  {isAdmin && <button onClick={()=>setTab('qr')} className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg font-bold border border-slate-200 transition-colors">🖨️ พิมพ์ QR</button>}
+                </div>
+                <div className="flex gap-3 text-[11px] font-bold text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>ว่าง</div>
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>มีรถ</div>
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>ปิด</div>
+                  <div className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 pr"></span>Delay</div>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto ds p-4 bg-slate-50/50">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {bays.map(dock=>{
+                    const ab=dockBooks.find(b=>b.allocation===dock.name);
+                    if(ab) return <DockCardOccupied key={dock.name} dock={dock} booking={ab} delay={isDelay(ab)}
+                      isPower={isPower} onEdit={handleEdit} onManifest={printManifest}
+                      onDelete={handleDelete} onCycle={handleCycle}/>;
+                    return <DockCardEmpty key={dock.name} dock={dock} canDock={canDock} isAdmin={isAdmin}
+                      onToggle={handleToggleBay} onPrintQR={printQR}/>;
+                  })}
+                </div>
+              </div>
+            </div>
+          </>)}
+
+          {tab==='schedule' && <ScheduleView bays={bays} bookings={bookings} viewDate={viewDate} isPower={isPower} onEdit={handleEdit}/>}
+          {tab==='list'     && <ListView bookings={bookings} viewDate={viewDate} completed={false} isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
+          {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
+          {tab==='scan'     && <ScanView scanOn={scanOn} setScanOn={setScanOn} scanMsg={scanMsg}/>}
+          {tab==='qr'       && <QRView bays={bays}/>}
         </div>
       </div>
     </div>
