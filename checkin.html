@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Driver Check-in — CEVA Logistics</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family:"Sarabun",sans-serif; }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+    .fade-up { animation:fadeUp 0.4s ease forwards; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .spin { animation:spin 1s linear infinite; }
+    @keyframes pulse-ring {
+      0%   { transform:scale(1);   opacity:0.8; }
+      100% { transform:scale(2.2); opacity:0; }
+    }
+    .pulse-ring {
+      position:absolute; inset:0; border-radius:50%;
+      background:rgba(0,47,108,0.3);
+      animation:pulse-ring 1.8s ease-out infinite;
+    }
+    @keyframes bounce-in {
+      0%  {transform:scale(0.5);opacity:0}
+      70% {transform:scale(1.1)}
+      100%{transform:scale(1);opacity:1}
+    }
+    .bounce-in { animation:bounce-in 0.5s ease forwards; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex flex-col">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between px-5 py-4 bg-black/30 backdrop-blur-sm border-b border-white/10">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
+        <span class="text-blue-900 font-black text-sm">C</span>
+      </div>
+      <div>
+        <div class="text-white font-bold text-sm leading-tight">CEVA Logistics</div>
+        <div class="text-blue-300 text-xs">Driver Arrival Check-in</div>
+      </div>
+    </div>
+    <div class="text-right">
+      <div class="text-white text-xs font-bold" id="hdr-time">—</div>
+      <div class="text-blue-300 text-xs" id="hdr-date">—</div>
+    </div>
+  </header>
+
+  <!-- Main -->
+  <main class="flex-1 flex items-center justify-center p-4">
+    <div class="w-full max-w-sm space-y-4">
+
+      <!-- Booking Info Card -->
+      <div id="booking-card" class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-5 fade-up">
+        <div class="text-xs text-blue-300 font-bold uppercase tracking-wider mb-3">📋 Your Booking</div>
+        <div id="booking-loading" class="text-center py-4">
+          <svg class="w-6 h-6 text-blue-300 spin mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          <div class="text-blue-200 text-xs mt-2">Loading booking details...</div>
+        </div>
+        <div id="booking-info" class="hidden space-y-2">
+          <div class="flex justify-between items-center">
+            <span class="text-blue-200 text-sm">Doc No.</span>
+            <span class="text-white font-black text-sm" id="b-docno">—</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-blue-200 text-sm">Company</span>
+            <span class="text-white font-bold text-sm" id="b-company">—</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-blue-200 text-sm">License Plate</span>
+            <span class="text-white font-bold text-sm" id="b-plate">—</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-blue-200 text-sm">Dock Time</span>
+            <span class="text-white font-bold text-sm" id="b-time">—</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="text-blue-200 text-sm">Status</span>
+            <span class="font-bold text-sm" id="b-status">—</span>
+          </div>
+        </div>
+        <div id="booking-error" class="hidden text-center py-4 text-red-300 text-sm">
+          ❌ Booking not found.<br>Please check your confirmation link.
+        </div>
+      </div>
+
+      <!-- Warehouse Location Info -->
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-4 fade-up">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-blue-600/30 rounded-xl flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </div>
+          <div>
+            <div class="text-white font-bold text-sm">CEVA Warehouse (RAPO)</div>
+            <div class="text-blue-300 text-xs">Geo-fence radius: 5 km</div>
+            <div class="text-slate-400 text-xs" id="warehouse-coords">13.7563° N, 100.5018° E</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE: Initial Check-in Button -->
+      <div id="state-init" class="fade-up">
+        <div class="text-center mb-6">
+          <p class="text-blue-200 text-sm">When you arrive near the warehouse,<br>tap the button below to confirm your arrival.</p>
+        </div>
+
+        <!-- Big Pulse Button -->
+        <div class="flex justify-center mb-6">
+          <button id="btn-checkin" onclick="startCheckin()"
+            class="relative w-44 h-44 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 shadow-2xl shadow-blue-900 flex flex-col items-center justify-center gap-2 hover:scale-105 transition-transform active:scale-95">
+            <div class="pulse-ring"></div>
+            <div class="pulse-ring" style="animation-delay:0.6s"></div>
+            <svg class="w-12 h-12 text-white relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <span class="text-white font-black text-base relative z-10 leading-tight text-center">CHECK IN<br><span class="text-xs font-normal opacity-80">Report Arrival</span></span>
+          </button>
+        </div>
+
+        <p class="text-center text-slate-400 text-xs">
+          🔒 This will request your device's GPS location.<br>Please allow location access when prompted.
+        </p>
+      </div>
+
+      <!-- STATE: Getting Location -->
+      <div id="state-loading" class="hidden text-center py-8 fade-up">
+        <svg class="w-12 h-12 text-blue-400 spin mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+        </svg>
+        <div class="text-white font-bold text-lg mb-1">Getting your location...</div>
+        <div class="text-blue-300 text-sm">Please wait and allow GPS access</div>
+      </div>
+
+      <!-- STATE: Success -->
+      <div id="state-success" class="hidden fade-up">
+        <div class="bg-emerald-500/20 border border-emerald-400/40 rounded-2xl p-6 text-center bounce-in">
+          <div class="w-16 h-16 bg-emerald-400/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-9 h-9 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <div class="text-emerald-300 font-black text-xl mb-1">✅ Checked In!</div>
+          <div class="text-emerald-200 text-sm mb-4">Your arrival has been confirmed.<br>Please proceed to the dock area.</div>
+          <div class="bg-black/20 rounded-xl p-3 text-xs space-y-1 text-left">
+            <div class="flex justify-between"><span class="text-emerald-300">Check-in Time</span><span class="text-white font-bold" id="s-time">—</span></div>
+            <div class="flex justify-between"><span class="text-emerald-300">Your Location</span><span class="text-white font-bold" id="s-coords">—</span></div>
+            <div class="flex justify-between"><span class="text-emerald-300">Distance</span><span class="text-white font-bold" id="s-dist">—</span></div>
+            <div class="flex justify-between"><span class="text-emerald-300">Status Updated</span><span class="text-emerald-400 font-bold">Arrived ✓</span></div>
+          </div>
+        </div>
+        <div class="mt-4 bg-blue-900/40 border border-blue-700/40 rounded-xl p-4 text-sm text-blue-200 text-center">
+          📞 If you need assistance, please call:<br>
+          <span class="text-white font-bold">CEVA Dock Control: 02-XXX-XXXX</span>
+        </div>
+      </div>
+
+      <!-- STATE: Out of Range -->
+      <div id="state-fail" class="hidden fade-up">
+        <div class="bg-red-500/20 border border-red-400/40 rounded-2xl p-6 text-center bounce-in">
+          <div class="w-16 h-16 bg-red-400/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-9 h-9 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </div>
+          <div class="text-red-300 font-black text-lg mb-1">❌ Check-in Failed</div>
+          <div class="text-red-200 text-sm mb-4 font-bold">You are not within the warehouse perimeter.</div>
+          <div class="bg-black/20 rounded-xl p-3 text-xs space-y-1 text-left mb-4">
+            <div class="flex justify-between"><span class="text-red-300">Your Location</span><span class="text-white font-bold" id="f-coords">—</span></div>
+            <div class="flex justify-between"><span class="text-red-300">Distance from CEVA</span><span class="text-red-300 font-bold" id="f-dist">—</span></div>
+            <div class="flex justify-between"><span class="text-red-300">Required</span><span class="text-white font-bold">Within 5 km</span></div>
+          </div>
+          <p class="text-red-200 text-xs">Please ensure you are at or near the CEVA Logistics warehouse before checking in.</p>
+        </div>
+        <button onclick="resetCheckin()"
+          class="w-full mt-4 bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-colors">
+          🔄 Try Again
+        </button>
+      </div>
+
+      <!-- STATE: GPS Error -->
+      <div id="state-gps-error" class="hidden fade-up">
+        <div class="bg-amber-500/20 border border-amber-400/40 rounded-2xl p-6 text-center">
+          <div class="text-amber-300 font-black text-lg mb-2">⚠️ Location Access Denied</div>
+          <p class="text-amber-200 text-sm mb-4">Please enable location access in your browser settings and try again.</p>
+          <div class="bg-black/20 rounded-xl p-3 text-xs text-left text-amber-200 space-y-1">
+            <div><b>Android Chrome:</b> Tap lock icon → Site settings → Location → Allow</div>
+            <div><b>iPhone Safari:</b> Settings → Safari → Location → Allow</div>
+          </div>
+          <button onclick="resetCheckin()" class="mt-4 w-full bg-amber-500/30 hover:bg-amber-500/50 text-amber-200 py-3 rounded-xl font-bold transition-colors">
+            🔄 Try Again
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+<script>
+  // ── Firebase ───────────────────────────────────────────
+  var FB_CFG = {
+    apiKey:"AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
+    authDomain:"rapo-system.firebaseapp.com",
+    databaseURL:"https://rapo-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:"rapo-system",
+    storageBucket:"rapo-system.firebasestorage.app",
+    messagingSenderId:"87090183469",
+    appId:"1:87090183469:web:eafb1ded183755f329a7a4"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
+  var db = firebase.database();
+
+  // ══════════════════════════════════════════════════════
+  // CEVA WAREHOUSE GPS (ปรับพิกัดตามจริงก่อน Go-Live)
+  // ══════════════════════════════════════════════════════
+  var WAREHOUSE = {
+    lat: 13.173493186005723,   // ← เปลี่ยนเป็นพิกัด CEVA จริง
+    lng: 101.00188357670406,  // ← เปลี่ยนเป็นพิกัด CEVA จริง
+    radius_km: 5      // 5 km geo-fence
+  };
+  document.getElementById("warehouse-coords").textContent =
+    WAREHOUSE.lat.toFixed(4) + "° N, " + WAREHOUSE.lng.toFixed(4) + "° E";
+
+  // ── Get booking ID from URL ────────────────────────────
+  var params    = new URLSearchParams(window.location.search);
+  var bookingId = params.get("id");   // numeric ID
+  var currentBooking = null;
+
+  // ── Clock ──────────────────────────────────────────────
+  function tick() {
+    var n = new Date();
+    document.getElementById("hdr-time").textContent =
+      String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
+    document.getElementById("hdr-date").textContent =
+      n.getDate()+"/"+(n.getMonth()+1)+"/"+n.getFullYear();
+  }
+  setInterval(tick,1000); tick();
+
+  // ── Load booking info ─────────────────────────────────
+  if (bookingId) {
+    db.ref("smartdock/bookings").once("value", function(snap) {
+      var data = snap.val();
+      var list = data ? (Array.isArray(data) ? data.filter(Boolean) : Object.values(data).filter(Boolean)) : [];
+      var b = list.find(function(x){ return String(x.id) === String(bookingId); });
+      document.getElementById("booking-loading").classList.add("hidden");
+      if (!b) {
+        document.getElementById("booking-error").classList.remove("hidden"); return;
+      }
+      currentBooking = b;
+      document.getElementById("b-docno").textContent   = b.shipmentNo || b.refNo || "—";
+      document.getElementById("b-company").textContent = b.vendor || "—";
+      document.getElementById("b-plate").textContent   = b.license || b.license_plate || "—";
+      document.getElementById("b-time").textContent    = (b.startTime||"—") + " – " + (b.endTime||"—");
+      var st = b.status || "Pending";
+      var stEl = document.getElementById("b-status");
+      stEl.textContent = st;
+      stEl.className = st === "Arrived" ? "font-bold text-sm text-emerald-400" :
+                       st === "Completed" ? "font-bold text-sm text-green-300" :
+                       "font-bold text-sm text-amber-300";
+      document.getElementById("booking-info").classList.remove("hidden");
+      // If already arrived, show success
+      if (st === "Arrived" || st === "Loading" || st === "WaitingDoc" || st === "Completed") {
+        document.getElementById("state-init").classList.add("hidden");
+        document.getElementById("state-success").classList.remove("hidden");
+        document.getElementById("s-time").textContent  = b.timeArrived || "Already checked in";
+        document.getElementById("s-coords").textContent = "—";
+        document.getElementById("s-dist").textContent  = "—";
+      }
+    });
+  } else {
+    // Demo mode (no booking ID)
+    document.getElementById("booking-loading").classList.add("hidden");
+    document.getElementById("booking-info").classList.remove("hidden");
+    document.getElementById("b-docno").textContent   = "DEMO-MODE";
+    document.getElementById("b-company").textContent = "Demo Supplier";
+    document.getElementById("b-plate").textContent   = "กข 1234";
+    document.getElementById("b-time").textContent    = "10:00 – 11:00";
+    document.getElementById("b-status").textContent  = "Pending";
+    document.getElementById("b-status").className    = "font-bold text-sm text-amber-300";
+  }
+
+  // ══════════════════════════════════════════════════════
+  // HAVERSINE FORMULA — Calculate distance between 2 GPS points
+  // Returns distance in kilometers
+  // ══════════════════════════════════════════════════════
+  function haversineDistance(lat1, lng1, lat2, lng2) {
+    var R = 6371; // Earth radius in km
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLng = (lng2 - lng1) * Math.PI / 180;
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  // ── Show/hide states ──────────────────────────────────
+  function showState(id) {
+    ["state-init","state-loading","state-success","state-fail","state-gps-error"]
+      .forEach(function(s){ document.getElementById(s).classList.add("hidden"); });
+    document.getElementById(id).classList.remove("hidden");
+  }
+
+  function resetCheckin() { showState("state-init"); }
+
+  // ── Main Check-in Logic ───────────────────────────────
+  function startCheckin() {
+    if (!navigator.geolocation) {
+      showState("state-gps-error"); return;
+    }
+    showState("state-loading");
+
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        var lat  = pos.coords.latitude;
+        var lng  = pos.coords.longitude;
+        var dist = haversineDistance(lat, lng, WAREHOUSE.lat, WAREHOUSE.lng);
+        var coordStr = lat.toFixed(5) + "° N, " + lng.toFixed(5) + "° E";
+        var distStr  = dist.toFixed(2) + " km";
+
+        if (dist <= WAREHOUSE.radius_km) {
+          // ✅ Within geo-fence — update Firebase
+          var now = new Date();
+          var timeStr = String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0");
+
+          document.getElementById("s-time").textContent   = timeStr;
+          document.getElementById("s-coords").textContent = coordStr;
+          document.getElementById("s-dist").textContent   = distStr + " from warehouse";
+
+          if (bookingId && currentBooking) {
+            // Update the specific booking in the array
+            db.ref("smartdock/bookings").once("value", function(snap) {
+              var data = snap.val();
+              var list = Array.isArray(data) ? data.filter(Boolean) : Object.values(data||{}).filter(Boolean);
+              var updated = list.map(function(b) {
+                if (String(b.id) === String(bookingId)) {
+                  return Object.assign({}, b, {
+                    status:       "Arrived",
+                    timeArrived:  timeStr,
+                    checkinLat:   lat,
+                    checkinLng:   lng,
+                    checkinDist:  dist
+                  });
+                }
+                return b;
+              });
+              db.ref("smartdock/bookings").set(updated, function(err) {
+                if (err) { console.error("Firebase update error:", err); }
+                showState("state-success");
+              });
+            });
+          } else {
+            // Demo mode — just show success
+            setTimeout(function(){ showState("state-success"); }, 600);
+          }
+        } else {
+          // ❌ Outside geo-fence
+          document.getElementById("f-coords").textContent = coordStr;
+          document.getElementById("f-dist").textContent   = distStr + " (max " + WAREHOUSE.radius_km + " km)";
+          showState("state-fail");
+        }
+      },
+      function(err) {
+        console.error("Geolocation error:", err);
+        showState("state-gps-error");
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
+</script>
+</body>
+</html>
