@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>สแกนคิว — RAPO Dock</title>
+  <link rel="manifest" href="manifest-scan.json">
+  <meta name="theme-color" content="#002048">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="สแกน Dock">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Sarabun',sans-serif;background:#002048;}
+    @keyframes pop{0%{transform:scale(.9);opacity:0}100%{transform:scale(1);opacity:1}}
+    .pop{animation:pop .2s ease}
+    @keyframes pulse2{0%,100%{opacity:1}50%{opacity:.4}}
+    .pulse2{animation:pulse2 1.4s ease-in-out infinite}
+    #reader video{border-radius:1rem;}
+    /* ซ่อนปุ่ม/ข้อความ default ของ html5-qrcode ที่ไม่ต้องการ */
+    #reader__dashboard_section_csr,#reader__dashboard_section_swaplink{display:none!important;}
+  </style>
+</head>
+<body class="h-[100dvh] overflow-hidden text-white flex flex-col">
+
+<div id="root" class="flex-1 flex flex-col"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ════════════════════════════════════════════════════════════
+// FIREBASE — rapo-system (เหมือน dock.html)
+// ════════════════════════════════════════════════════════════
+const FB = {
+  apiKey:"AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
+  authDomain:"rapo-system.firebaseapp.com",
+  databaseURL:"https://rapo-system-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"rapo-system",
+  storageBucket:"rapo-system.firebasestorage.app",
+  messagingSenderId:"87090183469",
+  appId:"1:87090183469:web:eafb1ded183755f329a7a4"
+};
+if(!firebase.apps.length) firebase.initializeApp(FB);
+const rtdb = firebase.database();
+const fbAuth = firebase.auth();
+
+const TODAY   = ()=>new Date().toISOString().split('T')[0];
+const TIMENOW = ()=>new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
+const safe = v=>{ if(!v)return[]; if(Array.isArray(v))return v.filter(Boolean); return Object.values(v).filter(Boolean); };
+
+const STATUSES = ['Pending','Arrived','Loading','WaitingDoc','Completed'];
+const STAT_LBL = {Pending:'รอเข้าท่า',Arrived:'1. รถมาถึง',Loading:'2. โหลดงาน',WaitingDoc:'3. รอเอกสาร',Completed:'4. เสร็จสิ้น'};
+
+// เสียง "ติ๊ด" สั้นๆ ตอนสแกนสำเร็จ (ไม่ต้องใช้ไฟล์เสียงภายนอก)
+function beep(ok){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = ok ? 880 : 220;
+    g.gain.setValueAtTime(0.15, ctx.currentTime);
+    o.start(); o.stop(ctx.currentTime + (ok?0.12:0.25));
+  }catch(e){}
+  if(navigator.vibrate) navigator.vibrate(ok ? 80 : [60,60,60]);
+}
+
+function App(){
+  const [authReady, setAuthReady] = useState(false);
+  const [authErr,   setAuthErr]   = useState('');
+  const [scanning,  setScanning]  = useState(true);   // เปิดกล้องตั้งแต่เข้าหน้า
+  const [result,    setResult]    = useState(null);    // {ok, title, sub}
+  const qrRef = useRef(null);
+  const busyRef = useRef(false); // กันสแกนซ้ำระหว่างกำลังเขียนข้อมูล
+
+  // ── Anonymous sign-in อัตโนมัติ ไม่มี UI ใดๆให้กรอก ──────
+  useEffect(()=>{
+    fbAuth.onAuthStateChanged(user=>{
+      if(user){ setAuthReady(true); return; }
+      fbAuth.signInAnonymously().catch(err=>setAuthErr(err.message));
+    });
+  },[]);
+
+  // ── เริ่มกล้องเมื่อ auth พร้อม และอยู่ในโหมด scanning ──────
+  useEffect(()=>{
+    if(!authReady || !scanning) return;
+    let qr = new Html5Qrcode('reader');
+    let stopped = false;
+    qr.start(
+      {facingMode:'environment'},
+      {fps:12, qrbox:{width:240,height:180}},
+      async (text)=>{
+        if(busyRef.current) return;
+        busyRef.current = true;
+        await handleScan(text.trim());
+        busyRef.current = false;
+      },
+      ()=>{} // เฟรมที่ยังหาไม่เจอ — เงียบไว้ ไม่ต้องโชว์ error รัวๆ
+    ).catch(err=>{
+      setResult({ok:false, title:'เปิดกล้องไม่ได้', sub: String(err.message||err)});
+      setScanning(false);
+    });
+    qrRef.current = qr;
+    return ()=>{ stopped=true; qr.stop().catch(()=>{}); };
+  },[authReady, scanning]);
+
+  const handleScan = useCallback(async (text)=>{
+    const todayStr = TODAY();
+    try{
+      // ดึงข้อมูลสดจาก server ตอนสแกน (ไม่ใช้ state ที่อาจเก่า) เพื่อลดโอกาส
+      // เขียนทับข้อมูลคนอื่นถ้ามีหลายเครื่องสแกนพร้อมกัน
+      const [baysSnap, bookSnap] = await Promise.all([
+        rtdb.ref('smartdock/bays').once('value'),
+        rtdb.ref('smartdock/bookings').once('value'),
+      ]);
+      const bays = safe(baysSnap.val()).map(x=> typeof x==='string' ? {name:x} : x);
+      const bookings = safe(bookSnap.val());
+
+      const norm = s => (s||'').replace(/[\s-]/g,'').toUpperCase();
+      const bay = bays.find(b=> norm(b.name) === norm(text));
+
+      let booking;
+      if(bay){
+        booking = bookings.find(b=> b.allocation===bay.name && b.status!=='Completed' && b.date===todayStr);
+        if(!booking){
+          beep(false);
+          setResult({ok:false, title:`ไม่มีคิวที่ ${bay.name}`, sub:'วันนี้ยังไม่มีรถจองช่องนี้'});
+          return;
+        }
+      } else {
+        booking = bookings.find(b=> (norm(b.shipmentNo)===norm(text) || b.license===text) && b.date===todayStr && b.status!=='Completed');
+        if(!booking){
+          beep(false);
+          setResult({ok:false, title:'ไม่พบ QR / บาร์โค้ดนี้', sub:'ลองสแกนใหม่อีกครั้ง'});
+          return;
+        }
+      }
+
+      const i = STATUSES.indexOf(booking.status);
+      if(i >= STATUSES.length-1){
+        beep(false);
+        setResult({ok:false, title:`${booking.shipmentNo} เสร็จสิ้นแล้ว`, sub:'ไม่มีสถานะถัดไป'});
+        return;
+      }
+      const next = STATUSES[i+1];
+      const t = TIMENOW();
+      const updated = {...booking, status:next};
+      if(next==='Arrived')    updated.timeArrived    = t;
+      if(next==='Loading')    updated.timeLoading    = t;
+      if(next==='WaitingDoc') updated.timeWaitingDoc = t;
+      if(next==='Completed')  updated.timeCompleted  = t;
+
+      // หมายเหตุสำคัญ: เขียนทั้ง array กลับ (เหมือน dock.html เดิม) เพราะ index ของ
+      // array ที่ผ่าน safe()/filter() แล้ว ไม่ตรงกับ key จริงใน Firebase เสมอไป
+      // ถ้ามีช่องว่าง (null) หลงเหลือจากการลบรายการก่อนหน้านี้ — เขียนด้วย index ตรงๆ
+      // มีความเสี่ยงเขียนทับตำแหน่งผิด จึงเลือกวิธีนี้แทนซึ่งปลอดภัยกว่าแม้จะมี
+      // race-condition แบบเดียวกับของเดิมอยู่ (ดูคำอธิบายที่เคยแจ้งไว้ก่อนหน้า)
+      const nb = bookings.map(b=> b.id===booking.id ? updated : b);
+      await rtdb.ref('smartdock/bookings').set(nb);
+
+      beep(true);
+      setResult({ok:true, title:`${booking.shipmentNo||booking.license}`, sub:`→ ${STAT_LBL[next]}`});
+    }catch(err){
+      beep(false);
+      setResult({ok:false, title:'เกิดข้อผิดพลาด', sub: String(err.message||err)});
+    }finally{
+      setScanning(false); // หยุดกล้องรอผู้ใช้กดสแกนใหม่
+    }
+  },[]);
+
+  const rescan = ()=>{ setResult(null); setScanning(true); };
+
+  // ── Auth กำลังเตรียมตัว ───────────────────────────────────
+  if(authErr){
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6 text-center gap-3">
+        <div className="text-4xl">⚠️</div>
+        <div className="font-bold text-lg">เชื่อมต่อระบบไม่ได้</div>
+        <div className="text-sm text-slate-400">{authErr}</div>
+      </div>
+    );
+  }
+  if(!authReady){
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        <div className="w-10 h-10 border-4 border-slate-700 border-t-indigo-500 rounded-full animate-spin"/>
+        <div className="text-slate-400 text-sm">กำลังเชื่อมต่อ...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col">
+      {/* HEADER เรียบที่สุด ไม่มีเมนู ไม่มี tab */}
+      <div className="px-5 py-4 flex items-center justify-center gap-2 shrink-0 border-b border-slate-800">
+        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center font-black text-sm">S</div>
+        <div className="font-bold text-base">สแกนคิว Dock</div>
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center p-5 gap-5">
+        {scanning && (
+          <div className="w-full max-w-sm">
+            <div id="reader" className="rounded-2xl overflow-hidden bg-black"></div>
+            <div className="text-center text-slate-400 text-sm mt-4 pulse2">📷 เล็งกล้องไปที่ QR ช่องจอด</div>
+          </div>
+        )}
+
+        {!scanning && result && (
+          <div className={`pop w-full max-w-sm rounded-3xl p-8 text-center flex flex-col items-center gap-3 ${result.ok?'bg-emerald-500/15 border-2 border-emerald-500':'bg-red-500/15 border-2 border-red-500'}`}>
+            <div className="text-6xl">{result.ok?'✅':'⚠️'}</div>
+            <div className="font-black text-2xl">{result.title}</div>
+            {result.sub && <div className="text-slate-300">{result.sub}</div>}
+          </div>
+        )}
+
+        <button onClick={rescan}
+          className="w-full max-w-sm py-4 rounded-xl font-bold text-lg bg-indigo-600 active:bg-indigo-700 transition-colors">
+          {scanning ? '⏳ กำลังเปิดกล้อง...' : '📷 สแกนต่อไป'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+
+</body>
+</html>

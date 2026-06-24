@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>QR เปิดแอปสแกน Dock — พิมพ์แปะหน้าคลัง</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  @page{ size:A4 portrait; margin:0; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family:'Sarabun',sans-serif;
+    width:210mm; height:297mm;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:white; padding:15mm;
+  }
+  .logo-row{ display:flex; align-items:center; justify-content:center; margin-bottom:8mm; }
+  .logo-row img{ height:16mm; }
+  .sub{ font-size:3.5mm; color:#64748b; text-align:center; margin-bottom:10mm; }
+  h1{ font-size:11mm; font-weight:900; color:#002048; text-align:center; margin-bottom:4mm; }
+  .desc{ font-size:5mm; color:#475569; text-align:center; margin-bottom:12mm; max-width:140mm; line-height:1.6; }
+  .qr-box{ background:#f8fafc; border:2px solid #e2e8f0; border-radius:8mm; padding:12mm;
+           display:flex; flex-direction:column; align-items:center; gap:6mm; }
+  .qr-box img.qr{ width:90mm; height:90mm; }
+  .steps{ margin-top:14mm; display:flex; flex-direction:column; gap:5mm; max-width:150mm; }
+  .step{ display:flex; align-items:flex-start; gap:5mm; }
+  .num{ width:9mm; height:9mm; min-width:9mm; border-radius:50%; background:#002048; color:white;
+        font-weight:900; font-size:4.5mm; display:flex; align-items:center; justify-content:center; }
+  .step-text{ font-size:4.5mm; color:#1e293b; line-height:1.5; padding-top:0.5mm; }
+  .footer{ margin-top:auto; padding-top:10mm; font-size:3mm; color:#94a3b8; }
+</style>
+</head>
+<body>
+
+  <div class="logo-row">
+    <img src="assets/ceva-logo-clean.png" alt="CEVA Logistics">
+  </div>
+  <div class="sub">RAPO — Smart Dock</div>
+
+  <h1>📷 สแกนเพื่อเปิดแอป<br>สแกนคิว Dock</h1>
+  <div class="desc">สแกน QR นี้ครั้งแรกครั้งเดียว เพื่อเปิดหน้าสแกนสถานะรถที่ช่องจอด<br>
+    ใช้มือถือส่วนตัวของพี่ๆ ได้เลย ไม่ต้องล็อกอิน ไม่ต้องลงแอปเพิ่ม</div>
+
+  <div class="qr-box">
+    <img class="qr" id="launcherQR" src="" alt="QR เปิดแอป">
+    <div style="font-size:3.5mm;color:#94a3b8;">หากสแกนไม่ได้ ให้พิมพ์: santar-c.github.io/smart-Rapo/dock-scan.html</div>
+  </div>
+
+  <div class="steps">
+    <div class="step"><div class="num">1</div><div class="step-text">เปิดกล้องมือถือ หรือแอปสแกน QR ปกติ แล้วสแกน QR ด้านบน</div></div>
+    <div class="step"><div class="num">2</div><div class="step-text">หน้าเว็บ "สแกนคิว Dock" จะเปิดขึ้นมาอัตโนมัติ</div></div>
+    <div class="step"><div class="num">3</div><div class="step-text">กดเมนู ⋮ (มุมขวาบน) เลือก <b>"เพิ่มไปยังหน้าจอหลัก"</b> (Add to Home Screen)</div></div>
+    <div class="step"><div class="num">4</div><div class="step-text">ครั้งต่อไปกดไอคอน "สแกน Dock" บนหน้าจอมือถือได้เลย ไม่ต้องสแกนซ้ำ</div></div>
+  </div>
+
+  <div class="footer">RAPO System · Smart Dock Pro</div>
+
+  <script>
+    // สร้าง QR ของ URL หน้าสแกนจริง ด้วย service เดียวกับที่ใช้ในระบบ (dock.html)
+    const targetURL = 'https://santar-c.github.io/smart-Rapo/dock-scan.html';
+    document.getElementById('launcherQR').src =
+      `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(targetURL)}&color=002048&margin=8`;
+    window.onload = () => setTimeout(() => window.print(), 400);
+  </script>
+
+</body>
+</html>
