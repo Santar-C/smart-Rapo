@@ -463,8 +463,7 @@
 
 <script>
 // ══════════════════════════════════════════
-// HELP TOOLTIP — ต้องอยู่นอก module เพื่อให้
-// onclick ใน HTML เรียกได้โดยตรง
+// HELP TOOLTIP (synchronous — ไม่รอ event ใด)
 // ══════════════════════════════════════════
 const HELP_DATA = {
   reorder_col: {
@@ -578,32 +577,21 @@ function closeHelp(){
 
 // Event delegation สำหรับ help icon — ผูกกับ document.body ให้แน่ใจว่าทำงานได้
 // ไม่ว่า module จะโหลดเสร็จเมื่อไหร่
-if(document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', bindHelpEvents);
-} else {
-  bindHelpEvents();
-}
-function bindHelpEvents(){
-  document.body.addEventListener('click', function(e){
-    const icon = e.target.closest('[data-help]');
-    if(icon){
+
+// ผูก click listener กับ document โดยตรง synchronous
+// document พร้อมใช้เสมอตั้งแต่ browser อ่านถึงแท็กนี้
+document.addEventListener('click', function(e) {
+  var t = e.target;
+  // หา element ที่มี data-help (รวม parent)
+  while(t && t !== document) {
+    if(t.hasAttribute && t.hasAttribute('data-help')) {
+      showHelp(t.getAttribute('data-help'));
       e.stopPropagation();
-      showHelp(icon.getAttribute('data-help'));
       return;
     }
-    const modal = document.getElementById('help-modal');
-    if(modal && e.target === modal) closeHelp();
-  }, true); // useCapture=true เพื่อให้ intercept ก่อน event อื่น
-}
-
-// bind events ทันทีที่ script นี้รัน (synchronous)
-document.addEventListener('click', function(e){
-  var icon = e.target.closest ? e.target.closest('[data-help]') : null;
-  if(icon){
-    e.stopPropagation();
-    showHelp(icon.getAttribute('data-help'));
-    return;
+    t = t.parentNode;
   }
+  // ปิด modal เมื่อคลิก overlay
   var modal = document.getElementById('help-modal');
   if(modal && e.target === modal) closeHelp();
 });
