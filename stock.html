@@ -583,7 +583,7 @@ function renderStats(){
 function renderList(){
   let data = [...allProducts];
   if(currentSearch){ const q=currentSearch.toLowerCase(); data=data.filter(p=>(p.name??'').toLowerCase().includes(q)||(p.sku??'').toLowerCase().includes(q)||(p.category??'').toLowerCase().includes(q)); }
-  if(currentFilter !== 'all') data = data.filter(p=>getStatus(p)===currentFilter);
+  if(currentFilter !== 'all') data = data.filter(p=>matchFilter(p, currentFilter));
   const tbody = document.getElementById('product-tbody');
   const noDiv = document.getElementById('no-products');
   if(!data.length){ tbody.innerHTML=''; noDiv.style.display='block'; return; }
@@ -977,6 +977,14 @@ window.setFilter = function(f){
   renderList();
 };
 
+// renderList กรอง low = รวม out ด้วย เพื่อตรงกับตัวเลขบน stat card
+function matchFilter(p, f){
+  if(f === 'all') return true;
+  const s = getStatus(p);
+  if(f === 'low') return s === 'low' || s === 'out';  // card แสดง low+out รวมกัน
+  return s === f;
+}
+
 // ══════════════════════════════════
 // EXPORT
 // ══════════════════════════════════
@@ -1009,10 +1017,23 @@ function startListeners(){
   const qP = query(collection(db, COL_PRODUCTS), orderBy('sku'));
   onSnapshot(qP, snap=>{ allProducts=snap.docs.map(d=>({id:d.id,...d.data()})); renderAll(); });
 
-  // ใช้ ts_import เป็น fallback สำหรับ records ที่ import จาก Excel (ไม่มี field ts)
-  // records ใหม่จากระบบจะมีทั้ง ts และ ts_import
+  // ดึงทั้งหมดมาแล้ว sort ใน JS แทน orderBy ใน Firestore
+  // เพื่อหลีกเลี่ยง composite index error เมื่อใช้ร่วมกับ filter
   const qL = query(collection(db, COL_LOGS), orderBy('ts_import','desc'), limit(1000));
-  onSnapshot(qL, snap=>{ allLogs=snap.docs.map(d=>({id:d.id,...d.data()})); renderLog(); });
+  onSnapshot(qL, snap=>{
+    allLogs = snap.docs.map(d=>({id:d.id,...d.data()}));
+    // sort ใน JS: records ที่มี ts ใช้ ts, ไม่งั้นใช้ ts_import, ไม่งั้นใช้ date string
+    allLogs.sort((a,b)=>{
+      const getTime = r => {
+        if(r.ts?.toDate)             return r.ts.toDate().getTime();
+        if(r.ts_import?.toDate)      return r.ts_import.toDate().getTime();
+        if(r.date)                   return new Date(r.date).getTime();
+        return 0;
+      };
+      return getTime(b) - getTime(a); // desc
+    });
+    renderLog();
+  });
 }
 
 // ══════════════════════════════════
@@ -1119,13 +1140,25 @@ window.closeHelp = function(){
   document.getElementById('help-modal').classList.remove('open');
 };
 
-// Event delegation สำหรับ help icon (ทำงานได้แม้อยู่ใน module scope)
-document.addEventListener('click', function(e){
-  const icon = e.target.closest('[data-help]');
-  if(icon){ window.showHelp(icon.getAttribute('data-help')); return; }
-  const modal = document.getElementById('help-modal');
-  if(modal && e.target === modal) window.closeHelp();
-});
+// Event delegation สำหรับ help icon — ผูกกับ document.body ให้แน่ใจว่าทำงานได้
+// ไม่ว่า module จะโหลดเสร็จเมื่อไหร่
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', bindHelpEvents);
+} else {
+  bindHelpEvents();
+}
+function bindHelpEvents(){
+  document.body.addEventListener('click', function(e){
+    const icon = e.target.closest('[data-help]');
+    if(icon){
+      e.stopPropagation();
+      window.showHelp(icon.getAttribute('data-help'));
+      return;
+    }
+    const modal = document.getElementById('help-modal');
+    if(modal && e.target === modal) window.closeHelp();
+  }, true); // useCapture=true เพื่อให้ intercept ก่อน event อื่น
+}
 
 // ═══════════════════════════════════
 // AUTH
