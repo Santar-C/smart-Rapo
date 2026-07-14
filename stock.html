@@ -457,6 +457,144 @@
 </div>
 <div id="toast"></div>
 
+<script>
+// ══════════════════════════════════════════
+// HELP TOOLTIP — ต้องอยู่นอก module เพื่อให้
+// onclick ใน HTML เรียกได้โดยตรง
+// ══════════════════════════════════════════
+const HELP_DATA = {
+  monthly: {
+    title: '📋 ค่าเฉลี่ยใช้ / เดือน (avg_monthly)',
+    tag: 'manual',
+    what: 'จำนวนหน่วยเฉลี่ยที่ใช้ไปต่อเดือน วัดจากการเบิก (Transaction Out) จริงในช่วงที่ผ่านมา',
+    source: 'Admin กรอกเองโดยดูจาก Transaction Out ย้อนหลัง 3-6 เดือน แล้วหาค่าเฉลี่ย ไม่ใช่ค่าที่ระบบคำนวณให้',
+    formula: null,
+    example: 'ถ้า 3 เดือนที่ผ่านมาใช้กล่อง 120 / 90 / 150 ใบ\nค่าเฉลี่ย = (120+90+150) ÷ 3 = 120 ใบ/เดือน\nกรอก 120 ในช่องนี้',
+    audit: 'Auditor: สามารถ verify ได้จาก Transaction Out report กรองตาม SKU และ date range เทียบกับค่าที่กรอกไว้',
+  },
+  lead: {
+    title: '📋 Lead Time (วัน)',
+    tag: 'manual',
+    what: 'จำนวนวันจริงตั้งแต่วันที่ออก PO (Purchase Order) ถึงวันที่ของมาถึงคลังและรับเข้าสต็อกได้ รวม: เวลาซัพฯ เตรียมของ + ขนส่ง + ตรวจรับ',
+    source: 'Admin กรอกเองจากประสบการณ์กับซัพพลายเออร์แต่ละราย ควร verify จาก PO history เปรียบเทียบ PO date vs GR date จริง',
+    formula: null,
+    example: 'ซัพฯ เทปใส: สั่งวันจันทร์ → ของมาวันพุธ = Lead Time 2 วัน\nซัพฯ พาเลทพลาสติก: สั่ง → ของมา 14 วัน = Lead Time 14 วัน\n\nแต่ละ SKU อาจมี Lead Time ต่างกัน ขึ้นกับซัพฯ',
+    audit: 'Auditor: ควรมีเอกสารสนับสนุน เช่น PO log ที่แสดง PO Date และ GR Date เพื่อ verify Lead Time ที่ตั้งไว้ — แนะนำ review ทุก 6 เดือน หรือเมื่อเปลี่ยนซัพฯ',
+  },
+  safety: {
+    title: '📋 Safety Stock',
+    tag: 'manual',
+    what: 'ปริมาณสต็อกขั้นต่ำที่เก็บไว้เป็น buffer กันเหตุการณ์ไม่คาดฝัน เช่น ซัพฯ ส่งของช้า, demand พุ่งสูงกว่าปกติ, หรือของเสียหายระหว่างขนส่ง',
+    source: 'Admin กำหนดเองตามการประเมินความเสี่ยงของธุรกิจ แนวทางคำนวณที่แนะนำคือ:\nSafety Stock = avg_daily × จำนวนวันที่รับความเสี่ยงได้\nแต่ในระบบนี้ Admin ใส่ตัวเลขโดยตรงเพื่อความยืดหยุ่น',
+    formula: 'แนวทาง: Safety Stock = avg_daily × buffer_days\nเช่น ใช้ 5 ชิ้น/วัน ต้องการ buffer 3 วัน\nSafety Stock = 5 × 3 = 15 ชิ้น',
+    example: 'สินค้า A ใช้วันละ 5 ชิ้น ถ้าของขาด 3 วันกระทบ operation\nSafety Stock = 5 × 3 = 15 ชิ้น\n\nสินค้า B ของขาดไม่กระทบมาก → Safety Stock = 5 ชิ้น',
+    audit: 'Auditor: Safety Stock ควรมี rationale ชัดเจนว่าเลือก buffer กี่วันและเหตุผล — ควร document ไว้ใน SOP หรือ inventory policy ของบริษัท',
+  },
+  moq: {
+    title: '📋 MOQ — Minimum Order Quantity',
+    tag: 'manual',
+    what: 'จำนวนขั้นต่ำที่ซัพพลายเออร์กำหนดให้ต้องสั่งซื้อต่อครั้ง ไม่สามารถสั่งน้อยกว่านี้ได้ มักระบุใน quotation หรือ supplier agreement',
+    source: 'Admin กรอกตามเงื่อนไขจริงของซัพฯ แต่ละราย สามารถ verify ได้จาก PO ที่ผ่านมา หรือ supplier catalogue',
+    formula: null,
+    example: 'ซัพฯ เทปใส: ขายขั้นต่ำ 1 กล่อง = 12 ม้วน → MOQ = 12\nซัพฯ ฉลาก: ขายขั้นต่ำ 1 roll → MOQ = 1\nซัพฯ พาเลท: ขายขั้นต่ำ 10 pcs → MOQ = 10',
+    audit: 'Auditor: MOQ ส่งผลโดยตรงต่อ "แนะนำสั่งซื้อ" ที่ระบบคำนวณให้ ควร verify กับ supplier agreement จริง',
+  },
+  min: {
+    title: '🧮 Min Point (จุดแจ้งเตือน)',
+    tag: 'calc',
+    what: 'ระดับสต็อกที่เมื่อต่ำกว่านี้ระบบจะแสดงแจ้งเตือน (badge สีส้ม) ทำหน้าที่เป็น early warning ก่อนถึง Reorder Point',
+    source: 'ถ้ากรอกเอง: Admin กำหนด\nถ้าเว้นว่าง: ระบบคำนวณอัตโนมัติ',
+    formula: 'Min Point (Auto) = Reorder Point + Safety Stock\n\nซึ่ง Reorder Point = (avg_monthly ÷ 30 × lead_time) + safety_stock\nดังนั้น Min Point = [(avg_monthly ÷ 30 × lead_time) + safety_stock] + safety_stock',
+    example: 'avg_monthly=60, lead_time=15, safety_stock=10\navg_daily = 60÷30 = 2 ชิ้น/วัน\nReorder Point = (2×15)+10 = 40\nMin Point (Auto) = 40+10 = 50\n\nเมื่อสต็อก ≤ 50 → แสดงสีส้ม "ควรสั่งซื้อ"',
+    audit: 'Auditor: ถ้า Min Point กรอกเอง ต้องมี rationale — ถ้าใช้ Auto calculation จะเห็นสูตรชัดเจนในระบบนี้',
+  },
+  max: {
+    title: '🧮 Max Point (สต็อกสูงสุด)',
+    tag: 'calc',
+    what: 'ปริมาณสต็อกสูงสุดที่ควรมี ใช้เพื่อป้องกัน overstock และคำนวณว่าควรสั่งเพิ่มครั้งละเท่าไหร่',
+    source: 'ถ้ากรอกเอง: Admin กำหนด\nถ้าเว้นว่าง: ระบบคำนวณอัตโนมัติ',
+    formula: 'Max Point (Auto) = Min Point + (avg_daily × lead_time × 2)\n\nเหตุผล: เผื่อสต็อกให้ใช้ได้อีก 2 รอบ lead time หลัง Min Point',
+    example: 'Min Point=50, avg_daily=2, lead_time=15\nMax Point = 50 + (2×15×2) = 50+60 = 110\n\nแนะนำสั่ง = ceil((110-คงเหลือ) ÷ MOQ) × MOQ',
+    audit: 'Auditor: Max Point กระทบงบประมาณและพื้นที่จัดเก็บโดยตรง ควร review ตามฤดูกาลหรือเมื่อ demand pattern เปลี่ยน',
+  },
+  dead: {
+    title: '📋 Dead Stock (วัน)',
+    tag: 'manual',
+    what: 'จำนวนวันที่ไม่มีการเคลื่อนไหว (ทั้ง IN และ OUT) หลังจากนี้ระบบจะ flag สินค้าเป็น "Dead Stock" (badge สีเทา) เพื่อให้ทราบว่ามีสินค้าที่ไม่ได้ใช้นาน',
+    source: 'Admin กำหนดเองตามนโยบายคลัง ค่า default = 90 วัน',
+    formula: 'Dead Stock = วันนี้ - วันที่มีการเคลื่อนไหวล่าสุด > dead_stock_days',
+    example: 'กำหนด dead_stock_days = 90\nถ้าสินค้าไม่มีการเบิก/รับเข้า > 90 วัน\n→ status เปลี่ยนเป็น "Dead Stock"\n\nระบบดูจาก field last_movement ที่บันทึกทุกครั้งที่มี transaction',
+    audit: 'Auditor: Dead Stock report ช่วยระบุสินค้าที่อาจหมดอายุ เสื่อมสภาพ หรือไม่จำเป็นแล้ว ควรมีกระบวนการ review และ disposal ที่ชัดเจน',
+  },
+};
+
+function showHelp(key){
+  if(!d) return;
+  const tagHtml = d.tag==='manual'
+    ? '<span class="modal-tag tag-manual">📋 กรอกเองแบบ Manual</span>'
+    : '<span class="modal-tag tag-calc">🧮 คำนวณอัตโนมัติ</span>';
+  document.getElementById('help-title').textContent = d.title;
+  document.getElementById('help-body').innerHTML = `
+    ${tagHtml}
+    <div class="modal-section">
+      <div class="modal-section-title">คืออะไร</div>
+      <div class="modal-body">${d.what.replace(/\n/g,'<br>')}</div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">ที่มาของข้อมูล</div>
+      <div class="modal-body">${d.source.replace(/\n/g,'<br>')}</div>
+    </div>
+    ${d.formula ? `
+    <div class="modal-section">
+      <div class="modal-section-title">สูตรคำนวณ</div>
+      <div class="formula-box">${d.formula.replace(/\n/g,'<br>')}</div>
+    </div>` : ''}
+    <div class="modal-section">
+      <div class="modal-section-title">ตัวอย่าง</div>
+      <div class="example-box">${d.example.replace(/\n/g,'<br>')}</div>
+    </div>
+    <div class="audit-note">
+      <b>📋 สำหรับ Auditor:</b><br>${d.audit}
+    </div>`;
+  document.getElementById('help-modal').classList.add('open');
+};
+
+function closeHelp(){
+  document.getElementById('help-modal').classList.remove('open');
+};
+
+// Event delegation สำหรับ help icon — ผูกกับ document.body ให้แน่ใจว่าทำงานได้
+// ไม่ว่า module จะโหลดเสร็จเมื่อไหร่
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', bindHelpEvents);
+} else {
+  bindHelpEvents();
+}
+function bindHelpEvents(){
+  document.body.addEventListener('click', function(e){
+    const icon = e.target.closest('[data-help]');
+    if(icon){
+      e.stopPropagation();
+      showHelp(icon.getAttribute('data-help'));
+      return;
+    }
+    const modal = document.getElementById('help-modal');
+    if(modal && e.target === modal) closeHelp();
+  }, true); // useCapture=true เพื่อให้ intercept ก่อน event อื่น
+}
+
+// bind events ทันทีที่ script นี้รัน (synchronous)
+document.addEventListener('click', function(e){
+  var icon = e.target.closest ? e.target.closest('[data-help]') : null;
+  if(icon){
+    e.stopPropagation();
+    showHelp(icon.getAttribute('data-help'));
+    return;
+  }
+  var modal = document.getElementById('help-modal');
+  if(modal && e.target === modal) closeHelp();
+});
+</script>
 <script type="module">
 import { auth, db } from "./firebase-config.js";
 import { getUserProfile, logoutUser } from "./auth.js";
@@ -1017,20 +1155,19 @@ function startListeners(){
   const qP = query(collection(db, COL_PRODUCTS), orderBy('sku'));
   onSnapshot(qP, snap=>{ allProducts=snap.docs.map(d=>({id:d.id,...d.data()})); renderAll(); });
 
-  // ดึงทั้งหมดมาแล้ว sort ใน JS แทน orderBy ใน Firestore
-  // เพื่อหลีกเลี่ยง composite index error เมื่อใช้ร่วมกับ filter
-  const qL = query(collection(db, COL_LOGS), orderBy('ts_import','desc'), limit(1000));
-  onSnapshot(qL, snap=>{
+  // ดึง stock_logs ทั้งหมดโดยไม่ใช้ orderBy เพื่อ return ทุก document
+  // (Firestore จะข้าม documents ที่ไม่มี field ที่ใช้ใน orderBy)
+  // แล้ว sort และ filter ใน JS แทน
+  onSnapshot(collection(db, COL_LOGS), snap=>{
     allLogs = snap.docs.map(d=>({id:d.id,...d.data()}));
-    // sort ใน JS: records ที่มี ts ใช้ ts, ไม่งั้นใช้ ts_import, ไม่งั้นใช้ date string
     allLogs.sort((a,b)=>{
-      const getTime = r => {
-        if(r.ts?.toDate)             return r.ts.toDate().getTime();
-        if(r.ts_import?.toDate)      return r.ts_import.toDate().getTime();
-        if(r.date)                   return new Date(r.date).getTime();
+      const getTime = r=>{
+        if(r.ts?.toDate)        return r.ts.toDate().getTime();
+        if(r.ts_import?.toDate) return r.ts_import.toDate().getTime();
+        if(r.date)              return new Date(r.date).getTime();
         return 0;
       };
-      return getTime(b) - getTime(a); // desc
+      return getTime(b)-getTime(a); // newest first
     });
     renderLog();
   });
@@ -1039,126 +1176,6 @@ function startListeners(){
 // ══════════════════════════════════
 // AUDIT HELP MODAL
 // ══════════════════════════════════
-const HELP_DATA = {
-  monthly: {
-    title: '📋 ค่าเฉลี่ยใช้ / เดือน (avg_monthly)',
-    tag: 'manual',
-    what: 'จำนวนหน่วยเฉลี่ยที่ใช้ไปต่อเดือน วัดจากการเบิก (Transaction Out) จริงในช่วงที่ผ่านมา',
-    source: 'Admin กรอกเองโดยดูจาก Transaction Out ย้อนหลัง 3-6 เดือน แล้วหาค่าเฉลี่ย ไม่ใช่ค่าที่ระบบคำนวณให้',
-    formula: null,
-    example: 'ถ้า 3 เดือนที่ผ่านมาใช้กล่อง 120 / 90 / 150 ใบ\nค่าเฉลี่ย = (120+90+150) ÷ 3 = 120 ใบ/เดือน\nกรอก 120 ในช่องนี้',
-    audit: 'Auditor: สามารถ verify ได้จาก Transaction Out report กรองตาม SKU และ date range เทียบกับค่าที่กรอกไว้',
-  },
-  lead: {
-    title: '📋 Lead Time (วัน)',
-    tag: 'manual',
-    what: 'จำนวนวันจริงตั้งแต่วันที่ออก PO (Purchase Order) ถึงวันที่ของมาถึงคลังและรับเข้าสต็อกได้ รวม: เวลาซัพฯ เตรียมของ + ขนส่ง + ตรวจรับ',
-    source: 'Admin กรอกเองจากประสบการณ์กับซัพพลายเออร์แต่ละราย ควร verify จาก PO history เปรียบเทียบ PO date vs GR date จริง',
-    formula: null,
-    example: 'ซัพฯ เทปใส: สั่งวันจันทร์ → ของมาวันพุธ = Lead Time 2 วัน\nซัพฯ พาเลทพลาสติก: สั่ง → ของมา 14 วัน = Lead Time 14 วัน\n\nแต่ละ SKU อาจมี Lead Time ต่างกัน ขึ้นกับซัพฯ',
-    audit: 'Auditor: ควรมีเอกสารสนับสนุน เช่น PO log ที่แสดง PO Date และ GR Date เพื่อ verify Lead Time ที่ตั้งไว้ — แนะนำ review ทุก 6 เดือน หรือเมื่อเปลี่ยนซัพฯ',
-  },
-  safety: {
-    title: '📋 Safety Stock',
-    tag: 'manual',
-    what: 'ปริมาณสต็อกขั้นต่ำที่เก็บไว้เป็น buffer กันเหตุการณ์ไม่คาดฝัน เช่น ซัพฯ ส่งของช้า, demand พุ่งสูงกว่าปกติ, หรือของเสียหายระหว่างขนส่ง',
-    source: 'Admin กำหนดเองตามการประเมินความเสี่ยงของธุรกิจ แนวทางคำนวณที่แนะนำคือ:\nSafety Stock = avg_daily × จำนวนวันที่รับความเสี่ยงได้\nแต่ในระบบนี้ Admin ใส่ตัวเลขโดยตรงเพื่อความยืดหยุ่น',
-    formula: 'แนวทาง: Safety Stock = avg_daily × buffer_days\nเช่น ใช้ 5 ชิ้น/วัน ต้องการ buffer 3 วัน\nSafety Stock = 5 × 3 = 15 ชิ้น',
-    example: 'สินค้า A ใช้วันละ 5 ชิ้น ถ้าของขาด 3 วันกระทบ operation\nSafety Stock = 5 × 3 = 15 ชิ้น\n\nสินค้า B ของขาดไม่กระทบมาก → Safety Stock = 5 ชิ้น',
-    audit: 'Auditor: Safety Stock ควรมี rationale ชัดเจนว่าเลือก buffer กี่วันและเหตุผล — ควร document ไว้ใน SOP หรือ inventory policy ของบริษัท',
-  },
-  moq: {
-    title: '📋 MOQ — Minimum Order Quantity',
-    tag: 'manual',
-    what: 'จำนวนขั้นต่ำที่ซัพพลายเออร์กำหนดให้ต้องสั่งซื้อต่อครั้ง ไม่สามารถสั่งน้อยกว่านี้ได้ มักระบุใน quotation หรือ supplier agreement',
-    source: 'Admin กรอกตามเงื่อนไขจริงของซัพฯ แต่ละราย สามารถ verify ได้จาก PO ที่ผ่านมา หรือ supplier catalogue',
-    formula: null,
-    example: 'ซัพฯ เทปใส: ขายขั้นต่ำ 1 กล่อง = 12 ม้วน → MOQ = 12\nซัพฯ ฉลาก: ขายขั้นต่ำ 1 roll → MOQ = 1\nซัพฯ พาเลท: ขายขั้นต่ำ 10 pcs → MOQ = 10',
-    audit: 'Auditor: MOQ ส่งผลโดยตรงต่อ "แนะนำสั่งซื้อ" ที่ระบบคำนวณให้ ควร verify กับ supplier agreement จริง',
-  },
-  min: {
-    title: '🧮 Min Point (จุดแจ้งเตือน)',
-    tag: 'calc',
-    what: 'ระดับสต็อกที่เมื่อต่ำกว่านี้ระบบจะแสดงแจ้งเตือน (badge สีส้ม) ทำหน้าที่เป็น early warning ก่อนถึง Reorder Point',
-    source: 'ถ้ากรอกเอง: Admin กำหนด\nถ้าเว้นว่าง: ระบบคำนวณอัตโนมัติ',
-    formula: 'Min Point (Auto) = Reorder Point + Safety Stock\n\nซึ่ง Reorder Point = (avg_monthly ÷ 30 × lead_time) + safety_stock\nดังนั้น Min Point = [(avg_monthly ÷ 30 × lead_time) + safety_stock] + safety_stock',
-    example: 'avg_monthly=60, lead_time=15, safety_stock=10\navg_daily = 60÷30 = 2 ชิ้น/วัน\nReorder Point = (2×15)+10 = 40\nMin Point (Auto) = 40+10 = 50\n\nเมื่อสต็อก ≤ 50 → แสดงสีส้ม "ควรสั่งซื้อ"',
-    audit: 'Auditor: ถ้า Min Point กรอกเอง ต้องมี rationale — ถ้าใช้ Auto calculation จะเห็นสูตรชัดเจนในระบบนี้',
-  },
-  max: {
-    title: '🧮 Max Point (สต็อกสูงสุด)',
-    tag: 'calc',
-    what: 'ปริมาณสต็อกสูงสุดที่ควรมี ใช้เพื่อป้องกัน overstock และคำนวณว่าควรสั่งเพิ่มครั้งละเท่าไหร่',
-    source: 'ถ้ากรอกเอง: Admin กำหนด\nถ้าเว้นว่าง: ระบบคำนวณอัตโนมัติ',
-    formula: 'Max Point (Auto) = Min Point + (avg_daily × lead_time × 2)\n\nเหตุผล: เผื่อสต็อกให้ใช้ได้อีก 2 รอบ lead time หลัง Min Point',
-    example: 'Min Point=50, avg_daily=2, lead_time=15\nMax Point = 50 + (2×15×2) = 50+60 = 110\n\nแนะนำสั่ง = ceil((110-คงเหลือ) ÷ MOQ) × MOQ',
-    audit: 'Auditor: Max Point กระทบงบประมาณและพื้นที่จัดเก็บโดยตรง ควร review ตามฤดูกาลหรือเมื่อ demand pattern เปลี่ยน',
-  },
-  dead: {
-    title: '📋 Dead Stock (วัน)',
-    tag: 'manual',
-    what: 'จำนวนวันที่ไม่มีการเคลื่อนไหว (ทั้ง IN และ OUT) หลังจากนี้ระบบจะ flag สินค้าเป็น "Dead Stock" (badge สีเทา) เพื่อให้ทราบว่ามีสินค้าที่ไม่ได้ใช้นาน',
-    source: 'Admin กำหนดเองตามนโยบายคลัง ค่า default = 90 วัน',
-    formula: 'Dead Stock = วันนี้ - วันที่มีการเคลื่อนไหวล่าสุด > dead_stock_days',
-    example: 'กำหนด dead_stock_days = 90\nถ้าสินค้าไม่มีการเบิก/รับเข้า > 90 วัน\n→ status เปลี่ยนเป็น "Dead Stock"\n\nระบบดูจาก field last_movement ที่บันทึกทุกครั้งที่มี transaction',
-    audit: 'Auditor: Dead Stock report ช่วยระบุสินค้าที่อาจหมดอายุ เสื่อมสภาพ หรือไม่จำเป็นแล้ว ควรมีกระบวนการ review และ disposal ที่ชัดเจน',
-  },
-};
-
-window.showHelp = function(key){
-  if(!d) return;
-  const tagHtml = d.tag==='manual'
-    ? '<span class="modal-tag tag-manual">📋 กรอกเองแบบ Manual</span>'
-    : '<span class="modal-tag tag-calc">🧮 คำนวณอัตโนมัติ</span>';
-  document.getElementById('help-title').textContent = d.title;
-  document.getElementById('help-body').innerHTML = `
-    ${tagHtml}
-    <div class="modal-section">
-      <div class="modal-section-title">คืออะไร</div>
-      <div class="modal-body">${d.what.replace(/\n/g,'<br>')}</div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-title">ที่มาของข้อมูล</div>
-      <div class="modal-body">${d.source.replace(/\n/g,'<br>')}</div>
-    </div>
-    ${d.formula ? `
-    <div class="modal-section">
-      <div class="modal-section-title">สูตรคำนวณ</div>
-      <div class="formula-box">${d.formula.replace(/\n/g,'<br>')}</div>
-    </div>` : ''}
-    <div class="modal-section">
-      <div class="modal-section-title">ตัวอย่าง</div>
-      <div class="example-box">${d.example.replace(/\n/g,'<br>')}</div>
-    </div>
-    <div class="audit-note">
-      <b>📋 สำหรับ Auditor:</b><br>${d.audit}
-    </div>`;
-  document.getElementById('help-modal').classList.add('open');
-};
-
-window.closeHelp = function(){
-  document.getElementById('help-modal').classList.remove('open');
-};
-
-// Event delegation สำหรับ help icon — ผูกกับ document.body ให้แน่ใจว่าทำงานได้
-// ไม่ว่า module จะโหลดเสร็จเมื่อไหร่
-if(document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', bindHelpEvents);
-} else {
-  bindHelpEvents();
-}
-function bindHelpEvents(){
-  document.body.addEventListener('click', function(e){
-    const icon = e.target.closest('[data-help]');
-    if(icon){
-      e.stopPropagation();
-      window.showHelp(icon.getAttribute('data-help'));
-      return;
-    }
-    const modal = document.getElementById('help-modal');
-    if(modal && e.target === modal) window.closeHelp();
-  }, true); // useCapture=true เพื่อให้ intercept ก่อน event อื่น
-}
 
 // ═══════════════════════════════════
 // AUTH
