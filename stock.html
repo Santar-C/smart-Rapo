@@ -103,29 +103,7 @@
     .form-group.span3{grid-column:span 3}
 
     /* CSS TOOLTIP — ไม่ต้องพึ่ง JS เลย */
-    .tip-wrap{position:relative;display:inline-flex;align-items:center}
-    .tip-wrap .tip-box{
-      display:none;position:absolute;bottom:calc(100% + 8px);left:50%;
-      transform:translateX(-50%);
-      background:#1e293b;color:#fff;font-size:.75rem;font-weight:400;
-      line-height:1.6;padding:.6rem .85rem;border-radius:10px;
-      width:260px;white-space:normal;z-index:9999;
-      box-shadow:0 8px 24px rgba(0,0,0,.35);
-      pointer-events:none;
-    }
-    .tip-wrap .tip-box::after{
-      content:'';position:absolute;top:100%;left:50%;
-      transform:translateX(-50%);border:6px solid transparent;
-      border-top-color:#1e293b;
-    }
-    .tip-wrap:hover .tip-box,
-    .tip-wrap:focus-within .tip-box{ display:block; }
-    .help-icon{display:inline-flex;align-items:center;justify-content:center;
-      width:16px;height:16px;border-radius:50%;background:#94a3b8;color:#fff;
-      font-size:.6rem;font-weight:900;cursor:help;margin-left:.35rem;
-      flex-shrink:0;transition:background .15s;vertical-align:middle;
-      border:none;outline:none;}
-    .help-icon:hover{background:#002048}
+    
     .modal-box{background:#fff;border-radius:16px;padding:1.5rem;width:100%;
       max-width:520px;max-height:88dvh;overflow-y:auto;
       box-shadow:0 24px 64px rgba(0,0,0,.35)}
@@ -250,12 +228,37 @@
       <thead><tr>
         <th>ชื่อสินค้า</th><th>SKU</th><th>หน่วย</th><th>Category</th><th>ที่เก็บ</th>
         <th>ยอดคงเหลือ</th><th>ค่าเฉลี่ย/เดือน</th>
-        <th>Lead Time (วัน) <span class="tip-wrap"><span class="help-icon" style="vertical-align:middle">?</span><span class="tip-box">Lead Time (วัน)<br>ที่มา: Manual — กรอกจากข้อตกลงกับซัพฯ<br>ความหมาย: วันจาก PO date ถึง GR date จริง</span></span></th>
-        <th>Safety Stock <span class="tip-wrap"><span class="help-icon" style="vertical-align:middle">?</span><span class="tip-box">Safety Stock<br>ที่มา: Manual — Admin กำหนดตามความเสี่ยง<br>สูตร: avg_daily × buffer_days ที่รับได้</span></span></th>
-        <th>Reorder Point <span class="tip-wrap"><span class="help-icon" style="vertical-align:middle">?</span><span class="tip-box">Reorder Point<br>สูตร: (avg_monthly÷30 × lead_time) + safety<br>เมื่อสต็อก ≤ นี้ ต้องสั่งซื้อทันที</span></span></th>
-        <th>Min <span class="tip-wrap"><span class="help-icon" style="vertical-align:middle">?</span><span class="tip-box">Min Point<br>สูตร: Reorder Point + Safety Stock<br>ระดับที่แจ้งเตือน (สีส้ม)</span></span></th>
-        <th>Max <span class="tip-wrap"><span class="help-icon" style="vertical-align:middle">?</span><span class="tip-box">Max Point<br>สูตร: Min + (avg_daily × lead × 2)<br>สต็อกสูงสุดที่ควรเก็บ</span></span></th>
-        <th>MOQ <span class="tip-wrap"><span class="help-icon" style="vertical-align:middle">?</span><span class="tip-box">MOQ (Minimum Order Qty)<br>ที่มา: Manual — เงื่อนไขซัพพลายเออร์<br>ความหมาย: จำนวนขั้นต่ำต่อ 1 คำสั่งซื้อ</span></span></th>
+        <th>Lead Time (วัน) <span class="help-icon" style="vertical-align:middle;cursor:help" title="Lead Time (วัน)
+──────────────
+ที่มา: Manual — กรอกจากข้อตกลงซัพฯ
+ความหมาย: วันจากวันที่ออก PO ถึงวันรับของจริง
+ตัวอย่าง: สั่งวันจันทร์ ของมาพุธ = 2 วัน">?</span></th>
+        <th>Safety Stock <span class="help-icon" style="vertical-align:middle;cursor:help" title="Safety Stock
+──────────────
+ที่มา: Manual — Admin กำหนดตามความเสี่ยง
+สูตรแนะนำ: avg_daily × จำนวนวัน buffer
+ความหมาย: สต็อกกันฉุกเฉิน ถ้าต่ำกว่านี้ = วิกฤต">?</span></th>
+        <th>Reorder Point <span class="help-icon" style="vertical-align:middle;cursor:help" title="Reorder Point (จุดสั่งซื้อ)
+──────────────
+สูตร: (avg_monthly÷30 × lead_time) + safety_stock
+ตัวอย่าง: ใช้ 60/เดือน, lead 15วัน, safety 10
+→ (2×15)+10 = 40
+เมื่อสต็อก ≤ นี้ ต้องสั่งซื้อทันที">?</span></th>
+        <th>Min <span class="help-icon" style="vertical-align:middle;cursor:help" title="Min Point
+──────────────
+สูตร (Auto): Reorder Point + Safety Stock
+ความหมาย: ต่ำกว่านี้ขึ้นแจ้งเตือนสีส้ม
+หรือกรอกเองได้ใน ⚙️ จัดการ">?</span></th>
+        <th>Max <span class="help-icon" style="vertical-align:middle;cursor:help" title="Max Point
+──────────────
+สูตร (Auto): Min + (avg_daily × lead × 2)
+ความหมาย: สต็อกสูงสุดที่ควรเก็บ
+หรือกรอกเองได้ใน ⚙️ จัดการ">?</span></th>
+        <th>MOQ <span class="help-icon" style="vertical-align:middle;cursor:help" title="MOQ (Minimum Order Quantity)
+──────────────
+ที่มา: Manual — เงื่อนไขของซัพฯ
+ความหมาย: จำนวนขั้นต่ำต่อ 1 คำสั่งซื้อ
+ใช้คำนวณ: แนะนำสั่ง = ceil(gap÷MOQ)×MOQ">?</span></th>
         <th>กราฟ</th><th>สถานะเติม</th><th>Moving Status</th>
         <th class="admin-only"></th>
       </tr></thead>
@@ -380,37 +383,65 @@
     </div>
     <div class="form-grid">
       <div class="form-group">
-        <label>ค่าเฉลี่ยใช้ / เดือน <span class="tip-wrap"><span class="help-icon">?</span><span class="tip-box">ค่าเฉลี่ยใช้/เดือน<br>ที่มา: Manual — ดูจาก Transaction Out<br>ใช้คำนวณ Reorder Point</span></span></label>
+        <label>ค่าเฉลี่ยใช้ / เดือน <span class="help-icon" style="vertical-align:middle;cursor:help" title="ค่าเฉลี่ยใช้/เดือน
+──────────────
+ที่มา: Manual — ดูจาก Transaction Out ย้อนหลัง
+ใช้คำนวณ: avg_daily = avg_monthly ÷ 30
+หากยัง 0 → Reorder Point จะเป็น 0">?</span></label>
         <input type="number" id="m-monthly" min="0" step="0.1" placeholder="10" oninput="calcPreview()">
         <div class="hint">📋 Manual — ดูจาก Transaction Out ย้อนหลัง</div>
       </div>
       <div class="form-group">
-        <label>Lead Time (วัน) <span class="tip-wrap"><span class="help-icon">?</span><span class="tip-box">Lead Time (วัน)<br>ที่มา: Manual — กรอกจากข้อตกลงกับซัพฯ<br>ความหมาย: วันจาก PO date ถึง GR date จริง</span></span></label>
+        <label>Lead Time (วัน) <span class="help-icon" style="vertical-align:middle;cursor:help" title="Lead Time (วัน)
+──────────────
+ที่มา: Manual — กรอกจากข้อตกลงซัพฯ
+ความหมาย: วันจากวันที่ออก PO ถึงวันรับของจริง
+ตัวอย่าง: สั่งวันจันทร์ ของมาพุธ = 2 วัน">?</span></label>
         <input type="number" id="m-lead" min="1" placeholder="15" oninput="calcPreview()">
         <div class="hint">📋 Manual — จากข้อตกลงกับซัพฯ</div>
       </div>
       <div class="form-group">
-        <label>Safety Stock <span class="tip-wrap"><span class="help-icon">?</span><span class="tip-box">Safety Stock<br>ที่มา: Manual — Admin กำหนดตามความเสี่ยง<br>สูตร: avg_daily × buffer_days ที่รับได้</span></span></label>
+        <label>Safety Stock <span class="help-icon" style="vertical-align:middle;cursor:help" title="Safety Stock
+──────────────
+ที่มา: Manual — Admin กำหนดตามความเสี่ยง
+สูตรแนะนำ: avg_daily × จำนวนวัน buffer
+ความหมาย: สต็อกกันฉุกเฉิน ถ้าต่ำกว่านี้ = วิกฤต">?</span></label>
         <input type="number" id="m-safety" min="0" placeholder="5" oninput="calcPreview()">
         <div class="hint">📋 Manual — Admin กำหนดตามความเสี่ยง</div>
       </div>
       <div class="form-group">
-        <label>MOQ (จำนวนสั่งขั้นต่ำ) <span class="tip-wrap"><span class="help-icon">?</span><span class="tip-box">MOQ (Minimum Order Qty)<br>ที่มา: Manual — เงื่อนไขซัพพลายเออร์<br>ความหมาย: จำนวนขั้นต่ำต่อ 1 คำสั่งซื้อ</span></span></label>
+        <label>MOQ (จำนวนสั่งขั้นต่ำ) <span class="help-icon" style="vertical-align:middle;cursor:help" title="MOQ (Minimum Order Quantity)
+──────────────
+ที่มา: Manual — เงื่อนไขของซัพฯ
+ความหมาย: จำนวนขั้นต่ำต่อ 1 คำสั่งซื้อ
+ใช้คำนวณ: แนะนำสั่ง = ceil(gap÷MOQ)×MOQ">?</span></label>
         <input type="number" id="m-moq" min="1" placeholder="10" oninput="calcPreview()">
         <div class="hint">📋 Manual — เงื่อนไขซัพพลายเออร์</div>
       </div>
       <div class="form-group">
-        <label>Min Point <span class="tip-wrap"><span class="help-icon">?</span><span class="tip-box">Min Point<br>สูตร: Reorder Point + Safety Stock<br>ระดับที่แจ้งเตือน (สีส้ม)</span></span></label>
+        <label>Min Point <span class="help-icon" style="vertical-align:middle;cursor:help" title="Min Point
+──────────────
+สูตร (Auto): Reorder Point + Safety Stock
+ความหมาย: ต่ำกว่านี้ขึ้นแจ้งเตือนสีส้ม
+หรือกรอกเองได้ใน ⚙️ จัดการ">?</span></label>
         <input type="number" id="m-min" min="0" placeholder="" oninput="calcPreview()">
         <div class="hint">🧮 Auto — หรือกรอกเองได้</div>
       </div>
       <div class="form-group">
-        <label>Max Point <span class="tip-wrap"><span class="help-icon">?</span><span class="tip-box">Max Point<br>สูตร: Min + (avg_daily × lead × 2)<br>สต็อกสูงสุดที่ควรเก็บ</span></span></label>
+        <label>Max Point <span class="help-icon" style="vertical-align:middle;cursor:help" title="Max Point
+──────────────
+สูตร (Auto): Min + (avg_daily × lead × 2)
+ความหมาย: สต็อกสูงสุดที่ควรเก็บ
+หรือกรอกเองได้ใน ⚙️ จัดการ">?</span></label>
         <input type="number" id="m-max" min="0" placeholder="" oninput="calcPreview()">
         <div class="hint">🧮 Auto — หรือกรอกเองได้</div>
       </div>
       <div class="form-group">
-        <label>Dead Stock หลัง (วัน) <span class="tip-wrap"><span class="help-icon">?</span><span class="tip-box">Dead Stock (วัน)<br>ที่มา: Manual — นโยบายคลัง<br>ถ้าไม่มีเคลื่อนไหว > N วัน → Dead</span></span></label>
+        <label>Dead Stock หลัง (วัน) <span class="help-icon" style="vertical-align:middle;cursor:help" title="Dead Stock (วัน)
+──────────────
+ที่มา: Manual — นโยบายคลัง (default=90 วัน)
+เงื่อนไข: ไม่มีเคลื่อนไหว > N วัน AND avg_monthly>0
+แก้ได้ใน ⚙️ จัดการ">?</span></label>
         <input type="number" id="m-dead" min="1" placeholder="90">
         <div class="hint">📋 Manual — นโยบายคลังสินค้า</div>
       </div>
@@ -512,12 +543,29 @@ function calcOrderQty(p){
 
 // Moving Status (ตาม Excel: ค่าเฉลี่ยรายเดือน)
 function movingStatus(p){
+  // สูตรตาม Excel: IFS(days<=7,"Fast",days<=14,"Normal",days<=30,"Slow",
+  //                    days<=60,"Very Slow",days>60,"Dead Stock")
+  // days = จำนวนวันนับจาก last_movement ล่าสุดถึงวันนี้
+  // ถ้ายังไม่มี last_movement หรือ import ใหม่ → ดูจาก avg_monthly แทน
+  if(p.last_movement){
+    const lm = p.last_movement.toDate ? p.last_movement.toDate() : new Date(p.last_movement);
+    const days = Math.floor((Date.now() - lm.getTime()) / 86400000);
+    // ป้องกัน last_movement=now จาก import (days≈0 → Fast Moving ไม่ถูก)
+    // ถ้า days < 1 ให้ดูจาก avg_monthly แทน
+    if(days >= 1){
+      if(days <= 7)  return {label:'🚀 Fast Moving',      cls:'badge-fast'};
+      if(days <= 14) return {label:'🏃 Normal Moving',    cls:'badge-ok'};
+      if(days <= 30) return {label:'🚶 Slow Moving',      cls:'badge-slow'};
+      if(days <= 60) return {label:'🐢 Very Slow Moving', cls:'badge-veryslow'};
+      return           {label:'💤 Dead Stock',            cls:'badge-dead'};
+    }
+  }
+  // Fallback: ถ้าไม่มี last_movement หรือ import ใหม่ (days<1)
   const m = p.avg_monthly ?? 0;
-  // ถ้ายังไม่ได้กรอก avg_monthly → แสดง "ยังไม่ระบุ" แทน Dead Stock
   if(m <= 0)  return {label:'— ยังไม่ระบุ', cls:'badge-dead'};
   if(m < 5)   return {label:'🐢 Very Slow Moving', cls:'badge-veryslow'};
-  if(m < 15)  return {label:'🚶 Slow Moving', cls:'badge-slow'};
-  return {label:'🚀 Fast Moving', cls:'badge-fast'};
+  if(m < 15)  return {label:'🚶 Slow Moving',      cls:'badge-slow'};
+  return             {label:'🚀 Fast Moving',      cls:'badge-fast'};
 }
 
 // Stock Status
