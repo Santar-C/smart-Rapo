@@ -92,6 +92,11 @@ const STAT_CLS  = {
 };
 const INIT_BAYS = Array.from({length:9},(_,i)=>({name:`Dock ${String(i+1).padStart(2,'0')}`,status:'Available'}));
 const VEHICLES  = ['4WT','6WT','20FT','40FT','40HQ'];
+const DEFAULT_SETTINGS = {
+  vendors:  ['RICOH','PAT','SKF','DENSO','บริษัทอื่นๆ'],
+  origins:  ['CEVA WAREHOUSE','PORT LAEM CHABANG','PORT BANGKOK','CUSTOMER SITE'],
+  destinations: ['PAT WAREHOUSE','CEVA WAREHOUSE','PORT LAEM CHABANG','PORT BANGKOK'],
+};
 
 const genDocNo = (date,type,bookings)=>{
   if(!date) return '';
@@ -287,8 +292,94 @@ const StatusBadge = ({booking, onCycle})=>(
   </span>
 );
 
+// ════════════════════════════════════════════════════════════
+// SETTINGS VIEW — จัดการ Vendor / Origin / Destination lists
+// ════════════════════════════════════════════════════════════
+const SettingsView = ({settings})=>{
+  const [localSettings, setLocalSettings] = React.useState(null);
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+
+  React.useEffect(()=>{ setLocalSettings(JSON.parse(JSON.stringify(settings))); },[settings]);
+
+  if(!localSettings) return <div className="p-6 text-slate-400">กำลังโหลด...</div>;
+
+  const saveToFirebase = async ()=>{
+    setSaving(true);
+    try {
+      await rtdb.ref('smartdock/settings').set(localSettings);
+      setSaved(true); setTimeout(()=>setSaved(false), 2500);
+    } catch(e){ alert('บันทึกไม่ได้: '+e.message); }
+    setSaving(false);
+  };
+
+  const ListEditor = ({label, listKey, color})=>{
+    const [newVal, setNewVal] = React.useState('');
+    const items = localSettings[listKey] || [];
+    const cls = color==='sky'?'border-sky-100 text-sky-700 bg-sky-500':color==='purple'?'border-purple-100 text-purple-700 bg-purple-500':'border-indigo-100 text-indigo-700 bg-indigo-500';
+    const [borderCls,textCls,dotCls] = cls.split(' ');
+    const add = ()=>{
+      const v = newVal.trim().toUpperCase();
+      if(!v || items.includes(v)) return;
+      setLocalSettings(p=>({...p,[listKey]:[...p[listKey],v]}));
+      setNewVal('');
+    };
+    const remove = (i)=>setLocalSettings(p=>({...p,[listKey]:p[listKey].filter((_,idx)=>idx!==i)}));
+    const moveUp = (i)=>{ if(i===0) return; const a=[...items]; [a[i-1],a[i]]=[a[i],a[i-1]]; setLocalSettings(p=>({...p,[listKey]:a})); };
+    return (
+      <div className={`bg-white border ${borderCls} rounded-2xl p-4 shadow-sm`}>
+        <div className={`text-xs font-black ${textCls} uppercase tracking-wider mb-3 flex items-center gap-2`}>
+          <span className={`w-2 h-2 rounded-full ${dotCls}`}/>
+          {label}
+          <span className="ml-auto text-slate-400 font-normal normal-case">{items.length} รายการ</span>
+        </div>
+        <div className="space-y-1.5 mb-3 max-h-48 overflow-y-auto pr-1">
+          {items.map((item,i)=>(
+            <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+              <button onClick={()=>moveUp(i)} className="text-slate-300 hover:text-slate-500 text-xs shrink-0">▲</button>
+              <span className="flex-1 text-sm font-medium text-slate-700">{item}</span>
+              <button onClick={()=>remove(i)} className="text-red-300 hover:text-red-500 text-lg leading-none shrink-0">×</button>
+            </div>
+          ))}
+          {items.length===0 && <div className="text-slate-300 text-xs text-center py-3">ยังไม่มีรายการ</div>}
+        </div>
+        <div className="flex gap-2">
+          <input value={newVal} onChange={e=>setNewVal(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&add()}
+            placeholder={`เพิ่ม ${label}... แล้ว Enter`}
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-slate-400"/>
+          <button onClick={add} className="bg-slate-700 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-slate-800">+ เพิ่ม</button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4">
+      <div className="max-w-2xl mx-auto space-y-4">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h2 className="text-lg font-black text-slate-800">⚙️ ตั้งค่า Smart Dock</h2>
+            <p className="text-xs text-slate-400 mt-0.5">รายชื่อ Vendor, Origin และ Destination ที่ใช้ใน dropdown ฟอร์มจองคิว</p>
+          </div>
+          <button onClick={saveToFirebase} disabled={saving}
+            className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md ${saved?'bg-emerald-500 text-white':'bg-indigo-600 hover:bg-indigo-700 text-white'} disabled:opacity-50`}>
+            {saving?'กำลังบันทึก...' : saved?'✅ บันทึกแล้ว' : '💾 บันทึกการตั้งค่า'}
+          </button>
+        </div>
+        <ListEditor label="Vendor / บริษัท" listKey="vendors" color="indigo"/>
+        <ListEditor label="Origin / CY Place" listKey="origins" color="sky"/>
+        <ListEditor label="Destination / Return Container" listKey="destinations" color="purple"/>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
+          💡 กด ▲ เพื่อเรียงลำดับ · กด × เพื่อลบ · กด "บันทึกการตั้งค่า" เพื่อให้มีผลกับทุกเครื่องทันที
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Form Panel ─────────────────────────────────────────────
-const FormPanel = React.memo(({form, setForm, bays, onSubmit, editId, onCancelEdit})=>(
+const FormPanel = React.memo(({form, setForm, bays, settings, onSubmit, editId, onCancelEdit})=>(
   <div className="w-full md:w-[380px] shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-auto md:h-full fi">
     <div className="p-4 border-b border-slate-100 bg-indigo-50/60">
       <h2 className="font-bold text-indigo-900 text-sm">{editId?'✏️ แก้ไขข้อมูลคิว':'📝 จองคิว / นัดหมายหน้าท่า'}</h2>
@@ -337,9 +428,12 @@ const FormPanel = React.memo(({form, setForm, bays, onSubmit, editId, onCancelEd
       {/* Vendor */}
       <div>
         <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">บริษัท / Vendor</label>
-        <input type="text" value={form.vendor}
+        <select value={form.vendor}
           onChange={e=>setForm(p=>({...p,vendor:e.target.value}))}
-          className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500" required/>
+          className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 outline-none focus:border-indigo-500" required>
+          <option value="">— เลือกบริษัท —</option>
+          {(settings?.vendors||[]).map(v=><option key={v} value={v}>{v}</option>)}
+        </select>
       </div>
       {/* License / Vehicle */}
       <div className="grid grid-cols-2 gap-3">
@@ -378,11 +472,19 @@ const FormPanel = React.memo(({form, setForm, bays, onSubmit, editId, onCancelEd
         <input type="text" value={form.origin}
           onChange={e=>setForm(p=>({...p,origin:e.target.value}))}
           placeholder="CY Place / Origin"
+          list="origin-list"
           className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
+        <datalist id="origin-list">
+          {(settings?.origins||[]).map(o=><option key={o} value={o}/>)}
+        </datalist>
         <input type="text" value={form.destination}
           onChange={e=>setForm(p=>({...p,destination:e.target.value}))}
           placeholder="Return Container / Destination"
+          list="dest-list"
           className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
+        <datalist id="dest-list">
+          {(settings?.destinations||[]).map(d=><option key={d} value={d}/>)}
+        </datalist>
         <input type="text" value={form.sealNo}
           onChange={e=>setForm(p=>({...p,sealNo:e.target.value}))}
           placeholder="Seal No."
@@ -662,6 +764,7 @@ const BLANK = getBlank();
 function App() {
   const [bays,     setBays]     = React.useState(INIT_BAYS);
   const [bookings, setBookings] = React.useState([]);
+  const [settings, setSettings] = React.useState(DEFAULT_SETTINGS);
   const [online,   setOnline]   = React.useState(false);
   const [viewDate, setViewDate] = React.useState(TODAY());
   const [tab,      setTab]      = React.useState('board');
@@ -680,9 +783,11 @@ function App() {
   React.useEffect(()=>{
     const bRef=rtdb.ref('smartdock/bookings');
     const dRef=rtdb.ref('smartdock/bays');
+    const sRef=rtdb.ref('smartdock/settings');
     bRef.on('value',s=>{ setBookings(safe(s.val())); setOnline(true); }, ()=>setOnline(false));
     dRef.on('value',s=>{ const d=safe(s.val()); setBays(d.length?d.map(x=>typeof x==='string'?{name:x,status:'Available'}:x):INIT_BAYS); });
-    return ()=>{ bRef.off(); dRef.off(); };
+    sRef.on('value',s=>{ const v=s.val(); if(v) setSettings({...DEFAULT_SETTINGS,...v}); });
+    return ()=>{ bRef.off(); dRef.off(); sRef.off(); };
   },[]);
 
   // ── Auto generate Doc No ──────────────────────────────
@@ -807,6 +912,7 @@ function App() {
     {id:'scan',lbl:'📷 สแกน'},
     {id:'reports',lbl:'📊 รายงาน',h:!isPower},
     {id:'qr',lbl:'🖨️ QR',h:!isAdmin},
+    {id:'settings',lbl:'⚙️ ตั้งค่า',h:!isAdmin},
   ];
 
   return (
@@ -855,7 +961,7 @@ function App() {
       <div className="flex-1 overflow-hidden flex flex-col md:flex-row p-4 gap-4">
         {/* Form Panel — only on board tab */}
         {isPower && tab==='board' && (
-          <FormPanel form={form} setForm={setForm} bays={bays}
+          <FormPanel form={form} setForm={setForm} bays={bays} settings={settings}
             onSubmit={handleSubmit} editId={editId} onCancelEdit={cancelEdit}/>
         )}
 
@@ -913,6 +1019,7 @@ function App() {
           {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
           {tab==='scan'     && <ScanView scanOn={scanOn} setScanOn={setScanOn} scanMsg={scanMsg}/>}
           {tab==='qr'       && <QRView bays={bays}/>}
+          {tab==='settings' && <SettingsView settings={settings}/>}
         </div>
       </div>
     </div>
