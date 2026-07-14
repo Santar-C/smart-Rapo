@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>เบิกสินค้า — RAPO Stock</title>
+  <link rel="manifest" href="manifest-scan.json">
+  <meta name="theme-color" content="#002048">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="เบิกสินค้า">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <!-- Firebase SDK v10 (ESM ผ่าน CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --navy:#002048;--red:#E6100D;--green:#16a34a;--amber:#d97706;
+      --sky:#0284c7;--border:#e2e8f0;--light:#f8fafc;--radius:14px
+    }
+    body{font-family:'Sarabun',sans-serif;background:var(--navy);min-height:100dvh;
+      display:flex;flex-direction:column;color:#1e293b}
+    /* HEADER */
+    .hdr{padding:1rem 1.25rem .75rem;display:flex;align-items:center;gap:.75rem;
+      border-bottom:1px solid rgba(255,255,255,.12)}
+    .hdr-icon{width:38px;height:38px;background:var(--red);border-radius:10px;
+      display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+    .hdr-title{color:#fff;font-weight:700;font-size:1rem;line-height:1.2}
+    .hdr-sub{color:rgba(255,255,255,.55);font-size:.72rem}
+    /* MAIN CARD */
+    .main{flex:1;padding:1rem 1rem 1.5rem;display:flex;flex-direction:column;gap:.85rem}
+    .card{background:#fff;border-radius:var(--radius);padding:1.1rem;
+      box-shadow:0 4px 24px rgba(0,0,0,.18)}
+    /* STEP INDICATOR */
+    .steps{display:flex;gap:0;background:rgba(255,255,255,.08);
+      border-radius:var(--radius);overflow:hidden;margin-bottom:.25rem}
+    .step{flex:1;padding:.55rem .5rem;text-align:center;font-size:.72rem;font-weight:700;
+      color:rgba(255,255,255,.4);transition:all .3s;position:relative}
+    .step.active{background:var(--red);color:#fff}
+    .step.done{background:rgba(22,163,74,.25);color:#4ade80}
+    /* CATEGORY TABS */
+    .cat-tabs{display:flex;gap:.4rem;overflow-x:auto;padding-bottom:.25rem;scrollbar-width:none}
+    .cat-tabs::-webkit-scrollbar{display:none}
+    .cat-tab{padding:.45rem 1rem;border-radius:20px;border:1.5px solid var(--border);
+      background:#fff;font-family:'Sarabun',sans-serif;font-size:.8rem;font-weight:700;
+      color:#64748b;cursor:pointer;white-space:nowrap;transition:all .2s;flex-shrink:0}
+    .cat-tab:hover{border-color:var(--navy);color:var(--navy)}
+    .cat-tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+    /* SEARCH */
+    .search-wrap{position:relative}
+    .search-input{width:100%;padding:.7rem 1rem .7rem 2.5rem;border:1.5px solid var(--border);
+      border-radius:10px;font-size:.95rem;font-family:'Sarabun',sans-serif;
+      outline:none;background:#f8fafc;transition:border-color .2s}
+    .search-input:focus{border-color:var(--navy);background:#fff}
+    .search-icon{position:absolute;left:.8rem;top:50%;transform:translateY(-50%);
+      color:#94a3b8;font-size:1rem}
+    /* PRODUCT LIST */
+    .prod-list{display:flex;flex-direction:column;gap:.45rem;max-height:340px;overflow-y:auto;
+      padding-right:.25rem}
+    .prod-list::-webkit-scrollbar{width:4px}
+    .prod-list::-webkit-scrollbar-track{background:var(--light)}
+    .prod-list::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:4px}
+    .prod-item{display:flex;align-items:center;gap:.75rem;padding:.7rem .9rem;
+      border:1.5px solid var(--border);border-radius:10px;cursor:pointer;
+      transition:all .2s;background:#fff}
+    .prod-item:hover{border-color:var(--navy);background:#f0f4ff}
+    .prod-item.selected{border-color:var(--navy);background:#eff6ff;
+      box-shadow:0 0 0 3px rgba(0,32,72,.1)}
+    .prod-item.out{opacity:.45;cursor:not-allowed}
+    .prod-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;
+      justify-content:center;font-size:1.1rem;flex-shrink:0}
+    .prod-icon.A{background:#dcfce7}
+    .prod-icon.B{background:#dbeafe}
+    .prod-icon.C{background:#fef3c7}
+    .prod-name{font-weight:700;font-size:.9rem;color:#1e293b;line-height:1.2}
+    .prod-meta{font-size:.72rem;color:#64748b;margin-top:.1rem}
+    .prod-qty{margin-left:auto;text-align:right;flex-shrink:0}
+    .prod-qty-num{font-size:1.1rem;font-weight:900;line-height:1}
+    .prod-qty-unit{font-size:.65rem;color:#94a3b8}
+    .prod-qty-low{color:var(--amber)}
+    .prod-qty-out{color:var(--red)}
+    .prod-qty-ok{color:var(--green)}
+    /* SELECTED PRODUCT DISPLAY */
+    .sel-box{background:#eff6ff;border:2px solid var(--navy);border-radius:12px;padding:.9rem 1rem}
+    .sel-name{font-weight:900;font-size:1.05rem;color:var(--navy)}
+    .sel-meta{font-size:.75rem;color:#64748b;margin-top:.15rem}
+    .sel-stock{display:flex;gap:1rem;margin-top:.5rem;font-size:.8rem}
+    .sel-stock span b{color:var(--navy)}
+    /* QTY INPUT */
+    .qty-row{display:flex;align-items:center;gap:.75rem;margin-top:.1rem}
+    .qty-btn{width:44px;height:44px;border-radius:10px;border:1.5px solid var(--border);
+      background:#fff;font-size:1.4rem;font-weight:700;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;color:var(--navy);
+      transition:all .15s;flex-shrink:0}
+    .qty-btn:active{transform:scale(.92);background:var(--light)}
+    .qty-input{flex:1;text-align:center;font-size:1.6rem;font-weight:900;
+      border:2px solid var(--border);border-radius:10px;padding:.55rem;
+      font-family:'Sarabun',sans-serif;outline:none;color:var(--navy);
+      transition:border-color .2s}
+    .qty-input:focus{border-color:var(--navy)}
+    /* NAME CHIPS */
+    .name-chips{display:flex;flex-wrap:wrap;gap:.4rem}
+    .name-chip{padding:.4rem .9rem;border-radius:20px;border:1.5px solid var(--border);
+      background:#fff;font-size:.82rem;font-family:'Sarabun',sans-serif;
+      cursor:pointer;font-weight:600;color:#475569;transition:all .15s}
+    .name-chip:hover{border-color:var(--navy);color:var(--navy)}
+    .name-chip.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+    .name-input{width:100%;padding:.6rem .85rem;border:1.5px solid var(--border);
+      border-radius:10px;font-size:.9rem;font-family:'Sarabun',sans-serif;
+      outline:none;transition:border-color .2s;margin-top:.5rem}
+    .name-input:focus{border-color:var(--navy)}
+    /* NOTE INPUT */
+    .note-input{width:100%;padding:.6rem .85rem;border:1.5px solid var(--border);
+      border-radius:10px;font-size:.88rem;font-family:'Sarabun',sans-serif;
+      outline:none;transition:border-color .2s;resize:none}
+    .note-input:focus{border-color:var(--navy)}
+    /* SUBMIT */
+    .submit-btn{width:100%;padding:.95rem;border-radius:12px;border:none;
+      background:var(--red);color:#fff;font-family:'Sarabun',sans-serif;
+      font-size:1.05rem;font-weight:900;cursor:pointer;transition:all .2s;
+      box-shadow:0 4px 16px rgba(230,16,13,.35)}
+    .submit-btn:hover{background:#b30c0a;transform:translateY(-1px)}
+    .submit-btn:active{transform:translateY(0)}
+    .submit-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    /* SUCCESS SCREEN */
+    .success-screen{display:none;flex-direction:column;align-items:center;
+      justify-content:center;flex:1;padding:2rem;text-align:center;gap:1rem}
+    .success-icon{font-size:5rem;animation:pop .4s ease}
+    @keyframes pop{0%{transform:scale(.5);opacity:0}100%{transform:scale(1);opacity:1}}
+    .success-title{color:#fff;font-size:1.4rem;font-weight:900}
+    .success-detail{color:rgba(255,255,255,.7);font-size:.9rem;line-height:1.6}
+    .success-card{background:#fff;border-radius:14px;padding:1rem 1.25rem;width:100%;max-width:320px;text-align:left}
+    .success-row{display:flex;justify-content:space-between;font-size:.83rem;padding:.25rem 0;border-bottom:1px solid #f1f5f9}
+    .success-row:last-child{border:none;font-weight:700;color:var(--navy)}
+    .new-btn{padding:.85rem 2rem;border-radius:12px;border:2px solid rgba(255,255,255,.4);
+      background:transparent;color:#fff;font-family:'Sarabun',sans-serif;font-size:.95rem;
+      font-weight:700;cursor:pointer;transition:all .2s}
+    .new-btn:hover{background:rgba(255,255,255,.15)}
+    /* LOADING */
+    .loading-screen{display:flex;flex-direction:column;align-items:center;
+      justify-content:center;flex:1;gap:1rem;color:rgba(255,255,255,.7)}
+    .spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,.2);
+      border-top:3px solid #fff;border-radius:50%;animation:spin .8s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    /* LABEL */
+    .field-label{font-size:.75rem;font-weight:700;color:#64748b;text-transform:uppercase;
+      margin-bottom:.4rem}
+    /* TOAST */
+    #toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(100px);
+      background:#1e293b;color:#fff;padding:.7rem 1.5rem;border-radius:12px;
+      font-size:.88rem;font-weight:600;z-index:9999;transition:transform .3s;
+      box-shadow:0 8px 24px rgba(0,0,0,.3);white-space:nowrap;pointer-events:none}
+    #toast.show{transform:translateX(-50%) translateY(0)}
+    /* EMPTY */
+    .empty{text-align:center;padding:2rem;color:#94a3b8;font-size:.88rem}
+  </style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-icon">📤</div>
+  <div>
+    <div class="hdr-title">เบิกสินค้า (Withdraw)</div>
+    <div class="hdr-sub">RAPO · Consumable Stock System</div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-screen" id="screen-loading">
+  <div class="spinner"></div>
+  <div>กำลังโหลดรายการสินค้า...</div>
+</div>
+
+<!-- MAIN FORM (hidden until loaded) -->
+<div class="main" id="screen-main" style="display:none">
+
+  <!-- STEP INDICATOR -->
+  <div class="steps">
+    <div class="step active" id="step1">1 · เลือกสินค้า</div>
+    <div class="step" id="step2">2 · จำนวน</div>
+    <div class="step" id="step3">3 · ชื่อผู้เบิก</div>
+    <div class="step" id="step4">4 · ยืนยัน</div>
+  </div>
+
+  <!-- STEP 1: เลือกสินค้า -->
+  <div class="card" id="sec-product">
+    <div class="field-label">หมวดสินค้า</div>
+    <div class="cat-tabs" id="cat-tabs">
+      <div class="cat-tab active" data-cat="ALL" onclick="setCat('ALL')">🔍 ทั้งหมด</div>
+      <div class="cat-tab" data-cat="A" onclick="setCat('A')">A · Stationary Office</div>
+      <div class="cat-tab" data-cat="B" onclick="setCat('B')">B · Consumable Office</div>
+      <div class="cat-tab" data-cat="C" onclick="setCat('C')">C · Consumable Warehouse</div>
+    </div>
+
+    <div class="search-wrap" style="margin:.75rem 0 .6rem">
+      <span class="search-icon">🔍</span>
+      <input type="search" class="search-input" id="prod-search"
+        placeholder="พิมพ์ชื่อสินค้าหรือ SKU..." oninput="renderProducts()">
+    </div>
+
+    <div class="prod-list" id="prod-list"></div>
+  </div>
+
+  <!-- STEP 2: จำนวน (ซ่อนจนกว่าจะเลือกสินค้า) -->
+  <div class="card" id="sec-qty" style="display:none">
+    <div class="sel-box" id="sel-display"></div>
+    <div style="margin-top:1rem">
+      <div class="field-label">จำนวนที่ต้องการเบิก</div>
+      <div class="qty-row">
+        <button class="qty-btn" onclick="changeQty(-1)">−</button>
+        <input type="number" class="qty-input" id="qty-input" value="1" min="1">
+        <button class="qty-btn" onclick="changeQty(1)">+</button>
+      </div>
+      <div id="qty-warn" style="font-size:.75rem;color:var(--amber);margin-top:.4rem;display:none"></div>
+    </div>
+  </div>
+
+  <!-- STEP 3: ชื่อผู้เบิก (ซ่อนจนกว่าจะใส่จำนวน) -->
+  <div class="card" id="sec-name" style="display:none">
+    <div class="field-label">ผู้เบิก (เลือกหรือพิมพ์ชื่อ)</div>
+    <div class="name-chips" id="name-chips"></div>
+    <input type="text" class="name-input" id="name-input"
+      placeholder="พิมพ์ชื่อ หรือแผนก..."
+      oninput="onNameInput()">
+
+    <div style="margin-top:1rem">
+      <div class="field-label">หมายเหตุ (ถ้ามี)</div>
+      <textarea class="note-input" id="note-input" rows="2"
+        placeholder="เพื่อใช้งาน / แผนก / งานที่เกี่ยวข้อง..."></textarea>
+    </div>
+  </div>
+
+  <!-- STEP 4: ยืนยัน -->
+  <div id="sec-submit" style="display:none">
+    <div class="card" id="confirm-card" style="margin-bottom:.85rem">
+      <div class="field-label">สรุปรายการเบิก</div>
+      <div id="confirm-detail"></div>
+    </div>
+    <button class="submit-btn" id="submit-btn" onclick="doSubmit()">
+      ✅ ยืนยันเบิกสินค้า
+    </button>
+  </div>
+
+</div><!-- end screen-main -->
+
+<!-- SUCCESS -->
+<div class="success-screen" id="screen-success">
+  <div class="success-icon">✅</div>
+  <div class="success-title">เบิกสำเร็จ!</div>
+  <div class="success-card" id="success-detail"></div>
+  <div class="success-detail" id="success-stock-after"></div>
+  <button class="new-btn" onclick="resetForm()">📤 เบิกรายการใหม่</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══════════════════════════════════════════
+// FIREBASE INIT (compat SDK — ไม่ใช้ ESM เพราะ
+// ไฟล์นี้ไม่ได้ผ่าน build tool และไม่ต้องการ
+// auth.js / firebase-config.js แบบ module)
+// ══════════════════════════════════════════
+const FB_CFG = {
+  apiKey:            "AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
+  authDomain:        "rapo-system.firebaseapp.com",
+  projectId:         "rapo-system",
+  storageBucket:     "rapo-system.firebasestorage.app",
+  messagingSenderId: "87090183469",
+  appId:             "1:87090183469:web:eafb1ded183755f329a7a4"
+};
+firebase.initializeApp(FB_CFG);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+const COL_PRODUCTS = "stock_products";
+const COL_LOGS     = "stock_logs";
+
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let allProducts  = [];
+let currentCat   = 'ALL';
+let selectedProd = null;
+let selectedName = '';
+
+// รายชื่อที่ใช้บ่อย (แก้ได้ตรงนี้ หรือดึงจาก Firestore ทีหลัง)
+const QUICK_NAMES = [
+  'Operations','Inbound','Outbound','Inventory',
+  'Supervisor','VAS','Admin','IT',
+];
+
+const CAT_ICON = {A:'📎', B:'📋', C:'📦'};
+const CAT_LABEL = {A:'Stationary Office', B:'Consumable Office', C:'Consumable Warehouse'};
+
+// ══════════════════════════════════════════
+// ANONYMOUS AUTH + LOAD PRODUCTS
+// ══════════════════════════════════════════
+auth.onAuthStateChanged(user => {
+  if(user){ loadProducts(); }
+  else { auth.signInAnonymously().catch(e => console.error(e)); }
+});
+
+function loadProducts(){
+  db.collection(COL_PRODUCTS).orderBy('name').onSnapshot(snap => {
+    allProducts = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    document.getElementById('screen-loading').style.display = 'none';
+    document.getElementById('screen-main').style.display    = 'flex';
+    buildNameChips();
+    renderProducts();
+  }, err => {
+    document.getElementById('screen-loading').innerHTML =
+      `<div style="color:#fca5a5;font-size:.9rem">❌ โหลดข้อมูลไม่ได้: ${err.message}</div>`;
+  });
+}
+
+// ══════════════════════════════════════════
+// RENDER PRODUCT LIST
+// ══════════════════════════════════════════
+function setCat(cat){
+  currentCat = cat;
+  document.querySelectorAll('.cat-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.cat === cat);
+  });
+  renderProducts();
+}
+
+function renderProducts(){
+  const q    = (document.getElementById('prod-search').value || '').toLowerCase();
+  const list = document.getElementById('prod-list');
+  let data   = [...allProducts];
+  if(currentCat !== 'ALL') data = data.filter(p => (p.category ?? '') === currentCat);
+  if(q) data = data.filter(p =>
+    (p.name ?? '').toLowerCase().includes(q) ||
+    (p.sku ?? '').toLowerCase().includes(q)
+  );
+  if(!data.length){
+    list.innerHTML = '<div class="empty">ไม่พบสินค้าที่ตรงกัน</div>';
+    return;
+  }
+  list.innerHTML = data.map(p => {
+    const q   = p.qty ?? 0;
+    const sel = selectedProd?.id === p.id;
+    const out = q <= 0;
+    const low = q > 0 && q <= (p.safety_stock ?? 0);
+    const qCls = out ? 'prod-qty-out' : low ? 'prod-qty-low' : 'prod-qty-ok';
+    const icon = CAT_ICON[p.category] ?? '📦';
+    const catCls = p.category ?? 'C';
+    return `<div class="prod-item ${sel?'selected':''} ${out?'out':''}"
+      onclick="${out ? '' : `selectProduct('${p.id}')`}"
+      style="${out ? 'pointer-events:none' : ''}">
+      <div class="prod-icon ${catCls}">${icon}</div>
+      <div style="flex:1;min-width:0">
+        <div class="prod-name">${p.name}</div>
+        <div class="prod-meta">${p.sku} · ${CAT_LABEL[p.category]??'—'} · ${p.location??'—'}</div>
+      </div>
+      <div class="prod-qty">
+        <div class="prod-qty-num ${qCls}">${q}</div>
+        <div class="prod-qty-unit">${p.unit ?? 'ชิ้น'}</div>
+        ${out ? '<div style="font-size:.65rem;color:var(--red)">หมด</div>' :
+          low  ? '<div style="font-size:.65rem;color:var(--amber)">ใกล้หมด</div>' : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════
+// SELECT PRODUCT
+// ══════════════════════════════════════════
+function selectProduct(id){
+  selectedProd = allProducts.find(p => p.id === id);
+  if(!selectedProd) return;
+
+  // อัปเดต UI รายการ
+  renderProducts();
+
+  // แสดง selected box
+  const q   = selectedProd.qty ?? 0;
+  const rp  = selectedProd.reorder_point ?? 0;
+  const ss  = selectedProd.safety_stock  ?? 0;
+  document.getElementById('sel-display').innerHTML = `
+    <div style="font-size:.72rem;color:#64748b;margin-bottom:.25rem">สินค้าที่เลือก</div>
+    <div style="font-weight:900;font-size:1.05rem;color:var(--navy)">${selectedProd.name}</div>
+    <div style="font-size:.75rem;color:#64748b;margin-top:.15rem">
+      ${selectedProd.sku} · ${CAT_LABEL[selectedProd.category]??'—'}
+    </div>
+    <div class="sel-stock">
+      <span>คงเหลือ <b>${q} ${selectedProd.unit??''}</b></span>
+      <span>Safety <b>${ss}</b></span>
+      <span>Reorder Pt. <b>${rp}</b></span>
+    </div>`;
+
+  // รีเซ็ต qty input
+  document.getElementById('qty-input').value = 1;
+  document.getElementById('qty-warn').style.display = 'none';
+
+  // แสดง sec-qty
+  document.getElementById('sec-qty').style.display   = 'block';
+  document.getElementById('sec-name').style.display  = 'none';
+  document.getElementById('sec-submit').style.display = 'none';
+
+  // อัปเดต steps
+  setStep(2);
+
+  // scroll ไปที่ qty
+  setTimeout(() => document.getElementById('sec-qty').scrollIntoView({behavior:'smooth',block:'nearest'}), 100);
+
+  // listener qty input
+  document.getElementById('qty-input').oninput = onQtyChange;
+}
+
+// ══════════════════════════════════════════
+// QTY CONTROL
+// ══════════════════════════════════════════
+function changeQty(delta){
+  const inp = document.getElementById('qty-input');
+  let v = parseInt(inp.value || 1) + delta;
+  if(v < 1) v = 1;
+  inp.value = v;
+  onQtyChange();
+}
+
+function onQtyChange(){
+  const qty  = parseInt(document.getElementById('qty-input').value) || 0;
+  const max  = selectedProd?.qty ?? 0;
+  const warn = document.getElementById('qty-warn');
+  if(qty > max){
+    warn.style.display = 'block';
+    warn.textContent   = `⚠️ จำนวนเกินสต็อก (มีแค่ ${max} ${selectedProd?.unit??''})`;
+  } else {
+    warn.style.display = 'none';
+  }
+  if(qty >= 1 && qty <= max){
+    document.getElementById('sec-name').style.display   = 'block';
+    document.getElementById('sec-submit').style.display = 'none';
+    setStep(3);
+    setTimeout(() => document.getElementById('sec-name').scrollIntoView({behavior:'smooth',block:'nearest'}), 100);
+  } else {
+    document.getElementById('sec-name').style.display   = 'none';
+    document.getElementById('sec-submit').style.display = 'none';
+    setStep(2);
+  }
+}
+
+// ══════════════════════════════════════════
+// NAME SELECTION
+// ══════════════════════════════════════════
+function buildNameChips(){
+  const wrap = document.getElementById('name-chips');
+  wrap.innerHTML = QUICK_NAMES.map(n =>
+    `<div class="name-chip" onclick="selectName('${n}')">${n}</div>`
+  ).join('');
+}
+
+function selectName(name){
+  selectedName = name;
+  document.getElementById('name-input').value = name;
+  document.querySelectorAll('.name-chip').forEach(c =>
+    c.classList.toggle('active', c.textContent === name));
+  showConfirm();
+}
+
+function onNameInput(){
+  const val = document.getElementById('name-input').value.trim();
+  selectedName = val;
+  document.querySelectorAll('.name-chip').forEach(c => c.classList.remove('active'));
+  if(val) showConfirm();
+  else {
+    document.getElementById('sec-submit').style.display = 'none';
+    setStep(3);
+  }
+}
+
+// ══════════════════════════════════════════
+// SHOW CONFIRM
+// ══════════════════════════════════════════
+function showConfirm(){
+  if(!selectedProd || !selectedName) return;
+  const qty  = parseInt(document.getElementById('qty-input').value) || 0;
+  const note = document.getElementById('note-input').value.trim();
+  const newQ = (selectedProd.qty ?? 0) - qty;
+  document.getElementById('confirm-detail').innerHTML = `
+    <div class="success-row"><span>สินค้า</span><span><b>${selectedProd.name}</b></span></div>
+    <div class="success-row"><span>SKU</span><span>${selectedProd.sku}</span></div>
+    <div class="success-row"><span>จำนวนเบิก</span><span><b style="color:var(--red)">${qty} ${selectedProd.unit??''}</b></span></div>
+    <div class="success-row"><span>คงเหลือหลังเบิก</span><span><b style="color:${newQ<=0?'var(--red)':newQ<=(selectedProd.safety_stock??0)?'var(--amber)':'var(--green)'}">${newQ} ${selectedProd.unit??''}</b></span></div>
+    <div class="success-row"><span>ผู้เบิก</span><span><b>${selectedName}</b></span></div>
+    ${note ? `<div class="success-row"><span>หมายเหตุ</span><span>${note}</span></div>` : ''}`;
+  document.getElementById('sec-submit').style.display = 'block';
+  setStep(4);
+  setTimeout(() => document.getElementById('sec-submit').scrollIntoView({behavior:'smooth',block:'nearest'}), 100);
+}
+
+// ══════════════════════════════════════════
+// SUBMIT
+// ══════════════════════════════════════════
+async function doSubmit(){
+  if(!selectedProd || !selectedName){
+    toast('⚠️ กรุณาเลือกสินค้าและระบุชื่อผู้เบิก');
+    return;
+  }
+  const qty  = parseInt(document.getElementById('qty-input').value) || 0;
+  const note = document.getElementById('note-input').value.trim();
+  const max  = selectedProd.qty ?? 0;
+  if(qty < 1 || qty > max){
+    toast(`❌ จำนวนไม่ถูกต้อง (มีแค่ ${max} ${selectedProd.unit??''})`);
+    return;
+  }
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ กำลังบันทึก...';
+  const newQty = max - qty;
+  const now    = firebase.firestore.FieldValue.serverTimestamp();
+  try {
+    // 1. ตัดสต็อก
+    await db.collection(COL_PRODUCTS).doc(selectedProd.id).update({
+      qty: newQty,
+      last_movement: now,
+    });
+    // 2. บันทึก transaction log
+    await db.collection(COL_LOGS).add({
+      type:      'OUT',
+      sku:       selectedProd.sku,
+      name:      selectedProd.name,
+      category:  selectedProd.category ?? '',
+      unit:      selectedProd.unit ?? '',
+      qty:       qty,
+      qty_before: max,
+      qty_after: newQty,
+      by:        selectedName,
+      note:      note || '',
+      source:    'stock-withdraw',   // ระบุว่ามาจากหน้าเบิกพนักงาน
+      ts:        now,
+    });
+
+    // แสดงหน้า success
+    showSuccess(qty, newQty, note);
+  } catch(e){
+    toast('❌ บันทึกไม่ได้: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '✅ ยืนยันเบิกสินค้า';
+  }
+}
+
+// ══════════════════════════════════════════
+// SUCCESS SCREEN
+// ══════════════════════════════════════════
+function showSuccess(qty, newQty, note){
+  document.getElementById('screen-main').style.display    = 'none';
+  document.getElementById('screen-success').style.display = 'flex';
+  const low = newQty <= (selectedProd.safety_stock ?? 0);
+  document.getElementById('success-detail').innerHTML = `
+    <div class="success-row"><span>สินค้า</span><span><b>${selectedProd.name}</b></span></div>
+    <div class="success-row"><span>จำนวนเบิก</span><span><b style="color:var(--red)">${qty} ${selectedProd.unit??''}</b></span></div>
+    <div class="success-row"><span>คงเหลือ</span><span><b style="color:${newQty<=0?'var(--red)':low?'var(--amber)':'var(--green)'}">${newQty} ${selectedProd.unit??''}</b></span></div>
+    <div class="success-row"><span>ผู้เบิก</span><span><b>${selectedName}</b></span></div>
+    ${note?`<div class="success-row"><span>หมายเหตุ</span><span>${note}</span></div>`:''}`;
+  document.getElementById('success-stock-after').innerHTML =
+    newQty <= 0 ? '⚠️ สต็อกหมดแล้ว — Admin ควรสั่งซื้อเพิ่ม' :
+    low         ? '⚠️ สต็อกต่ำกว่า Safety Stock — ควรแจ้งสั่งซื้อเร็วๆนี้' : '';
+}
+
+// ══════════════════════════════════════════
+// RESET
+// ══════════════════════════════════════════
+function resetForm(){
+  selectedProd = null;
+  selectedName = '';
+  document.getElementById('qty-input').value  = 1;
+  document.getElementById('name-input').value = '';
+  document.getElementById('note-input').value = '';
+  document.getElementById('prod-search').value = '';
+  document.querySelectorAll('.name-chip').forEach(c => c.classList.remove('active'));
+  document.getElementById('sec-qty').style.display    = 'none';
+  document.getElementById('sec-name').style.display   = 'none';
+  document.getElementById('sec-submit').style.display = 'none';
+  setStep(1);
+  renderProducts();
+  document.getElementById('screen-success').style.display = 'none';
+  document.getElementById('screen-main').style.display    = 'flex';
+  document.getElementById('submit-btn').disabled = false;
+  document.getElementById('submit-btn').textContent = '✅ ยืนยันเบิกสินค้า';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ══════════════════════════════════════════
+// STEP INDICATOR
+// ══════════════════════════════════════════
+function setStep(n){
+  [1,2,3,4].forEach(i => {
+    const el = document.getElementById('step'+i);
+    el.classList.toggle('active', i === n);
+    el.classList.toggle('done',   i < n);
+  });
+}
+
+// ══════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════
+let _tt;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(_tt); _tt = setTimeout(() => el.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>

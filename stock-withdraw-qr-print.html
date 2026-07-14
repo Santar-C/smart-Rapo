@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>QR เบิกสินค้า — พิมพ์แปะหน้าคลัง</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  @page{ size:A4 portrait; margin:0; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    font-family:'Sarabun',sans-serif;
+    width:210mm; min-height:297mm;
+    background:white;
+    display:flex; flex-direction:column; align-items:center;
+    padding:14mm 16mm;
+  }
+
+  /* HEADER */
+  .hdr{ display:flex; align-items:center; justify-content:space-between; width:100%; margin-bottom:8mm; }
+  .hdr-logo img{ height:14mm; }
+  .hdr-right{ text-align:right; font-size:3mm; color:#64748b; }
+
+  /* TITLE */
+  .title{ font-size:13mm; font-weight:900; color:#002048; text-align:center; line-height:1.1; margin-bottom:3mm; }
+  .title-sub{ font-size:5mm; color:#E6100D; font-weight:700; text-align:center; margin-bottom:8mm; }
+
+  /* INSTRUCTION */
+  .instruction{ font-size:4.5mm; color:#475569; text-align:center; line-height:1.7;
+    margin-bottom:8mm; max-width:150mm; }
+
+  /* QR BOX */
+  .qr-box{
+    border:3px solid #002048; border-radius:8mm;
+    padding:8mm 10mm; display:flex; flex-direction:column; align-items:center;
+    gap:4mm; margin-bottom:8mm; width:100%; max-width:160mm;
+  }
+  .qr-box img{ width:80mm; height:80mm; }
+  .qr-url{ font-size:3mm; color:#94a3b8; text-align:center; word-break:break-all; }
+
+  /* STEPS */
+  .steps{ display:flex; gap:0; width:100%; max-width:160mm; margin-bottom:10mm; }
+  .step-item{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:1.5mm;
+    position:relative;
+  }
+  .step-item:not(:last-child)::after{
+    content:''; position:absolute; top:5mm; left:50%; width:100%; height:0.5mm;
+    background:#cbd5e1;
+  }
+  .step-num{
+    width:10mm; height:10mm; border-radius:50%; background:#002048; color:white;
+    font-weight:900; font-size:4mm; display:flex; align-items:center; justify-content:center;
+    position:relative; z-index:1;
+  }
+  .step-text{ font-size:3mm; color:#475569; text-align:center; line-height:1.4; }
+
+  /* CATEGORY TABLE */
+  .cat-box{
+    background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:5mm;
+    padding:5mm 6mm; width:100%; max-width:160mm; margin-bottom:8mm;
+  }
+  .cat-title{ font-size:3.5mm; font-weight:900; color:#002048; margin-bottom:3mm; text-transform:uppercase; }
+  .cat-row{ display:flex; gap:3mm; align-items:center; margin-bottom:2mm; font-size:3.5mm; }
+  .cat-badge{
+    width:6mm; height:6mm; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:2.5mm; font-weight:900; flex-shrink:0;
+  }
+  .cat-A{ background:#dcfce7; color:#15803d; }
+  .cat-B{ background:#dbeafe; color:#1d4ed8; }
+  .cat-C{ background:#fef3c7; color:#92400e; }
+
+  /* FOOTER */
+  .footer{ margin-top:auto; padding-top:8mm; font-size:2.8mm; color:#94a3b8; text-align:center; border-top:0.5mm solid #e2e8f0; width:100%; }
+
+  /* NOTE BOX */
+  .note-box{
+    background:#fef3c7; border:1.5px solid #fbbf24; border-radius:4mm;
+    padding:3.5mm 5mm; width:100%; max-width:160mm; margin-bottom:8mm;
+    font-size:3.5mm; color:#92400e; line-height:1.6;
+  }
+</style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <img src="assets/ceva-logo-clean.png" alt="CEVA Logistics" style="height:13mm">
+    <div class="hdr-right">
+      RAPO Consumable Stock System<br>
+      <span id="print-date"></span>
+    </div>
+  </div>
+
+  <!-- TITLE -->
+  <div class="title">📤 เบิกสินค้า</div>
+  <div class="title-sub">สแกน QR เพื่อเข้าระบบเบิกสินค้า Consumables</div>
+
+  <div class="instruction">
+    สแกน QR Code ด้านล่างด้วยกล้องมือถือ<br>
+    ไม่ต้องล็อกอิน · เลือกสินค้า · ใส่จำนวน · ยืนยัน
+  </div>
+
+  <!-- QR CODE -->
+  <div class="qr-box">
+    <img id="qr-img" src="" alt="QR เบิกสินค้า">
+    <div class="qr-url" id="qr-url-text"></div>
+  </div>
+
+  <!-- STEPS -->
+  <div class="steps">
+    <div class="step-item">
+      <div class="step-num">1</div>
+      <div class="step-text">สแกน QR<br>เปิดหน้าเบิก</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">2</div>
+      <div class="step-text">เลือก<br>หมวด/สินค้า</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">3</div>
+      <div class="step-text">ใส่<br>จำนวน</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">4</div>
+      <div class="step-text">เลือก<br>ชื่อผู้เบิก</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">5</div>
+      <div class="step-text">กด<br>ยืนยัน ✅</div>
+    </div>
+  </div>
+
+  <!-- CATEGORY INFO -->
+  <div class="cat-box">
+    <div class="cat-title">หมวดหมู่สินค้าในระบบ</div>
+    <div class="cat-row"><div class="cat-badge cat-A">A</div><b>Stationary Office</b> — อุปกรณ์สำนักงาน (แฟ้ม, กระดาษ, ปากกา ฯลฯ)</div>
+    <div class="cat-row"><div class="cat-badge cat-B">B</div><b>Consumable Office</b> — วัสดุสิ้นเปลืองสำนักงาน (เทป, ลวด, หมึก ฯลฯ)</div>
+    <div class="cat-row"><div class="cat-badge cat-C">C</div><b>Consumable Warehouse</b> — วัสดุคลังสินค้า (กล่อง, ซีล, ฉลาก, สายรัด ฯลฯ)</div>
+  </div>
+
+  <!-- NOTE -->
+  <div class="note-box">
+    💡 <b>หมายเหตุ:</b> ทุกการเบิกจะถูกบันทึกในระบบอัตโนมัติ
+    หากสินค้าหมดหรือไม่พบรายการ กรุณาแจ้ง Admin หรือหัวหน้างาน
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    RAPO Consumable Stock System · CEVA Logistics (Thailand) Ltd<br>
+    2556 66 Tower, Sukhumvit Road, Bang Na, Bangkok 10260
+  </div>
+
+<script>
+  const URL = 'https://santar-c.github.io/smart-Rapo/stock-withdraw.html';
+
+  // QR code (navy color ตาม brand)
+  document.getElementById('qr-img').src =
+    `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(URL)}&color=002048&margin=10`;
+  document.getElementById('qr-url-text').textContent = URL;
+
+  // วันที่พิมพ์
+  document.getElementById('print-date').textContent =
+    new Date().toLocaleDateString('th-TH', {year:'numeric', month:'long', day:'numeric'});
+
+  // auto print เมื่อ QR โหลดเสร็จ
+  document.getElementById('qr-img').onload = () => setTimeout(() => window.print(), 500);
+</script>
+</body>
+</html>
