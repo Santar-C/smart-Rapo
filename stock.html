@@ -101,6 +101,41 @@
     .form-group .hint{font-size:.68rem;color:#94a3b8;margin-top:.2rem}
     .form-group.span2{grid-column:span 2}
     .form-group.span3{grid-column:span 3}
+    /* HELP TOOLTIP */
+    .help-icon{display:inline-flex;align-items:center;justify-content:center;
+      width:16px;height:16px;border-radius:50%;background:#94a3b8;color:#fff;
+      font-size:.6rem;font-weight:900;cursor:pointer;margin-left:.35rem;
+      flex-shrink:0;transition:background .15s;vertical-align:middle}
+    .help-icon:hover{background:var(--navy)}
+    /* AUDIT MODAL */
+    .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+      z-index:900;align-items:center;justify-content:center;padding:1rem}
+    .modal-overlay.open{display:flex}
+    .modal-box{background:#fff;border-radius:16px;padding:1.5rem;width:100%;
+      max-width:520px;max-height:88dvh;overflow-y:auto;
+      box-shadow:0 24px 64px rgba(0,0,0,.35)}
+    .modal-hdr{display:flex;align-items:flex-start;justify-content:space-between;
+      margin-bottom:1rem;gap:.5rem}
+    .modal-title{font-weight:900;font-size:1rem;color:var(--navy);line-height:1.3}
+    .modal-close{background:#f1f5f9;border:none;border-radius:8px;width:32px;height:32px;
+      cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;transition:background .15s}
+    .modal-close:hover{background:#e2e8f0}
+    .modal-tag{display:inline-block;padding:.2rem .6rem;border-radius:6px;font-size:.7rem;
+      font-weight:700;margin-bottom:.6rem}
+    .tag-manual{background:#dbeafe;color:#1d4ed8}
+    .tag-calc{background:#dcfce7;color:#15803d}
+    .modal-section{margin-bottom:.85rem}
+    .modal-section-title{font-size:.72rem;font-weight:700;color:#64748b;
+      text-transform:uppercase;margin-bottom:.3rem}
+    .modal-body{font-size:.85rem;color:#374151;line-height:1.7}
+    .formula-box{background:#f0fdf4;border:1.5px solid #86efac;border-radius:8px;
+      padding:.65rem .85rem;font-family:monospace;font-size:.82rem;color:#166534;
+      margin:.5rem 0;line-height:1.8}
+    .example-box{background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:8px;
+      padding:.65rem .85rem;font-size:.8rem;color:#1e40af;margin:.5rem 0;line-height:1.7}
+    .audit-note{background:#fef3c7;border:1.5px solid #fbbf24;border-radius:8px;
+      padding:.6rem .85rem;font-size:.78rem;color:#92400e;margin-top:.6rem;line-height:1.6}
     /* CALC BOX */
     .calc-box{background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;
       padding:.85rem 1rem;margin-top:.75rem}
@@ -322,42 +357,43 @@
 
     <div style="margin-top:1rem;margin-bottom:.5rem;font-weight:700;font-size:.85rem;color:var(--navy);border-top:1px solid var(--border);padding-top:.75rem">
       📊 พารามิเตอร์ควบคุมสต็อก
+      <span style="font-size:.72rem;font-weight:400;color:var(--gray);margin-left:.5rem">กด ? เพื่อดูที่มาและหลักการคำนวณ</span>
     </div>
     <div class="form-grid">
       <div class="form-group">
-        <label>ค่าเฉลี่ยใช้ / เดือน</label>
+        <label>ค่าเฉลี่ยใช้ / เดือน <span class="help-icon" onclick="showHelp('monthly')">?</span></label>
         <input type="number" id="m-monthly" min="0" step="0.1" placeholder="10" oninput="calcPreview()">
-        <div class="hint">จำนวนที่ใช้เฉลี่ยต่อเดือน</div>
+        <div class="hint">📋 Manual — ดูจาก Transaction Out ย้อนหลัง</div>
       </div>
       <div class="form-group">
-        <label>Lead Time (วัน) *</label>
+        <label>Lead Time (วัน) <span class="help-icon" onclick="showHelp('lead')">?</span></label>
         <input type="number" id="m-lead" min="1" placeholder="15" oninput="calcPreview()">
-        <div class="hint">ตั้งแต่สั่งถึงรับของ</div>
+        <div class="hint">📋 Manual — จากข้อตกลงกับซัพฯ</div>
       </div>
       <div class="form-group">
-        <label>Safety Stock *</label>
+        <label>Safety Stock <span class="help-icon" onclick="showHelp('safety')">?</span></label>
         <input type="number" id="m-safety" min="0" placeholder="5" oninput="calcPreview()">
-        <div class="hint">บัฟเฟอร์กันของขาด</div>
+        <div class="hint">📋 Manual — Admin กำหนดตามความเสี่ยง</div>
       </div>
       <div class="form-group">
-        <label>MOQ (จำนวนสั่งขั้นต่ำ) *</label>
+        <label>MOQ (จำนวนสั่งขั้นต่ำ) <span class="help-icon" onclick="showHelp('moq')">?</span></label>
         <input type="number" id="m-moq" min="1" placeholder="10" oninput="calcPreview()">
-        <div class="hint">จำนวนต่ำสุดต่อคำสั่งซื้อ</div>
+        <div class="hint">📋 Manual — เงื่อนไขซัพพลายเออร์</div>
       </div>
       <div class="form-group">
-        <label>Min Point (แจ้งเตือน)</label>
+        <label>Min Point <span class="help-icon" onclick="showHelp('min')">?</span></label>
         <input type="number" id="m-min" min="0" placeholder="" oninput="calcPreview()">
-        <div class="hint">เว้นว่าง = คำนวณอัตโนมัติ</div>
+        <div class="hint">🧮 Auto — หรือกรอกเองได้</div>
       </div>
       <div class="form-group">
-        <label>Max Point</label>
+        <label>Max Point <span class="help-icon" onclick="showHelp('max')">?</span></label>
         <input type="number" id="m-max" min="0" placeholder="" oninput="calcPreview()">
-        <div class="hint">เว้นว่าง = คำนวณอัตโนมัติ</div>
+        <div class="hint">🧮 Auto — หรือกรอกเองได้</div>
       </div>
       <div class="form-group">
-        <label>Dead Stock หลัง (วัน)</label>
+        <label>Dead Stock หลัง (วัน) <span class="help-icon" onclick="showHelp('dead')">?</span></label>
         <input type="number" id="m-dead" min="1" placeholder="90">
-        <div class="hint">ไม่มีความเคลื่อนไหวนาน</div>
+        <div class="hint">📋 Manual — นโยบายคลังสินค้า</div>
       </div>
       <div class="form-group"><label>ซัพพลายเออร์หลัก</label><input type="text" id="m-supplier" placeholder="ชื่อ / เบอร์"></div>
     </div>
@@ -408,6 +444,17 @@
 </div>
 
 </div><!-- end page-body -->
+
+<!-- AUDIT HELP MODAL -->
+<div class="modal-overlay" id="help-modal" onclick="if(event.target===this)closeHelp()">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <div class="modal-title" id="help-title"></div>
+      <button class="modal-close" onclick="closeHelp()">✕</button>
+    </div>
+    <div id="help-body"></div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script type="module">
@@ -961,8 +1008,113 @@ function startListeners(){
 }
 
 // ══════════════════════════════════
-// AUTH
+// AUDIT HELP MODAL
 // ══════════════════════════════════
+const HELP_DATA = {
+  monthly: {
+    title: '📋 ค่าเฉลี่ยใช้ / เดือน (avg_monthly)',
+    tag: 'manual',
+    what: 'จำนวนหน่วยเฉลี่ยที่ใช้ไปต่อเดือน วัดจากการเบิก (Transaction Out) จริงในช่วงที่ผ่านมา',
+    source: 'Admin กรอกเองโดยดูจาก Transaction Out ย้อนหลัง 3-6 เดือน แล้วหาค่าเฉลี่ย ไม่ใช่ค่าที่ระบบคำนวณให้',
+    formula: null,
+    example: 'ถ้า 3 เดือนที่ผ่านมาใช้กล่อง 120 / 90 / 150 ใบ\nค่าเฉลี่ย = (120+90+150) ÷ 3 = 120 ใบ/เดือน\nกรอก 120 ในช่องนี้',
+    audit: 'Auditor: สามารถ verify ได้จาก Transaction Out report กรองตาม SKU และ date range เทียบกับค่าที่กรอกไว้',
+  },
+  lead: {
+    title: '📋 Lead Time (วัน)',
+    tag: 'manual',
+    what: 'จำนวนวันจริงตั้งแต่วันที่ออก PO (Purchase Order) ถึงวันที่ของมาถึงคลังและรับเข้าสต็อกได้ รวม: เวลาซัพฯ เตรียมของ + ขนส่ง + ตรวจรับ',
+    source: 'Admin กรอกเองจากประสบการณ์กับซัพพลายเออร์แต่ละราย ควร verify จาก PO history เปรียบเทียบ PO date vs GR date จริง',
+    formula: null,
+    example: 'ซัพฯ เทปใส: สั่งวันจันทร์ → ของมาวันพุธ = Lead Time 2 วัน\nซัพฯ พาเลทพลาสติก: สั่ง → ของมา 14 วัน = Lead Time 14 วัน\n\nแต่ละ SKU อาจมี Lead Time ต่างกัน ขึ้นกับซัพฯ',
+    audit: 'Auditor: ควรมีเอกสารสนับสนุน เช่น PO log ที่แสดง PO Date และ GR Date เพื่อ verify Lead Time ที่ตั้งไว้ — แนะนำ review ทุก 6 เดือน หรือเมื่อเปลี่ยนซัพฯ',
+  },
+  safety: {
+    title: '📋 Safety Stock',
+    tag: 'manual',
+    what: 'ปริมาณสต็อกขั้นต่ำที่เก็บไว้เป็น buffer กันเหตุการณ์ไม่คาดฝัน เช่น ซัพฯ ส่งของช้า, demand พุ่งสูงกว่าปกติ, หรือของเสียหายระหว่างขนส่ง',
+    source: 'Admin กำหนดเองตามการประเมินความเสี่ยงของธุรกิจ แนวทางคำนวณที่แนะนำคือ:\nSafety Stock = avg_daily × จำนวนวันที่รับความเสี่ยงได้\nแต่ในระบบนี้ Admin ใส่ตัวเลขโดยตรงเพื่อความยืดหยุ่น',
+    formula: 'แนวทาง: Safety Stock = avg_daily × buffer_days\nเช่น ใช้ 5 ชิ้น/วัน ต้องการ buffer 3 วัน\nSafety Stock = 5 × 3 = 15 ชิ้น',
+    example: 'สินค้า A ใช้วันละ 5 ชิ้น ถ้าของขาด 3 วันกระทบ operation\nSafety Stock = 5 × 3 = 15 ชิ้น\n\nสินค้า B ของขาดไม่กระทบมาก → Safety Stock = 5 ชิ้น',
+    audit: 'Auditor: Safety Stock ควรมี rationale ชัดเจนว่าเลือก buffer กี่วันและเหตุผล — ควร document ไว้ใน SOP หรือ inventory policy ของบริษัท',
+  },
+  moq: {
+    title: '📋 MOQ — Minimum Order Quantity',
+    tag: 'manual',
+    what: 'จำนวนขั้นต่ำที่ซัพพลายเออร์กำหนดให้ต้องสั่งซื้อต่อครั้ง ไม่สามารถสั่งน้อยกว่านี้ได้ มักระบุใน quotation หรือ supplier agreement',
+    source: 'Admin กรอกตามเงื่อนไขจริงของซัพฯ แต่ละราย สามารถ verify ได้จาก PO ที่ผ่านมา หรือ supplier catalogue',
+    formula: null,
+    example: 'ซัพฯ เทปใส: ขายขั้นต่ำ 1 กล่อง = 12 ม้วน → MOQ = 12\nซัพฯ ฉลาก: ขายขั้นต่ำ 1 roll → MOQ = 1\nซัพฯ พาเลท: ขายขั้นต่ำ 10 pcs → MOQ = 10',
+    audit: 'Auditor: MOQ ส่งผลโดยตรงต่อ "แนะนำสั่งซื้อ" ที่ระบบคำนวณให้ ควร verify กับ supplier agreement จริง',
+  },
+  min: {
+    title: '🧮 Min Point (จุดแจ้งเตือน)',
+    tag: 'calc',
+    what: 'ระดับสต็อกที่เมื่อต่ำกว่านี้ระบบจะแสดงแจ้งเตือน (badge สีส้ม) ทำหน้าที่เป็น early warning ก่อนถึง Reorder Point',
+    source: 'ถ้ากรอกเอง: Admin กำหนด\nถ้าเว้นว่าง: ระบบคำนวณอัตโนมัติ',
+    formula: 'Min Point (Auto) = Reorder Point + Safety Stock\n\nซึ่ง Reorder Point = (avg_monthly ÷ 30 × lead_time) + safety_stock\nดังนั้น Min Point = [(avg_monthly ÷ 30 × lead_time) + safety_stock] + safety_stock',
+    example: 'avg_monthly=60, lead_time=15, safety_stock=10\navg_daily = 60÷30 = 2 ชิ้น/วัน\nReorder Point = (2×15)+10 = 40\nMin Point (Auto) = 40+10 = 50\n\nเมื่อสต็อก ≤ 50 → แสดงสีส้ม "ควรสั่งซื้อ"',
+    audit: 'Auditor: ถ้า Min Point กรอกเอง ต้องมี rationale — ถ้าใช้ Auto calculation จะเห็นสูตรชัดเจนในระบบนี้',
+  },
+  max: {
+    title: '🧮 Max Point (สต็อกสูงสุด)',
+    tag: 'calc',
+    what: 'ปริมาณสต็อกสูงสุดที่ควรมี ใช้เพื่อป้องกัน overstock และคำนวณว่าควรสั่งเพิ่มครั้งละเท่าไหร่',
+    source: 'ถ้ากรอกเอง: Admin กำหนด\nถ้าเว้นว่าง: ระบบคำนวณอัตโนมัติ',
+    formula: 'Max Point (Auto) = Min Point + (avg_daily × lead_time × 2)\n\nเหตุผล: เผื่อสต็อกให้ใช้ได้อีก 2 รอบ lead time หลัง Min Point',
+    example: 'Min Point=50, avg_daily=2, lead_time=15\nMax Point = 50 + (2×15×2) = 50+60 = 110\n\nแนะนำสั่ง = ceil((110-คงเหลือ) ÷ MOQ) × MOQ',
+    audit: 'Auditor: Max Point กระทบงบประมาณและพื้นที่จัดเก็บโดยตรง ควร review ตามฤดูกาลหรือเมื่อ demand pattern เปลี่ยน',
+  },
+  dead: {
+    title: '📋 Dead Stock (วัน)',
+    tag: 'manual',
+    what: 'จำนวนวันที่ไม่มีการเคลื่อนไหว (ทั้ง IN และ OUT) หลังจากนี้ระบบจะ flag สินค้าเป็น "Dead Stock" (badge สีเทา) เพื่อให้ทราบว่ามีสินค้าที่ไม่ได้ใช้นาน',
+    source: 'Admin กำหนดเองตามนโยบายคลัง ค่า default = 90 วัน',
+    formula: 'Dead Stock = วันนี้ - วันที่มีการเคลื่อนไหวล่าสุด > dead_stock_days',
+    example: 'กำหนด dead_stock_days = 90\nถ้าสินค้าไม่มีการเบิก/รับเข้า > 90 วัน\n→ status เปลี่ยนเป็น "Dead Stock"\n\nระบบดูจาก field last_movement ที่บันทึกทุกครั้งที่มี transaction',
+    audit: 'Auditor: Dead Stock report ช่วยระบุสินค้าที่อาจหมดอายุ เสื่อมสภาพ หรือไม่จำเป็นแล้ว ควรมีกระบวนการ review และ disposal ที่ชัดเจน',
+  },
+};
+
+window.showHelp = function(key){
+  const d = HELP_DATA[key];
+  if(!d) return;
+  const tagHtml = d.tag==='manual'
+    ? '<span class="modal-tag tag-manual">📋 กรอกเองแบบ Manual</span>'
+    : '<span class="modal-tag tag-calc">🧮 คำนวณอัตโนมัติ</span>';
+  document.getElementById('help-title').textContent = d.title;
+  document.getElementById('help-body').innerHTML = `
+    ${tagHtml}
+    <div class="modal-section">
+      <div class="modal-section-title">คืออะไร</div>
+      <div class="modal-body">${d.what.replace(/\n/g,'<br>')}</div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">ที่มาของข้อมูล</div>
+      <div class="modal-body">${d.source.replace(/\n/g,'<br>')}</div>
+    </div>
+    ${d.formula ? `
+    <div class="modal-section">
+      <div class="modal-section-title">สูตรคำนวณ</div>
+      <div class="formula-box">${d.formula.replace(/\n/g,'<br>')}</div>
+    </div>` : ''}
+    <div class="modal-section">
+      <div class="modal-section-title">ตัวอย่าง</div>
+      <div class="example-box">${d.example.replace(/\n/g,'<br>')}</div>
+    </div>
+    <div class="audit-note">
+      <b>📋 สำหรับ Auditor:</b><br>${d.audit}
+    </div>`;
+  document.getElementById('help-modal').classList.add('open');
+};
+
+window.closeHelp = function(){
+  document.getElementById('help-modal').classList.remove('open');
+};
+
+// ═══════════════════════════════════
+// AUTH
+// ═══════════════════════════════════
 onAuthStateChanged(auth, async user=>{
   if(!user){ window.location.href='index.html'; return; }
   currentUser = user;
