@@ -304,8 +304,9 @@ auth.onAuthStateChanged(user => {
 });
 
 function loadProducts(){
-  db.collection(COL_PRODUCTS).orderBy('name').onSnapshot(snap => {
+  db.collection(COL_PRODUCTS).onSnapshot(snap => {  // ไม่ใช้ orderBy เพื่อหลีกเลี่ยง index error
     allProducts = snap.docs.map(d => ({id:d.id, ...d.data()}));
+    allProducts.sort((a,b)=>(a.name||'').localeCompare(b.name||'','th'));
     document.getElementById('screen-loading').style.display = 'none';
     document.getElementById('screen-main').style.display    = 'flex';
     buildNameChips();
