@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cleanup Stock Data — RAPO</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;background:#002048;min-height:100dvh;
+    display:flex;align-items:center;justify-content:center;padding:1.5rem}
+  .card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:560px;
+    box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  h2{font-size:1.05rem;font-weight:900;color:#7f1d1d;margin-bottom:1rem;
+    padding-bottom:.75rem;border-bottom:2px solid #fee2e2}
+  .warn{background:#fee2e2;border:1.5px solid #fca5a5;border-radius:8px;
+    padding:.85rem 1rem;font-size:.83rem;color:#7f1d1d;margin-bottom:1rem;line-height:1.8}
+  .info{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;
+    padding:.75rem;font-size:.82rem;color:#1e40af;margin-bottom:1rem;line-height:1.7}
+  .auth-ok{background:#dcfce7;border:1px solid #86efac;border-radius:8px;
+    padding:.6rem .85rem;font-size:.82rem;color:#166534;margin-bottom:1rem}
+  .auth-no{background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;
+    padding:.6rem .85rem;font-size:.82rem;color:#92400e;margin-bottom:1rem}
+  .prog-wrap{background:#e2e8f0;border-radius:8px;height:10px;overflow:hidden;margin:1rem 0}
+  .prog-fill{height:100%;background:linear-gradient(90deg,#dc2626,#7f1d1d);
+    border-radius:8px;width:0;transition:width .3s}
+  .log-area{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;
+    padding:.75rem;height:180px;overflow-y:auto;font-size:.75rem;
+    font-family:monospace;margin-bottom:1rem}
+  .log-ok{color:#16a34a}.log-err{color:#dc2626}.log-info{color:#0284c7}
+  .log-warn{color:#d97706}
+  .col-row{display:flex;align-items:center;justify-content:space-between;
+    padding:.6rem .85rem;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;
+    margin-bottom:.5rem}
+  .col-name{font-weight:700;font-size:.88rem;color:#1e293b}
+  .col-count{font-size:.8rem;color:#64748b}
+  .col-count b{color:#dc2626}
+  .btn{width:100%;padding:.85rem;border-radius:10px;border:none;font-size:1rem;
+    font-weight:700;cursor:pointer;transition:all .2s}
+  .btn-danger{background:#dc2626;color:#fff}
+  .btn-danger:hover{background:#b91c1c}
+  .btn-danger:disabled{opacity:.4;cursor:not-allowed}
+  .step-row{display:flex;gap:.5rem;margin-bottom:.85rem}
+  .step{flex:1;padding:.5rem;border-radius:8px;text-align:center;font-size:.75rem;
+    font-weight:700;background:#f1f5f9;color:#64748b;border:1.5px solid #e2e8f0}
+  .step.active{background:#dc2626;color:#fff;border-color:#dc2626}
+  .step.done{background:#dcfce7;color:#166534;border-color:#86efac}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🗑️ ล้างข้อมูล Stock (Clean Start)</h2>
+
+  <div class="warn">
+    ⚠️ <b>คำเตือน: ลบไม่ได้คืน!</b><br>
+    ปุ่มนี้จะลบข้อมูลใน Firestore ทั้งหมดต่อไปนี้:<br>
+    • <b>stock_logs</b> — ประวัติ Transaction ทั้งหมด (2,157+ records)<br>
+    • <b>stock_products</b> — รายการสินค้าทั้งหมด (ถ้ามี)<br><br>
+    หลังจากลบแล้วให้ทำการ import ใหม่ด้วย<br>
+    1️⃣ stock-import.html → 2️⃣ stock-products-import.html
+  </div>
+
+  <div id="auth-box" class="auth-no">กำลังตรวจสอบ login...</div>
+
+  <!-- แสดงจำนวน records ปัจจุบัน -->
+  <div id="col-info">
+    <div class="col-row">
+      <div class="col-name">📜 stock_logs</div>
+      <div class="col-count" id="cnt-logs">กำลังนับ...</div>
+    </div>
+    <div class="col-row">
+      <div class="col-name">📦 stock_products</div>
+      <div class="col-count" id="cnt-products">กำลังนับ...</div>
+    </div>
+  </div>
+
+  <!-- STEP INDICATOR -->
+  <div class="step-row" style="margin-top:1rem">
+    <div class="step" id="s1">1 นับข้อมูล</div>
+    <div class="step" id="s2">2 ลบ Logs</div>
+    <div class="step" id="s3">3 ลบ Products</div>
+    <div class="step" id="s4">4 เสร็จสิ้น</div>
+  </div>
+
+  <div class="prog-wrap"><div class="prog-fill" id="prog"></div></div>
+  <div style="font-size:.8rem;color:#64748b;text-align:center;margin-top:-.5rem;margin-bottom:.75rem"
+    id="prog-text">รอเริ่ม...</div>
+
+  <div class="log-area" id="log-area"></div>
+
+  <button class="btn btn-danger" id="btn-clean" onclick="confirmAndClean()" disabled>
+    🗑️ ลบข้อมูลทั้งหมด และเริ่มใหม่
+  </button>
+  <div style="margin-top:.6rem;font-size:.75rem;color:#64748b;text-align:center"
+    id="final-msg"></div>
+</div>
+
+<script>
+var FB = {
+  apiKey:"AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
+  authDomain:"rapo-system.firebaseapp.com",
+  projectId:"rapo-system",
+  storageBucket:"rapo-system.firebasestorage.app",
+  messagingSenderId:"87090183469",
+  appId:"1:87090183469:web:eafb1ded183755f329a7a4"
+};
+firebase.initializeApp(FB);
+var auth = firebase.auth();
+var db   = firebase.firestore();
+
+var totalLogs=0, totalProds=0;
+
+function log(msg,cls){
+  var a=document.getElementById('log-area'), d=document.createElement('div');
+  d.className=cls||'log-info';
+  d.textContent='['+new Date().toLocaleTimeString('th-TH')+'] '+msg;
+  a.appendChild(d); a.scrollTop=a.scrollHeight;
+}
+function setStep(n){
+  [1,2,3,4].forEach(function(i){
+    var el=document.getElementById('s'+i);
+    el.className='step'+(i<n?' done':i===n?' active':'');
+  });
+}
+function setProg(pct){ document.getElementById('prog').style.width=pct+'%'; }
+function setProgText(t){ document.getElementById('prog-text').textContent=t; }
+
+// ── ล้าง collection ทีละ batch ──────────────────────────
+async function deleteCollection(colName, onProgress){
+  var deleted=0;
+  while(true){
+    var snap = await db.collection(colName).limit(400).get();
+    if(snap.empty) break;
+    var batch = db.batch();
+    snap.docs.forEach(function(d){ batch.delete(d.ref); });
+    await batch.commit();
+    deleted += snap.docs.length;
+    if(onProgress) onProgress(deleted);
+    await new Promise(function(r){ setTimeout(r,80); }); // หน่วงเล็กน้อย
+  }
+  return deleted;
+}
+
+// ── นับ records ──────────────────────────────────────────
+auth.onAuthStateChanged(async function(user){
+  var box=document.getElementById('auth-box');
+  var btn=document.getElementById('btn-clean');
+  if(!user){
+    box.className='auth-no';
+    box.textContent='ยังไม่ได้ Login — เปิด stock.html login ก่อน';
+    document.getElementById('cnt-logs').textContent='ต้อง login ก่อน';
+    document.getElementById('cnt-products').textContent='ต้อง login ก่อน';
+    return;
+  }
+  box.className='auth-ok';
+  box.textContent='Login แล้ว: '+user.email;
+  setStep(1);
+
+  // นับ logs (ใช้ count aggregation ถ้า SDK รองรับ หรือ getDocs ถ้าไม่รองรับ)
+  try{
+    var logsSnap  = await db.collection('stock_logs').get();
+    var prodsSnap = await db.collection('stock_products').get();
+    totalLogs  = logsSnap.size;
+    totalProds = prodsSnap.size;
+    document.getElementById('cnt-logs').innerHTML =
+      'มีอยู่ <b>'+totalLogs+'</b> records';
+    document.getElementById('cnt-products').innerHTML =
+      'มีอยู่ <b>'+totalProds+'</b> รายการ';
+    log('พบ stock_logs: '+totalLogs+' records, stock_products: '+totalProds+' รายการ','log-info');
+    btn.disabled=false;
+  }catch(e){
+    log('นับข้อมูลไม่ได้: '+e.message,'log-err');
+    document.getElementById('cnt-logs').textContent='นับไม่ได้';
+    document.getElementById('cnt-products').textContent='นับไม่ได้';
+  }
+});
+
+var cleaning=false;
+function confirmAndClean(){
+  if(cleaning)return;
+  var msg='⚠️ ยืนยันการลบ?\n\n'
+    +'• stock_logs: '+totalLogs+' records\n'
+    +'• stock_products: '+totalProds+' รายการ\n\n'
+    +'ข้อมูลทั้งหมดจะหายไปถาวร ไม่สามารถกู้คืนได้\n\n'
+    +'พิมพ์ "ลบ" เพื่อยืนยัน:';
+  var confirm_text=window.prompt(msg,'');
+  if(confirm_text !== 'ลบ'){
+    alert('ยกเลิก — พิมพ์คำว่า "ลบ" ตรงๆ ถึงจะดำเนินการได้');
+    return;
+  }
+  startClean();
+}
+
+async function startClean(){
+  cleaning=true;
+  document.getElementById('btn-clean').disabled=true;
+  document.getElementById('btn-clean').textContent='กำลังลบ...';
+
+  // ── Step 2: ลบ stock_logs ──
+  setStep(2);
+  log('เริ่มลบ stock_logs ('+totalLogs+' records)...','log-warn');
+  try{
+    var delLogs=0;
+    var deleted = await deleteCollection('stock_logs', function(n){
+      delLogs=n;
+      setProg(Math.round(n/(totalLogs+totalProds+1)*100));
+      setProgText('ลบ logs: '+n+'/'+totalLogs);
+    });
+    log('ลบ stock_logs เสร็จ: '+deleted+' records','log-ok');
+    document.getElementById('cnt-logs').innerHTML='ลบแล้ว <b style="color:#16a34a">0</b> records';
+  }catch(e){ log('Error ลบ logs: '+e.message,'log-err'); }
+
+  // ── Step 3: ลบ stock_products ──
+  setStep(3);
+  log('เริ่มลบ stock_products...','log-warn');
+  try{
+    var deleted2 = await deleteCollection('stock_products', function(n){
+      setProg(Math.round((totalLogs+n)/(totalLogs+totalProds+1)*100));
+      setProgText('ลบ products: '+n+'/'+totalProds);
+    });
+    log('ลบ stock_products เสร็จ: '+deleted2+' รายการ','log-ok');
+    document.getElementById('cnt-products').innerHTML='ลบแล้ว <b style="color:#16a34a">0</b> รายการ';
+  }catch(e){ log('Error ลบ products: '+e.message,'log-err'); }
+
+  // ── Step 4: เสร็จ ──
+  setStep(4);
+  setProg(100);
+  document.getElementById('prog').style.background='#16a34a';
+  setProgText('✅ ลบข้อมูลทั้งหมดเรียบร้อย');
+  log('✅ Clean เสร็จสมบูรณ์ — พร้อม import ใหม่','log-ok');
+  document.getElementById('btn-clean').textContent='✅ ลบเสร็จแล้ว';
+  document.getElementById('final-msg').innerHTML =
+    'ขั้นตอนต่อไป: '
+    +'<a href="stock-import.html" style="color:#002048;font-weight:700">1️⃣ Import Logs</a>'
+    +' → '
+    +'<a href="stock-products-import.html" style="color:#002048;font-weight:700">2️⃣ Import Products</a>';
+  cleaning=false;
+}
+</script>
+</body>
+</html>
