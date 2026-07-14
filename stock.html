@@ -669,20 +669,25 @@ function renderLog(){
   const empty = document.getElementById('log-empty');
   if(!data.length){ tbody.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
-  tbody.innerHTML = data.slice(0,200).map(l=>{
-    const dt  = l.ts?.toDate ? l.ts.toDate() : new Date(l.ts??0);
+  tbody.innerHTML = data.slice(0,500).map(l=>{
+    // รองรับทั้ง Firestore Timestamp (ts), ts_import, และ date string จาก Excel import
+    let dtStr = '—';
+    if(l.ts?.toDate)            dtStr = l.ts.toDate().toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'});
+    else if(l.ts_import?.toDate) dtStr = l.ts_import.toDate().toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'});
+    else if(l.date)              dtStr = l.date;  // string จาก Excel เช่น "2025-01-01"
     const tc  = l.type==='IN'?'color:var(--green);font-weight:700':l.type==='ADJ'?'color:var(--sky);font-weight:700':'color:var(--red);font-weight:700';
     const tl  = l.type==='IN'?'📥 รับ':l.type==='ADJ'?'🔧 ปรับ':'📤 เบิก';
+    const srcBadge = l.source==='import_excel' ? '<span style="font-size:.65rem;background:#f1f5f9;padding:.1rem .4rem;border-radius:4px;color:#64748b">Excel</span>' : '';
     return `<tr>
-      <td>${dt.toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}</td>
+      <td>${dtStr}</td>
       <td style="${tc}">${tl}</td>
       <td class="sku-cell">${l.sku??'—'}</td>
       <td>${l.name??'—'}</td>
       <td>${l.type==='OUT'?'-':''}${l.type==='ADJ'?'→':'+'}<b>${l.qty??0}</b></td>
       <td>${l.qty_after??'—'}</td>
-      <td>${l.by??'—'}</td>
-      <td style="font-size:.75rem">${l.po??'—'}</td>
-      <td style="font-size:.75rem;color:var(--gray)">${l.note??'—'}</td>
+      <td>${l.by??'—'} ${srcBadge}</td>
+      <td style="font-size:.75rem">${l.po??l.note??'—'}</td>
+      <td style="font-size:.75rem;color:var(--gray)">${l.source==='import_excel'?'นำเข้าจาก Excel':l.note??'—'}</td>
     </tr>`;
   }).join('');
 }
@@ -1003,7 +1008,10 @@ function toast(msg){ const el=document.getElementById('toast'); el.textContent=m
 function startListeners(){
   const qP = query(collection(db, COL_PRODUCTS), orderBy('sku'));
   onSnapshot(qP, snap=>{ allProducts=snap.docs.map(d=>({id:d.id,...d.data()})); renderAll(); });
-  const qL = query(collection(db, COL_LOGS), orderBy('ts','desc'), limit(500));
+
+  // ใช้ ts_import เป็น fallback สำหรับ records ที่ import จาก Excel (ไม่มี field ts)
+  // records ใหม่จากระบบจะมีทั้ง ts และ ts_import
+  const qL = query(collection(db, COL_LOGS), orderBy('ts_import','desc'), limit(1000));
   onSnapshot(qL, snap=>{ allLogs=snap.docs.map(d=>({id:d.id,...d.data()})); renderLog(); });
 }
 
