@@ -361,37 +361,37 @@
     </div>
     <div class="form-grid">
       <div class="form-group">
-        <label>ค่าเฉลี่ยใช้ / เดือน <span class="help-icon" onclick="showHelp('monthly')">?</span></label>
+        <label>ค่าเฉลี่ยใช้ / เดือน <span class="help-icon" data-help="monthly">?</span></label>
         <input type="number" id="m-monthly" min="0" step="0.1" placeholder="10" oninput="calcPreview()">
         <div class="hint">📋 Manual — ดูจาก Transaction Out ย้อนหลัง</div>
       </div>
       <div class="form-group">
-        <label>Lead Time (วัน) <span class="help-icon" onclick="showHelp('lead')">?</span></label>
+        <label>Lead Time (วัน) <span class="help-icon" data-help="lead">?</span></label>
         <input type="number" id="m-lead" min="1" placeholder="15" oninput="calcPreview()">
         <div class="hint">📋 Manual — จากข้อตกลงกับซัพฯ</div>
       </div>
       <div class="form-group">
-        <label>Safety Stock <span class="help-icon" onclick="showHelp('safety')">?</span></label>
+        <label>Safety Stock <span class="help-icon" data-help="safety">?</span></label>
         <input type="number" id="m-safety" min="0" placeholder="5" oninput="calcPreview()">
         <div class="hint">📋 Manual — Admin กำหนดตามความเสี่ยง</div>
       </div>
       <div class="form-group">
-        <label>MOQ (จำนวนสั่งขั้นต่ำ) <span class="help-icon" onclick="showHelp('moq')">?</span></label>
+        <label>MOQ (จำนวนสั่งขั้นต่ำ) <span class="help-icon" data-help="moq">?</span></label>
         <input type="number" id="m-moq" min="1" placeholder="10" oninput="calcPreview()">
         <div class="hint">📋 Manual — เงื่อนไขซัพพลายเออร์</div>
       </div>
       <div class="form-group">
-        <label>Min Point <span class="help-icon" onclick="showHelp('min')">?</span></label>
+        <label>Min Point <span class="help-icon" data-help="min">?</span></label>
         <input type="number" id="m-min" min="0" placeholder="" oninput="calcPreview()">
         <div class="hint">🧮 Auto — หรือกรอกเองได้</div>
       </div>
       <div class="form-group">
-        <label>Max Point <span class="help-icon" onclick="showHelp('max')">?</span></label>
+        <label>Max Point <span class="help-icon" data-help="max">?</span></label>
         <input type="number" id="m-max" min="0" placeholder="" oninput="calcPreview()">
         <div class="hint">🧮 Auto — หรือกรอกเองได้</div>
       </div>
       <div class="form-group">
-        <label>Dead Stock หลัง (วัน) <span class="help-icon" onclick="showHelp('dead')">?</span></label>
+        <label>Dead Stock หลัง (วัน) <span class="help-icon" data-help="dead">?</span></label>
         <input type="number" id="m-dead" min="1" placeholder="90">
         <div class="hint">📋 Manual — นโยบายคลังสินค้า</div>
       </div>
@@ -1085,7 +1085,6 @@ const HELP_DATA = {
 };
 
 window.showHelp = function(key){
-  const d = HELP_DATA[key];
   if(!d) return;
   const tagHtml = d.tag==='manual'
     ? '<span class="modal-tag tag-manual">📋 กรอกเองแบบ Manual</span>'
@@ -1119,6 +1118,14 @@ window.showHelp = function(key){
 window.closeHelp = function(){
   document.getElementById('help-modal').classList.remove('open');
 };
+
+// Event delegation สำหรับ help icon (ทำงานได้แม้อยู่ใน module scope)
+document.addEventListener('click', function(e){
+  const icon = e.target.closest('[data-help]');
+  if(icon){ window.showHelp(icon.getAttribute('data-help')); return; }
+  const modal = document.getElementById('help-modal');
+  if(modal && e.target === modal) window.closeHelp();
+});
 
 // ═══════════════════════════════════
 // AUTH
