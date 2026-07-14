@@ -437,9 +437,9 @@
       <div class="form-group">
         <label>Category</label>
         <select id="m-category">
-          <option value="A">A — Fast Moving</option>
-          <option value="B">B — Normal Moving</option>
-          <option value="C">C — Slow Moving</option>
+          <option value="A">A — Stationary Office</option>
+          <option value="B">B — Consumable Office</option>
+          <option value="C">C — Consumable Warehouse</option>
         </select>
       </div>
       <div class="form-group"><label>ที่เก็บ / Location</label><input type="text" id="m-location" placeholder="Rack A1"></div>
@@ -563,57 +563,65 @@ let currentRole = 'user', currentUser = null;
 // Max Point (default) = Min Point + (avg_daily × lead_time × 2)
 // Order Qty = ceil((Max - qty) / MOQ) × MOQ
 
+// ══════════════════════════════════════════════════════
+// สูตรคำนวณ Inventory Parameters
+// ══════════════════════════════════════════════════════
+
+// avg_daily = avg_monthly ÷ 30
 function avgDaily(p){ return (p.avg_monthly ?? 0) / 30; }
 
-function calcRP(p){
-  return Math.ceil(avgDaily(p) * (p.lead_time_days ?? 15) + (p.safety_stock ?? 0));
+// Safety Stock = ROUNDUP(avg_monthly × 0.2, 0)  [Excel: =ROUNDUP(avg*0.2,0)]
+// ถ้ากรอกเองใน m-safety จะใช้ค่านั้น ถ้าเว้นว่างคำนวณอัตโนมัติ
+function calcSafety(p){
+  if((p.safety_stock ?? 0) > 0) return p.safety_stock;
+  return Math.ceil((p.avg_monthly ?? 0) * 0.2);
 }
+
+// Reorder Point = (avg_daily × lead_time) + safety
+function calcRP(p){
+  return Math.ceil(avgDaily(p) * (p.lead_time_days ?? 7) + calcSafety(p));
+}
+
+// Min Stock = Reorder Point (จุดแจ้งเตือนสีส้ม)
 function calcMin(p){
   if((p.min_stock ?? 0) > 0) return p.min_stock;
-  return Math.ceil(calcRP(p) + (p.safety_stock ?? 0));
+  return calcRP(p);
 }
+
+// Max Stock = Min + (avg_daily × lead_time)  [เติมเผื่อ 1 รอบ lead time]
 function calcMax(p){
   if((p.max_stock ?? 0) > 0) return p.max_stock;
-  return Math.ceil(calcMin(p) + avgDaily(p) * (p.lead_time_days ?? 15) * 2);
+  return Math.ceil(calcMin(p) + avgDaily(p) * (p.lead_time_days ?? 7));
 }
+// จำนวนที่ควรสั่ง = cover Lead Time + Safety (ไม่ดูจาก Max Point)
+// สูตร: ROUNDUP((avg_daily × lead_time × 2) + safety - qty, 0) แล้วปัดเป็น × MOQ
 function calcOrderQty(p){
   const qty    = p.qty ?? 0;
   const moq    = Math.max(1, p.moq ?? 1);
-  const daily  = avgDaily(p);                    // avg_monthly ÷ 30
+  const daily  = avgDaily(p);
   const lead   = p.lead_time_days ?? 7;
-  const safety = p.safety_stock ?? 0;
-
-  // จำนวณที่ใช้ระหว่างรอของ (lead time consumption)
-  const leadConsumption = Math.ceil(daily * lead);
-
-  // Target = ของที่ต้องมีตอนสั่ง + ของที่ใช้ระหว่างรอ + safety
-  // = Reorder Point + leadConsumption + safety
-  // = เติมไปถึง Max Point (ถ้ากำหนดไว้) หรือคำนวณเอง
-  const maxPt = calcMax(p);
-  const target = maxPt > 0 ? maxPt : (leadConsumption * 2 + safety);
-
-  const gap = target - qty;
-  if(gap <= 0) return moq; // สั่งขั้นต่ำ MOQ เสมอ
+  const safety = calcSafety(p);
+  const needed = Math.ceil(daily * lead * 2) + safety;
+  const gap    = needed - qty;
+  if(gap <= 0) return moq;
   return Math.ceil(gap / moq) * moq;
 }
 
-// ฟังก์ชันแยกเพื่อแสดงรายละเอียดการคำนวณ
+// Breakdown สำหรับแสดงรายละเอียดการคำนวณในหน้า สั่งซื้อ
 function calcOrderBreakdown(p){
   const qty    = p.qty ?? 0;
   const daily  = avgDaily(p);
   const lead   = p.lead_time_days ?? 7;
-  const safety = p.safety_stock ?? 0;
+  const safety = calcSafety(p);
   const moq    = Math.max(1, p.moq ?? 1);
-  const maxPt  = calcMax(p);
-
-  const leadConsumption = Math.ceil(daily * lead);  // ใช้ระหว่างรอ
-  const coverPeriod     = lead > 0 ? lead : 7;
-  const target          = maxPt > 0 ? maxPt : (leadConsumption * 2 + safety);
-  const rawGap          = Math.max(0, target - qty);
-  const orderQty        = rawGap <= 0 ? moq : Math.ceil(rawGap / moq) * moq;
-  const daysStock       = daily > 0 ? Math.floor(orderQty / daily) : 0;
-
-  return { leadConsumption, target, rawGap, orderQty, daysStock, coverPeriod, daily: daily.toFixed(2) };
+  const useDuringLead = Math.ceil(daily * lead);
+  const coverBuffer   = Math.ceil(daily * lead * 2);
+  const needed        = coverBuffer + safety;
+  const rawGap        = Math.max(0, needed - qty);
+  const orderQty      = rawGap <= 0 ? moq : Math.ceil(rawGap / moq) * moq;
+  const daysStock     = daily > 0 ? Math.floor((qty + orderQty) / daily) : 0;
+  return { useDuringLead, coverBuffer, safety, needed, rawGap, orderQty,
+           daysStock, daily: daily.toFixed(2), lead, moq };
 }
 
 // Moving Status (ตาม Excel: ค่าเฉลี่ยรายเดือน)
@@ -802,24 +810,32 @@ function renderReorder(){
 
       <!-- การคำนวณจำนวนสั่งซื้อ -->
       <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:.65rem .85rem">
-        <div style="font-size:.72rem;font-weight:700;color:#c2410c;margin-bottom:.4rem;text-transform:uppercase">
-          🧮 การคำนวณจำนวนที่ควรสั่งซื้อ
+        <div style="font-size:.73rem;font-weight:700;color:#c2410c;margin-bottom:.45rem">
+          🧮 จำนวนที่ควรสั่งซื้อ (cover Lead Time + Safety)
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem .75rem;font-size:.78rem;color:#374151">
-          <span style="color:#64748b">ใช้ระหว่างรอ (${lead} วัน):</span>
-          <span><b>${bd.leadConsumption}</b> ${p.unit??''} (${bd.daily}/วัน × ${lead} วัน)</span>
-          <span style="color:#64748b">เป้าหมายสต็อก (Max Point):</span>
-          <span><b>${bd.target}</b> ${p.unit??''}</span>
-          <span style="color:#64748b">ขาดอยู่ (target − คงเหลือ):</span>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:.2rem .75rem;font-size:.78rem;color:#374151;align-items:center">
+          <span style="color:#64748b">ใช้ระหว่างรอ (${bd.lead}วัน × ${bd.daily}/วัน):</span>
+          <span><b>${bd.useDuringLead}</b> ${p.unit??''}</span>
+          <span style="color:#64748b">เผื่อ 2 รอบ lead time (×2):</span>
+          <span><b>${bd.coverBuffer}</b> ${p.unit??''}</span>
+          <span style="color:#64748b">Safety Stock (avg×20%):</span>
+          <span><b>+${bd.safety}</b> ${p.unit??''}</span>
+          <span style="color:#64748b">รวมต้องการ:</span>
+          <span><b>${bd.needed}</b> ${p.unit??''}</span>
+          <span style="color:#64748b">หักคงเหลือปัจจุบัน:</span>
+          <span>−<b>${p.qty??0}</b> ${p.unit??''}</span>
+          <span style="color:#64748b">ขาดอยู่:</span>
           <span><b>${bd.rawGap}</b> ${p.unit??''}</span>
-          <span style="color:#64748b">ปัดขึ้น × MOQ (${moq}):</span>
+          <span style="color:#64748b">ปัดขึ้น × MOQ (${bd.moq}):</span>
           <span style="color:#c2410c;font-weight:700">= <b>${bd.orderQty}</b> ${p.unit??''}</span>
         </div>
-        <div style="margin-top:.5rem;padding-top:.5rem;border-top:1px solid #fed7aa;
-          font-size:.82rem;font-weight:900;color:var(--red);display:flex;align-items:center;gap:.5rem">
-          📦 สั่งซื้อ <span style="font-size:1.1rem">${bd.orderQty}</span> ${p.unit??''}
-          ${bd.daysStock > 0 ? `<span style="font-size:.72rem;font-weight:400;color:#64748b">
-            (เพียงพอใช้ ~${bd.daysStock} วัน)</span>` : ''}
+        <div style="margin-top:.5rem;padding-top:.45rem;border-top:1px solid #fed7aa;
+          font-size:.9rem;font-weight:900;color:var(--red);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+          📦 สั่งซื้อ <span style="font-size:1.2rem">${bd.orderQty}</span> ${p.unit??''} 
+          ${bd.daysStock>0?`<span style="font-size:.73rem;font-weight:400;color:#64748b">(หลังรับของมีสต็อกใช้ได้ ~${bd.daysStock} วัน)</span>`:''}
+        </div>
+        <div style="margin-top:.3rem;font-size:.68rem;color:#94a3b8;font-style:italic">
+          สูตร: (${bd.daily}/วัน × ${bd.lead}วัน × 2) + ${bd.safety} safety = ${bd.needed} หน่วย
         </div>
       </div>
     </div>`;
@@ -888,24 +904,26 @@ function renderAll(){
 // ══════════════════════════════════
 window.calcPreview = function(){
   const monthly = parseFloat(document.getElementById('m-monthly').value) || 0;
-  const lead    = parseInt(document.getElementById('m-lead').value)      || 0;
-  const safety  = parseInt(document.getElementById('m-safety').value)    || 0;
+  const lead    = parseInt(document.getElementById('m-lead').value)      || 7;
+  const safetyInput = parseInt(document.getElementById('m-safety').value) || 0;
+  const safety  = safetyInput > 0 ? safetyInput : Math.ceil(monthly * 0.2);
   const moq     = parseInt(document.getElementById('m-moq').value)       || 1;
-  const minIn   = parseInt(document.getElementById('m-min').value)       || 0;
-  const maxIn   = parseInt(document.getElementById('m-max').value)       || 0;
   const daily   = monthly / 30;
   const rp      = Math.ceil(daily * lead + safety);
-  const minCalc = minIn  > 0 ? minIn  : Math.ceil(rp + safety);
-  const maxCalc = maxIn  > 0 ? maxIn  : Math.ceil(minCalc + daily * lead * 2);
-  const oQty    = Math.max(moq, Math.ceil(Math.max(maxCalc,0)/moq)*moq);
+  const minCalc = rp;
+  const maxCalc = Math.ceil(minCalc + daily * lead);
+  const needed  = Math.ceil(daily * lead * 2) + safety;
+  const oQty    = needed <= 0 ? moq : Math.ceil(needed / moq) * moq;
+
   document.getElementById('calc-rows').innerHTML = `
-    <div class="calc-row"><span>ค่าเฉลี่ยใช้ / วัน</span><span>${daily.toFixed(2)} ชิ้น/วัน</span></div>
-    <div class="calc-row"><span>Reorder Point (จุดสั่งซื้อ)</span><span>${rp}</span></div>
-    <div class="calc-row"><span>Min Point</span><span>${minCalc} ${minIn>0?'(กำหนดเอง)':'(คำนวณ)'}</span></div>
-    <div class="calc-row"><span>Max Point</span><span>${maxCalc} ${maxIn>0?'(กำหนดเอง)':'(คำนวณ)'}</span></div>
-    <div class="calc-row"><span>แนะนำสั่งครั้งละ (เติมไป Max)</span><span style="color:var(--red)">${oQty} หน่วย</span></div>`;
+    <div class="calc-row"><span>ค่าเฉลี่ยใช้/วัน</span><span>${daily.toFixed(2)} ${document.getElementById('m-unit').value||'หน่วย'}/วัน</span></div>
+    <div class="calc-row"><span>Safety Stock (${monthly}×20%)</span><span><b>${safety}</b> ${safetyInput>0?'(กรอกเอง)':'(Auto)'}</span></div>
+    <div class="calc-row"><span>Reorder Point</span><span><b>${rp}</b></span></div>
+    <div class="calc-row"><span>Min Point</span><span>${minCalc}</span></div>
+    <div class="calc-row"><span>Max Point</span><span>${maxCalc}</span></div>
+    <div class="calc-row"><span>แนะนำสั่งซื้อ (2×lead+safety)</span><span style="color:var(--red);font-weight:700"><b>${oQty}</b></span></div>`;
   document.getElementById('calc-formula').textContent =
-    `Reorder Point = (${daily.toFixed(2)}/วัน × ${lead} วัน Lead Time) + ${safety} Safety = ${rp}`;
+    \`สูตร: safety=${safety} | RP=(${daily.toFixed(2)}×${lead})+${safety}=${rp} | สั่ง=(${daily.toFixed(2)}×${lead}×2)+${safety}=${needed}→ปัด×${moq}=${oQty}\`;
 };
 
 // ══════════════════════════════════
