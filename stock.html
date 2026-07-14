@@ -235,8 +235,12 @@
       <thead><tr>
         <th>ชื่อสินค้า</th><th>SKU</th><th>หน่วย</th><th>Category</th><th>ที่เก็บ</th>
         <th>ยอดคงเหลือ</th><th>ค่าเฉลี่ย/เดือน</th>
-        <th>Lead Time (วัน)</th><th>Safety Stock</th><th>Reorder Point</th>
-        <th>Min</th><th>Max</th><th>MOQ</th>
+        <th>Lead Time (วัน) <span class="help-icon" data-help="lead" style="vertical-align:middle">?</span></th>
+        <th>Safety Stock <span class="help-icon" data-help="safety" style="vertical-align:middle">?</span></th>
+        <th>Reorder Point <span class="help-icon" data-help="reorder_col" style="vertical-align:middle">?</span></th>
+        <th>Min <span class="help-icon" data-help="min" style="vertical-align:middle">?</span></th>
+        <th>Max <span class="help-icon" data-help="max" style="vertical-align:middle">?</span></th>
+        <th>MOQ <span class="help-icon" data-help="moq" style="vertical-align:middle">?</span></th>
         <th>กราฟ</th><th>สถานะเติม</th><th>Moving Status</th>
         <th class="admin-only"></th>
       </tr></thead>
@@ -463,6 +467,15 @@
 // onclick ใน HTML เรียกได้โดยตรง
 // ══════════════════════════════════════════
 const HELP_DATA = {
+  reorder_col: {
+    title: '🧮 Reorder Point — จุดสั่งซื้อ',
+    tag: 'calc',
+    what: 'ระดับสต็อกที่เมื่อถึงจุดนี้ต้องสั่งซื้อทันที เพื่อให้ของมาถึงพอดีก่อนสต็อกจะหมด ระบบคำนวณให้อัตโนมัติจาก 3 ค่าที่ Admin กรอก',
+    source: 'คำนวณอัตโนมัติจาก avg_monthly + lead_time_days + safety_stock\nถ้าสินค้าที่ import มามี avg_monthly = 0 → Reorder Point จะเป็น 0 ต้องไปตั้งค่าใน ⚙️ จัดการ',
+    formula: 'avg_daily        = avg_monthly ÷ 30\nReorder Point    = (avg_daily × lead_time_days) + safety_stock\n\nMin Point (Auto) = Reorder Point + safety_stock\nMax Point (Auto) = Min Point + (avg_daily × lead_time_days × 2)\n\nแนะนำสั่ง       = ceil((Max - คงเหลือ) ÷ MOQ) × MOQ',
+    example: 'ตัวอย่าง: กล่องลัง\navg_monthly = 60 กล่อง/เดือน\nlead_time   = 15 วัน\nsafety_stock = 10 กล่อง\n\navg_daily     = 60 ÷ 30 = 2 กล่อง/วัน\nReorder Point = (2 × 15) + 10 = 40 กล่อง\nMin Point     = 40 + 10 = 50 กล่อง\nMax Point     = 50 + (2 × 15 × 2) = 110 กล่อง\n\nถ้าคงเหลือ = 30 → ต่ำกว่า Reorder Point → ขึ้น 🔔 สีส้ม\nแนะนำสั่ง   = ceil((110-30)÷MOQ) × MOQ',
+    audit: 'Auditor: ค่าที่เห็นเป็น 0 ทั้งหมดแปลว่า Admin ยังไม่ได้กรอก avg_monthly และ lead_time สำหรับสินค้านั้น ให้ไปกรอกใน ⚙️ จัดการ → แก้ไขสินค้า ระบบจะคำนวณให้อัตโนมัติ',
+  },
   monthly: {
     title: '📋 ค่าเฉลี่ยใช้ / เดือน (avg_monthly)',
     tag: 'manual',
