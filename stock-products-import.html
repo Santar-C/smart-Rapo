@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Import Stock Products — RAPO</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;background:#002048;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+  .card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:640px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  h2{font-size:1.05rem;font-weight:900;color:#002048;margin-bottom:1rem;padding-bottom:.75rem;border-bottom:2px solid #e2e8f0}
+  .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1rem}
+  .stat-box{background:#f8fafc;border-radius:8px;padding:.6rem;text-align:center;border:1px solid #e2e8f0}
+  .stat-num{font-size:1.3rem;font-weight:900;color:#002048}
+  .stat-lbl{font-size:.7rem;color:#64748b;margin-top:.1rem}
+  .warn{background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:.75rem;font-size:.8rem;color:#92400e;margin-bottom:1rem;line-height:1.7}
+  .info{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:.75rem;font-size:.8rem;color:#1e40af;margin-bottom:1rem;line-height:1.7}
+  .auth-ok{background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:.6rem .85rem;font-size:.82rem;color:#166534;margin-bottom:1rem}
+  .auth-no{background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:.6rem .85rem;font-size:.82rem;color:#92400e;margin-bottom:1rem}
+  .prog-wrap{background:#e2e8f0;border-radius:8px;height:10px;overflow:hidden;margin:1rem 0}
+  .prog-fill{height:100%;background:linear-gradient(90deg,#002048,#E6100D);border-radius:8px;width:0;transition:width .2s}
+  .log-area{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:.75rem;height:180px;overflow-y:auto;font-size:.75rem;font-family:monospace;margin-bottom:1rem}
+  .log-ok{color:#16a34a}.log-err{color:#dc2626}.log-info{color:#0284c7}
+  .btn{width:100%;padding:.85rem;border-radius:10px;border:none;font-size:1rem;font-weight:700;cursor:pointer;background:#002048;color:#fff}
+  .btn:hover{background:#003580}.btn:disabled{opacity:.5;cursor:not-allowed}
+  .preview-table{width:100%;border-collapse:collapse;font-size:.75rem;margin-bottom:1rem;max-height:200px;overflow-y:auto;display:block}
+  .preview-table th{background:#002048;color:#fff;padding:.4rem .5rem;text-align:left}
+  .preview-table td{padding:.3rem .5rem;border-bottom:1px solid #f1f5f9}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>📦 Import Stock Products (90 รายการ) → Firestore stock_products</h2>
+
+  <div class="stat-grid">
+    <div class="stat-box"><div class="stat-num" style="color:#16a34a">55</div><div class="stat-lbl">A · Stationary</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#0284c7">15</div><div class="stat-lbl">B · Consumable Office</div></div>
+    <div class="stat-box"><div class="stat-num" style="color:#d97706">20</div><div class="stat-lbl">C · Consumable WH</div></div>
+  </div>
+
+  <div class="info">
+    <b>ข้อมูลที่จะ import:</b><br>
+    ยอดคงเหลือ = ยอดยกมา + รับเข้าทั้งหมด - เบิกออกทั้งหมด (คำนวณจาก Transaction IN/OUT จริง)<br>
+    SKU สร้างอัตโนมัติ: RAPO-A001, RAPO-B001, RAPO-C001...<br>
+    Lead Time / Safety Stock / MOQ ยังไม่ได้กำหนด — ให้ Admin ใส่ในหน้า ⚙️ จัดการ ภายหลัง
+  </div>
+
+  <div class="warn">
+    <b>ทำครั้งเดียวเท่านั้น</b> — ถ้า import ซ้ำจะได้สินค้าซ้ำในระบบ ตรวจสอบก่อนกดปุ่ม
+  </div>
+
+  <div id="auth-box" class="auth-no">กำลังตรวจสอบ login...</div>
+
+  <div class="prog-wrap"><div class="prog-fill" id="prog"></div></div>
+  <div style="font-size:.8rem;color:#64748b;text-align:center;margin-top:-.5rem;margin-bottom:.75rem" id="prog-text">รอเริ่ม...</div>
+
+  <div class="log-area" id="log-area"></div>
+
+  <button class="btn" id="btn" onclick="startImport()" disabled>🚀 เริ่ม Import (90 สินค้า)</button>
+  <div style="margin-top:.6rem;font-size:.75rem;color:#64748b;text-align:center" id="final-msg"></div>
+</div>
+
+<script>
+var PRODUCTS = [{"name": "Post It", "unit": "pcs", "category": "A", "qty": 0, "sku": "RAPO-A001"}, {"name": "เทป 2 หน้าแบบโฟม", "unit": "roll", "category": "A", "qty": 7, "sku": "RAPO-A002"}, {"name": "เทป 2 หน้าแบบบาง", "unit": "roll", "category": "A", "qty": 9, "sku": "RAPO-A003"}, {"name": "เทปโฟมอะคิลิคแบบบางสีแดง", "unit": "roll", "category": "A", "qty": 2, "sku": "RAPO-A004"}, {"name": "เทปใสเล็ก", "unit": "ม้วน", "category": "A", "qty": 91, "sku": "RAPO-A005"}, {"name": "เทปกาว2หน้า(3M)", "unit": "roll", "category": "A", "qty": 0, "sku": "RAPO-A006"}, {"name": "เทปลบคำผิด", "unit": "pcs", "category": "A", "qty": 11, "sku": "RAPO-A007"}, {"name": "แท่นเทปใส", "unit": "pcs", "category": "A", "qty": 0, "sku": "RAPO-A008"}, {"name": "แท่นที่ตัดเทปใส 2 นิ้ว", "unit": "pcs", "category": "A", "qty": -5, "sku": "RAPO-A009"}, {"name": "แปรงลบกระดาน", "unit": "pcs", "category": "A", "qty": 1, "sku": "RAPO-A010"}, {"name": "แม็ก(เล็ก)", "unit": "pcs", "category": "A", "qty": 0, "sku": "RAPO-A011"}, {"name": "แม็ก(ใหญ่)", "unit": "pcs", "category": "A", "qty": 2, "sku": "RAPO-A012"}, {"name": "ใบมีดคัตเตอร์(เล็ก)", "unit": "ห่อ", "category": "A", "qty": 28, "sku": "RAPO-A013"}, {"name": "ใบมีดคัตเตอร์(ใหญ่)", "unit": "ห่่อ", "category": "A", "qty": 52, "sku": "RAPO-A014"}, {"name": "ไม้บรรทัดพลาสติก", "unit": "pcs", "category": "A", "qty": 2, "sku": "RAPO-A015"}, {"name": "กรรไกรเล็ก", "unit": "pcs", "category": "A", "qty": 2, "sku": "RAPO-A016"}, {"name": "กรรไกรใหญ่", "unit": "pcs", "category": "A", "qty": 8, "sku": "RAPO-A017"}, {"name": "กระดานคลิปบอร์ด", "unit": "pcs", "category": "A", "qty": 29, "sku": "RAPO-A018"}, {"name": "กระดาษ A4", "unit": "ริม", "category": "A", "qty": 28, "sku": "RAPO-A019"}, {"name": "ขี้ผึ้งนับกระดาษ", "unit": "pcs", "category": "A", "qty": 4, "sku": "RAPO-A020"}, {"name": "คลิปดำ NO.108", "unit": "box", "category": "A", "qty": 150, "sku": "RAPO-A021"}, {"name": "คลิปดำ NO.109", "unit": "box", "category": "A", "qty": 7, "sku": "RAPO-A022"}, {"name": "คลิปดำ NO.110", "unit": "box", "category": "A", "qty": 36, "sku": "RAPO-A023"}, {"name": "คลิปดำ NO.112", "unit": "box", "category": "A", "qty": 45, "sku": "RAPO-A024"}, {"name": "คัตเตอร์เล็ก", "unit": "pcs", "category": "A", "qty": 3, "sku": "RAPO-A025"}, {"name": "คัตเตอร์ใหญ่", "unit": "pcs", "category": "A", "qty": 24, "sku": "RAPO-A026"}, {"name": "Silicon", "unit": "pcs", "category": "C", "qty": 3, "sku": "RAPO-C001"}, {"name": "ดินสอไม้", "unit": "แท่ง", "category": "A", "qty": 4, "sku": "RAPO-A027"}, {"name": "ตลับเมตร", "unit": "pcs", "category": "A", "qty": 1, "sku": "RAPO-A028"}, {"name": "ที่เจาะกระดาษ", "unit": "pcs", "category": "A", "qty": 4, "sku": "RAPO-A029"}, {"name": "ที่ดึงลูกแม็ก", "unit": "pcs", "category": "A", "qty": 0, "sku": "RAPO-A030"}, {"name": "ปากกาเคมี(แดง)", "unit": "แท่ง", "category": "A", "qty": 32, "sku": "RAPO-A031"}, {"name": "ปากกาเคมี(ดำ)", "unit": "แท่ง", "category": "A", "qty": 63, "sku": "RAPO-A032"}, {"name": "ปากกาเคมี(น้ำเงิน)", "unit": "แท่ง", "category": "A", "qty": 36, "sku": "RAPO-A033"}, {"name": "ปากกาไวท์บอร์ด (เขียว)", "unit": "แท่ง", "category": "A", "qty": 4, "sku": "RAPO-A034"}, {"name": "ปากกาไวท์บอร์ด (น้ำตาลเข้ม)", "unit": "แท่ง", "category": "A", "qty": 3, "sku": "RAPO-A035"}, {"name": "ปากกาไวท์บอร์ด (ส้ม)", "unit": "แท่ง", "category": "A", "qty": 3, "sku": "RAPO-A036"}, {"name": "ปากกาไวท์บอร์ด(แดง)", "unit": "แท่ง", "category": "A", "qty": 38, "sku": "RAPO-A037"}, {"name": "ปากกาไวท์บอร์ด(ดำ)", "unit": "แท่ง", "category": "A", "qty": 20, "sku": "RAPO-A038"}, {"name": "ปากกาไวท์บอร์ด(น้ำเงิน)", "unit": "แท่ง", "category": "A", "qty": 21, "sku": "RAPO-A039"}, {"name": "ปากกาไฮไลท์", "unit": "ชิ้น", "category": "A", "qty": 0, "sku": "RAPO-A040"}, {"name": "ปากกาไฮไลท์สีเขียว", "unit": "แท่ง", "category": "A", "qty": 37, "sku": "RAPO-A041"}, {"name": "ปากกาไฮไลท์สีเหลือง", "unit": "แท่ง", "category": "A", "qty": 35, "sku": "RAPO-A042"}, {"name": "ปากกาไฮไลท์สีชมพู", "unit": "แท่ง", "category": "A", "qty": 42, "sku": "RAPO-A043"}, {"name": "ปากกาลูกลื่น(แดง)", "unit": "แท่ง", "category": "A", "qty": 151, "sku": "RAPO-A044"}, {"name": "ปากกาลูกลื่น(น้ำเงิน)", "unit": "แท่ง", "category": "A", "qty": 181, "sku": "RAPO-A045"}, {"name": "ยางลบ", "unit": "pcs", "category": "A", "qty": 3, "sku": "RAPO-A046"}, {"name": "ลวดเย็บกระดาษNo.10", "unit": "Box", "category": "A", "qty": 79, "sku": "RAPO-A047"}, {"name": "ลวดเสียบกระดาษ No.0 (ใหญ่)", "unit": "Box", "category": "A", "qty": 29, "sku": "RAPO-A048"}, {"name": "ลวดเสียบกระดาษ No.1 (เล็ก)", "unit": "Box", "category": "A", "qty": 3, "sku": "RAPO-A049"}, {"name": "ลวดเย็บกระดาษ  No.35", "unit": "box", "category": "A", "qty": 68, "sku": "RAPO-A050"}, {"name": "TAG INB", "unit": "roll", "category": "C", "qty": 13, "sku": "RAPO-C002"}, {"name": "TAG CON", "unit": "roll", "category": "C", "qty": 6, "sku": "RAPO-C003"}, {"name": "TAG PAC", "unit": "roll", "category": "C", "qty": 12, "sku": "RAPO-C004"}, {"name": "LABEL 4x3", "unit": "roll", "category": "C", "qty": 4, "sku": "RAPO-C005"}, {"name": "LABEL 4x3 (CUT)", "unit": "roll", "category": "C", "qty": 20, "sku": "RAPO-C006"}, {"name": "LABEL 4x6", "unit": "roll", "category": "C", "qty": 10, "sku": "RAPO-C007"}, {"name": "Ribbon", "unit": "roll", "category": "C", "qty": 7, "sku": "RAPO-C008"}, {"name": "Sticker ขาวด้าน", "unit": "sheet", "category": "C", "qty": 84, "sku": "RAPO-C009"}, {"name": "Sticker PVC ใส", "unit": "sheet", "category": "C", "qty": 164, "sku": "RAPO-C010"}, {"name": "Bubble", "unit": "pcs", "category": "C", "qty": 155, "sku": "RAPO-C011"}, {"name": "Sticker PVC ใส BULK", "unit": "sheet", "category": "C", "qty": 12, "sku": "RAPO-C012"}, {"name": "Shock watch", "unit": "#N/A", "category": "C", "qty": 2, "sku": "RAPO-C013"}, {"name": "ฟิมล์ยืดม้วนใหญ่", "unit": "roll", "category": "C", "qty": 13, "sku": "RAPO-C014"}, {"name": "ฟิมล์ยืดม้วนเล็ก", "unit": "roll", "category": "C", "qty": 11, "sku": "RAPO-C015"}, {"name": "พลาสติกคลุมพาเลท", "unit": "roll", "category": "C", "qty": 9, "sku": "RAPO-C016"}, {"name": "สายรัดพลาสติก", "unit": "roll", "category": "C", "qty": 12, "sku": "RAPO-C017"}, {"name": "พาเลทพลาสติก", "unit": "pcs", "category": "C", "qty": 100, "sku": "RAPO-C018"}, {"name": "Air bag (25/1CTN)", "unit": "pcs", "category": "C", "qty": 21, "sku": "RAPO-C019"}, {"name": "เทปใส2นิ้ว", "unit": "roll", "category": "C", "qty": 207, "sku": "RAPO-C020"}, {"name": "ทิชชู่ม้วนใหญ่", "unit": "roll", "category": "B", "qty": 17, "sku": "RAPO-B001"}, {"name": "กรวยน้ำ", "unit": "แถว", "category": "B", "qty": 66, "sku": "RAPO-B002"}, {"name": "ถุงขยะดำขนาด 18x20", "unit": "kg", "category": "B", "qty": 27, "sku": "RAPO-B003"}, {"name": "ถุงขยะดำขนาด24x28", "unit": "kg", "category": "B", "qty": 14, "sku": "RAPO-B004"}, {"name": "ถุงขยะดำขนาด 30x40", "unit": "kg", "category": "B", "qty": 12, "sku": "RAPO-B005"}, {"name": "น้ำยาล้างจาน", "unit": "แกลอน", "category": "B", "qty": 2, "sku": "RAPO-B006"}, {"name": "น้ำยาดันฝุ่น", "unit": "แกลอน", "category": "B", "qty": 3, "sku": "RAPO-B007"}, {"name": "กาแฟกล่อง", "unit": "bag", "category": "B", "qty": 5, "sku": "RAPO-B008"}, {"name": "น้ำตาลทราย", "unit": "kg", "category": "B", "qty": 5, "sku": "RAPO-B009"}, {"name": "ครีมเทียม", "unit": "ถุง", "category": "B", "qty": 4, "sku": "RAPO-B010"}, {"name": "กระดาษทิชชู่สำหรับเช็ดโต๊ะ", "unit": "roll", "category": "B", "qty": 133, "sku": "RAPO-B011"}, {"name": "กระดาษทิชชู่สำหรับเช็ดหน้า", "unit": "roll", "category": "B", "qty": 61, "sku": "RAPO-B012"}, {"name": "น้ำยาล้างมือ", "unit": "แกลอน", "category": "B", "qty": 3, "sku": "RAPO-B013"}, {"name": "เมล็ดกาแฟ", "unit": "bag", "category": "B", "qty": 3, "sku": "RAPO-B014"}, {"name": "แผ่นเคลือบกระดาษ ขนาด A4", "unit": "แผ่น", "category": "A", "qty": 200, "sku": "RAPO-A051"}, {"name": "น้ำยาฆ่าเชื้อ ขนาด 1 ลิตร ( Dettol)", "unit": "แกลอน", "category": "B", "qty": 2, "sku": "RAPO-B015"}, {"name": "ปากกาไวท์บอร์ด (น้ำตาลอ่อน)", "unit": "แท่ง", "category": "A", "qty": 2, "sku": "RAPO-A052"}, {"name": "ปากกาไวท์บอร์ด (ฟ้า)", "unit": "แท่่ง", "category": "A", "qty": 2, "sku": "RAPO-A053"}, {"name": "ปากกาไวท์บอร์ด (ชมพู)", "unit": "แท่ง", "category": "A", "qty": 2, "sku": "RAPO-A054"}, {"name": "กระดาษ A5", "unit": "ริม", "category": "A", "qty": 5, "sku": "RAPO-A055"}];
+
+var FB = {
+  apiKey:"AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
+  authDomain:"rapo-system.firebaseapp.com",
+  projectId:"rapo-system",
+  storageBucket:"rapo-system.firebasestorage.app",
+  messagingSenderId:"87090183469",
+  appId:"1:87090183469:web:eafb1ded183755f329a7a4"
+};
+firebase.initializeApp(FB);
+var auth = firebase.auth();
+var db   = firebase.firestore();
+var TS   = firebase.firestore.FieldValue.serverTimestamp;
+
+auth.onAuthStateChanged(function(user){
+  var box = document.getElementById('auth-box');
+  var btn = document.getElementById('btn');
+  if(user){
+    box.className='auth-ok';
+    box.textContent='Login แล้ว: '+user.email+' — พร้อม Import';
+    btn.disabled=false;
+  } else {
+    box.className='auth-no';
+    box.textContent='ยังไม่ได้ Login — เปิด stock.html login ก่อน';
+    btn.disabled=true;
+  }
+});
+
+function log(msg,cls){ var a=document.getElementById('log-area'),d=document.createElement('div'); d.className=cls||'log-info'; d.textContent='['+new Date().toLocaleTimeString('th-TH')+'] '+msg; a.appendChild(d); a.scrollTop=a.scrollHeight; }
+
+var importing=false;
+function startImport(){
+  if(importing)return;
+  importing=true;
+  document.getElementById('btn').disabled=true;
+  document.getElementById('btn').textContent='กำลัง Import...';
+  var total=PRODUCTS.length, done=0;
+  log('เริ่ม Import '+total+' สินค้า...','log-info');
+
+  function doOne(i){
+    if(i>=total){
+      log('Import เสร็จ! '+done+'/'+total+' สินค้า','log-ok');
+      document.getElementById('prog').style.background='#16a34a';
+      document.getElementById('prog-text').textContent='เสร็จสมบูรณ์ — '+done+' สินค้า';
+      document.getElementById('btn').textContent='Import เสร็จแล้ว';
+      document.getElementById('final-msg').innerHTML='ไปดูรายการสต็อกได้ที่ <a href="stock.html" style="color:#002048;font-weight:700">stock.html</a> — กด F5 reload ถ้ายังไม่เห็นข้อมูล';
+      importing=false;
+      return;
+    }
+    var p=PRODUCTS[i];
+    db.collection('stock_products').add(Object.assign({},p,{
+      safety_stock:0, min_stock:0, max_stock:0, moq:1,
+      avg_monthly:0, lead_time_days:7, reorder_point:0,
+      dead_stock_days:90, supplier:'', location:'',
+      created_at:TS(), last_movement:TS(),
+      source:'import_excel'
+    })).then(function(){ done++; var pct=Math.round(done/total*100); document.getElementById('prog').style.width=pct+'%'; document.getElementById('prog-text').textContent=done+'/'+total+' ('+pct+'%)'; setTimeout(function(){doOne(i+1);},20); }).catch(function(e){ log('Error '+p.name+': '+e.message,'log-err'); setTimeout(function(){doOne(i+1);},50); });
+  }
+  doOne(0);
+}
+</script>
+</body>
+</html>
