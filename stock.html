@@ -577,9 +577,43 @@ function calcMax(p){
   return Math.ceil(calcMin(p) + avgDaily(p) * (p.lead_time_days ?? 15) * 2);
 }
 function calcOrderQty(p){
-  const gap = calcMax(p) - (p.qty ?? 0);
-  const moq = p.moq ?? 1;
-  return Math.max(moq, Math.ceil(Math.max(gap, 0) / moq) * moq);
+  const qty    = p.qty ?? 0;
+  const moq    = Math.max(1, p.moq ?? 1);
+  const daily  = avgDaily(p);                    // avg_monthly ÷ 30
+  const lead   = p.lead_time_days ?? 7;
+  const safety = p.safety_stock ?? 0;
+
+  // จำนวณที่ใช้ระหว่างรอของ (lead time consumption)
+  const leadConsumption = Math.ceil(daily * lead);
+
+  // Target = ของที่ต้องมีตอนสั่ง + ของที่ใช้ระหว่างรอ + safety
+  // = Reorder Point + leadConsumption + safety
+  // = เติมไปถึง Max Point (ถ้ากำหนดไว้) หรือคำนวณเอง
+  const maxPt = calcMax(p);
+  const target = maxPt > 0 ? maxPt : (leadConsumption * 2 + safety);
+
+  const gap = target - qty;
+  if(gap <= 0) return moq; // สั่งขั้นต่ำ MOQ เสมอ
+  return Math.ceil(gap / moq) * moq;
+}
+
+// ฟังก์ชันแยกเพื่อแสดงรายละเอียดการคำนวณ
+function calcOrderBreakdown(p){
+  const qty    = p.qty ?? 0;
+  const daily  = avgDaily(p);
+  const lead   = p.lead_time_days ?? 7;
+  const safety = p.safety_stock ?? 0;
+  const moq    = Math.max(1, p.moq ?? 1);
+  const maxPt  = calcMax(p);
+
+  const leadConsumption = Math.ceil(daily * lead);  // ใช้ระหว่างรอ
+  const coverPeriod     = lead > 0 ? lead : 7;
+  const target          = maxPt > 0 ? maxPt : (leadConsumption * 2 + safety);
+  const rawGap          = Math.max(0, target - qty);
+  const orderQty        = rawGap <= 0 ? moq : Math.ceil(rawGap / moq) * moq;
+  const daysStock       = daily > 0 ? Math.floor(orderQty / daily) : 0;
+
+  return { leadConsumption, target, rawGap, orderQty, daysStock, coverPeriod, daily: daily.toFixed(2) };
 }
 
 // Moving Status (ตาม Excel: ค่าเฉลี่ยรายเดือน)
@@ -722,27 +756,72 @@ function renderReorder(){
     const ss   = p.safety_stock ?? 0;
     const lead = p.lead_time_days ?? '—';
     const moq  = p.moq ?? '—';
-    return `<div class="reorder-card ${cls}">
-      <div style="font-size:1.5rem;flex-shrink:0">${icon}</div>
-      <div style="flex:1">
-        <div style="font-weight:700;font-size:.9rem;color:var(--navy)">${p.name}
-          <span style="font-size:.72rem;color:var(--gray);font-weight:400">(${p.sku})</span></div>
-        <div style="font-size:.75rem;color:var(--gray);margin-top:.1rem">
-          ${p.category??'—'} · ${p.location??'—'} · ซัพฯ: ${p.supplier??'—'}
+    const bd = calcOrderBreakdown(p);
+    return `<div class="reorder-card ${cls}" style="flex-direction:column;gap:.6rem">
+      <div style="display:flex;align-items:flex-start;gap:.75rem">
+        <div style="font-size:1.4rem;flex-shrink:0">${icon}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:.9rem;color:var(--navy)">${p.name}
+            <span style="font-size:.72rem;color:var(--gray);font-weight:400">(${p.sku})</span>
+          </div>
+          <div style="font-size:.75rem;color:var(--gray);margin-top:.1rem">
+            ${p.category??'—'} · ${p.location??'—'} · ซัพฯ: ${p.supplier??'—'}
+          </div>
         </div>
-        <div style="font-size:.8rem;margin-top:.3rem;display:flex;gap:1rem;flex-wrap:wrap">
-          <span>คงเหลือ <b>${p.qty??0}</b> ${p.unit??''}</span>
-          <span>Safety <b>${ss}</b></span>
-          <span>Reorder Point <b>${rp}</b></span>
-          <span>Lead Time <b>${lead} วัน</b></span>
-          <span>MOQ <b>${moq}</b></span>
+        <div>${statusBadge(p)}</div>
+      </div>
+
+      <!-- สถานะปัจจุบัน -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.4rem">
+        <div style="background:#f8fafc;border-radius:8px;padding:.4rem .6rem;text-align:center">
+          <div style="font-size:.68rem;color:#64748b">คงเหลือ</div>
+          <div style="font-weight:900;font-size:1rem;color:${(p.qty??0)<=0?'var(--red)':'var(--navy)'}">${p.qty??0}</div>
+          <div style="font-size:.65rem;color:#94a3b8">${p.unit??''}</div>
         </div>
-        <div style="margin-top:.35rem;font-size:.82rem;font-weight:700;color:var(--navy)">
-          📋 แนะนำสั่ง: <span style="color:var(--red)">${oQty} ${p.unit??''}</span>
-          <span style="font-size:.72rem;font-weight:400;color:var(--gray)">(เติมไปถึง Max = ${calcMax(p)})</span>
+        <div style="background:#fef3c7;border-radius:8px;padding:.4rem .6rem;text-align:center">
+          <div style="font-size:.68rem;color:#92400e">Reorder Point</div>
+          <div style="font-weight:900;font-size:1rem;color:#d97706">${rp}</div>
+          <div style="font-size:.65rem;color:#94a3b8">${p.unit??''}</div>
+        </div>
+        <div style="background:#eff6ff;border-radius:8px;padding:.4rem .6rem;text-align:center">
+          <div style="font-size:.68rem;color:#1d4ed8">Lead Time</div>
+          <div style="font-weight:900;font-size:1rem;color:#0284c7">${lead}</div>
+          <div style="font-size:.65rem;color:#94a3b8">วัน</div>
+        </div>
+        <div style="background:#f0fdf4;border-radius:8px;padding:.4rem .6rem;text-align:center">
+          <div style="font-size:.68rem;color:#166534">Safety Stock</div>
+          <div style="font-weight:900;font-size:1rem;color:#16a34a">${ss}</div>
+          <div style="font-size:.65rem;color:#94a3b8">${p.unit??''}</div>
+        </div>
+        <div style="background:#faf5ff;border-radius:8px;padding:.4rem .6rem;text-align:center">
+          <div style="font-size:.68rem;color:#6d28d9">MOQ</div>
+          <div style="font-weight:900;font-size:1rem;color:#7c3aed">${moq}</div>
+          <div style="font-size:.65rem;color:#94a3b8">${p.unit??''}/ครั้ง</div>
         </div>
       </div>
-      <div>${statusBadge(p)}</div>
+
+      <!-- การคำนวณจำนวนสั่งซื้อ -->
+      <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:.65rem .85rem">
+        <div style="font-size:.72rem;font-weight:700;color:#c2410c;margin-bottom:.4rem;text-transform:uppercase">
+          🧮 การคำนวณจำนวนที่ควรสั่งซื้อ
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem .75rem;font-size:.78rem;color:#374151">
+          <span style="color:#64748b">ใช้ระหว่างรอ (${lead} วัน):</span>
+          <span><b>${bd.leadConsumption}</b> ${p.unit??''} (${bd.daily}/วัน × ${lead} วัน)</span>
+          <span style="color:#64748b">เป้าหมายสต็อก (Max Point):</span>
+          <span><b>${bd.target}</b> ${p.unit??''}</span>
+          <span style="color:#64748b">ขาดอยู่ (target − คงเหลือ):</span>
+          <span><b>${bd.rawGap}</b> ${p.unit??''}</span>
+          <span style="color:#64748b">ปัดขึ้น × MOQ (${moq}):</span>
+          <span style="color:#c2410c;font-weight:700">= <b>${bd.orderQty}</b> ${p.unit??''}</span>
+        </div>
+        <div style="margin-top:.5rem;padding-top:.5rem;border-top:1px solid #fed7aa;
+          font-size:.82rem;font-weight:900;color:var(--red);display:flex;align-items:center;gap:.5rem">
+          📦 สั่งซื้อ <span style="font-size:1.1rem">${bd.orderQty}</span> ${p.unit??''}
+          ${bd.daysStock > 0 ? `<span style="font-size:.72rem;font-weight:400;color:#64748b">
+            (เพียงพอใช้ ~${bd.daysStock} วัน)</span>` : ''}
+        </div>
+      </div>
     </div>`;
   }).join('');
 }
