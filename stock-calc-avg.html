@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Auto-calc avg_monthly — RAPO Stock</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;background:#002048;min-height:100dvh;
+    display:flex;align-items:center;justify-content:center;padding:1.5rem}
+  .card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:600px;
+    box-shadow:0 20px 60px rgba(0,0,0,.4)}
+  h2{font-size:1.05rem;font-weight:900;color:#002048;margin-bottom:1rem;
+    padding-bottom:.75rem;border-bottom:2px solid #e2e8f0}
+  .info{background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;
+    padding:.75rem;font-size:.82rem;color:#1e40af;margin-bottom:1rem;line-height:1.7}
+  .warn{background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;
+    padding:.75rem;font-size:.82rem;color:#92400e;margin-bottom:1rem;line-height:1.7}
+  .auth-ok{background:#dcfce7;border:1px solid #86efac;border-radius:8px;
+    padding:.6rem .85rem;font-size:.82rem;color:#166534;margin-bottom:1rem}
+  .auth-no{background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;
+    padding:.6rem .85rem;font-size:.82rem;color:#92400e;margin-bottom:1rem}
+  .prog-wrap{background:#e2e8f0;border-radius:8px;height:10px;overflow:hidden;margin:1rem 0}
+  .prog-fill{height:100%;background:linear-gradient(90deg,#002048,#E6100D);
+    border-radius:8px;width:0;transition:width .2s}
+  .log-area{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;
+    padding:.75rem;height:200px;overflow-y:auto;font-size:.75rem;
+    font-family:monospace;margin-bottom:1rem}
+  .log-ok{color:#16a34a}.log-err{color:#dc2626}.log-info{color:#0284c7}
+  .btn{width:100%;padding:.85rem;border-radius:10px;border:none;font-size:1rem;
+    font-weight:700;cursor:pointer;background:#002048;color:#fff}
+  .btn:hover{background:#003580}.btn:disabled{opacity:.5;cursor:not-allowed}
+  table{width:100%;border-collapse:collapse;font-size:.75rem;margin-bottom:1rem}
+  th{background:#002048;color:#fff;padding:.4rem .5rem;text-align:left}
+  td{padding:.3rem .5rem;border-bottom:1px solid #f1f5f9}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🧮 Auto-คำนวณ avg_monthly จาก Transaction OUT จริง</h2>
+  
+  <div class="info">
+    <b>คำนวณจาก:</b> Transaction OUT ย้อนหลัง 3 เดือน (เม.ย.-ก.ค. 2569)<br>
+    <b>สูตร:</b> avg_monthly = sum(qty OUT 3 เดือน) ÷ 3<br>
+    <b>Safety Stock:</b> ROUNDUP(avg_monthly × 20%, 0)<br>
+    <b>จำนวนสินค้า:</b> 90 รายการ (82 มีข้อมูล, 8 ยังไม่มี transaction)
+  </div>
+
+  <div class="warn">
+    <b>ทำได้ครั้งเดียวเท่านั้น</b> — จะอัปเดต avg_monthly และ safety_stock ทุกตัว
+  </div>
+
+  <div id="auth-box" class="auth-no">กำลังตรวจสอบ login...</div>
+
+  <div class="prog-wrap"><div class="prog-fill" id="prog"></div></div>
+  <div style="font-size:.8rem;color:#64748b;text-align:center;margin-top:-.5rem;margin-bottom:.75rem" id="prog-text">รอเริ่ม...</div>
+
+  <div class="log-area" id="log-area"></div>
+
+  <button class="btn" id="btn" onclick="startUpdate()" disabled>
+    🚀 เริ่มคำนวณและอัปเดต (90 สินค้า)
+  </button>
+  <div style="margin-top:.6rem;font-size:.75rem;color:#64748b;text-align:center" id="final-msg"></div>
+</div>
+
+<script>
+var UPDATES = [{"sku": "RAPO-A001", "name": "Post It", "avg_monthly": 1.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A002", "name": "เทป 2 หน้าแบบโฟม", "avg_monthly": 0.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A003", "name": "เทป 2 หน้าแบบบาง", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A004", "name": "เทปโฟมอะคิลิคแบบบางสีแดง", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A005", "name": "เทปใสเล็ก", "avg_monthly": 6.3, "safety_stock": 2, "reorder_point": 4, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A006", "name": "เทปกาว2หน้า(3M)", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A007", "name": "เทปลบคำผิด", "avg_monthly": 0.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A008", "name": "แท่นเทปใส", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A009", "name": "แท่นที่ตัดเทปใส 2 นิ้ว", "avg_monthly": 3.5, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A010", "name": "แปรงลบกระดาน", "avg_monthly": 0, "safety_stock": 0, "reorder_point": 0, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A011", "name": "แม็ก(เล็ก)", "avg_monthly": 2.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A012", "name": "แม็ก(ใหญ่)", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A013", "name": "ใบมีดคัตเตอร์(เล็ก)", "avg_monthly": 0.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A014", "name": "ใบมีดคัตเตอร์(ใหญ่)", "avg_monthly": 1.5, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A015", "name": "ไม้บรรทัดพลาสติก", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A016", "name": "กรรไกรเล็ก", "avg_monthly": 0, "safety_stock": 0, "reorder_point": 0, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A017", "name": "กรรไกรใหญ่", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A018", "name": "กระดานคลิปบอร์ด", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A019", "name": "กระดาษ A4", "avg_monthly": 10.3, "safety_stock": 3, "reorder_point": 6, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A020", "name": "ขี้ผึ้งนับกระดาษ", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A021", "name": "คลิปดำ NO.108", "avg_monthly": 0, "safety_stock": 0, "reorder_point": 0, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A022", "name": "คลิปดำ NO.109", "avg_monthly": 0, "safety_stock": 0, "reorder_point": 0, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A023", "name": "คลิปดำ NO.110", "avg_monthly": 4.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A024", "name": "คลิปดำ NO.112", "avg_monthly": 39.0, "safety_stock": 8, "reorder_point": 18, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A025", "name": "คัตเตอร์เล็ก", "avg_monthly": 2.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A026", "name": "คัตเตอร์ใหญ่", "avg_monthly": 1.6, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C001", "name": "Silicon", "avg_monthly": 0.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A027", "name": "ดินสอไม้", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A028", "name": "ตลับเมตร", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A029", "name": "ที่เจาะกระดาษ", "avg_monthly": 0, "safety_stock": 0, "reorder_point": 0, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A030", "name": "ที่ดึงลูกแม็ก", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A031", "name": "ปากกาเคมี(แดง)", "avg_monthly": 8.0, "safety_stock": 2, "reorder_point": 4, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A032", "name": "ปากกาเคมี(ดำ)", "avg_monthly": 8.7, "safety_stock": 2, "reorder_point": 5, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A033", "name": "ปากกาเคมี(น้ำเงิน)", "avg_monthly": 3.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A034", "name": "ปากกาไวท์บอร์ด (เขียว)", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A035", "name": "ปากกาไวท์บอร์ด (น้ำตาลเข้ม)", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A036", "name": "ปากกาไวท์บอร์ด (ส้ม)", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A037", "name": "ปากกาไวท์บอร์ด(แดง)", "avg_monthly": 0.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A038", "name": "ปากกาไวท์บอร์ด(ดำ)", "avg_monthly": 6.3, "safety_stock": 2, "reorder_point": 4, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A039", "name": "ปากกาไวท์บอร์ด(น้ำเงิน)", "avg_monthly": 2.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A040", "name": "ปากกาไฮไลท์", "avg_monthly": 2.1, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A041", "name": "ปากกาไฮไลท์สีเขียว", "avg_monthly": 0.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A042", "name": "ปากกาไฮไลท์สีเหลือง", "avg_monthly": 0.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A043", "name": "ปากกาไฮไลท์สีชมพู", "avg_monthly": 0.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A044", "name": "ปากกาลูกลื่น(แดง)", "avg_monthly": 0.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A045", "name": "ปากกาลูกลื่น(น้ำเงิน)", "avg_monthly": 1.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A046", "name": "ยางลบ", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A047", "name": "ลวดเย็บกระดาษNo.10", "avg_monthly": 2.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A048", "name": "ลวดเสียบกระดาษ No.0 (ใหญ่)", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A049", "name": "ลวดเสียบกระดาษ No.1 (เล็ก)", "avg_monthly": 4.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A050", "name": "ลวดเย็บกระดาษ  No.35", "avg_monthly": 0.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C002", "name": "TAG INB", "avg_monthly": 1.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C003", "name": "TAG CON", "avg_monthly": 3.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C004", "name": "TAG PAC", "avg_monthly": 1.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C005", "name": "LABEL 4x3", "avg_monthly": 1.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C006", "name": "LABEL 4x3 (CUT)", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C007", "name": "LABEL 4x6", "avg_monthly": 1.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C008", "name": "Ribbon", "avg_monthly": 0.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C009", "name": "Sticker ขาวด้าน", "avg_monthly": 4.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C010", "name": "Sticker PVC ใส", "avg_monthly": 1.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C011", "name": "Bubble", "avg_monthly": 1.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C012", "name": "Sticker PVC ใส BULK", "avg_monthly": 6.0, "safety_stock": 2, "reorder_point": 4, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C013", "name": "Shock watch", "avg_monthly": 0, "safety_stock": 0, "reorder_point": 0, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C014", "name": "ฟิมล์ยืดม้วนใหญ่", "avg_monthly": 4.7, "safety_stock": 1, "reorder_point": 3, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C015", "name": "ฟิมล์ยืดม้วนเล็ก", "avg_monthly": 23.3, "safety_stock": 5, "reorder_point": 11, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C016", "name": "พลาสติกคลุมพาเลท", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C017", "name": "สายรัดพลาสติก", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C018", "name": "พาเลทพลาสติก", "avg_monthly": 19.3, "safety_stock": 4, "reorder_point": 9, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C019", "name": "Air bag (25/1CTN)", "avg_monthly": 4.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-C020", "name": "เทปใส2นิ้ว", "avg_monthly": 17.7, "safety_stock": 4, "reorder_point": 9, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B001", "name": "ทิชชู่ม้วนใหญ่", "avg_monthly": 16.7, "safety_stock": 4, "reorder_point": 8, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B002", "name": "กรวยน้ำ", "avg_monthly": 15.0, "safety_stock": 3, "reorder_point": 7, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B003", "name": "ถุงขยะดำขนาด 18x20", "avg_monthly": 0.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B004", "name": "ถุงขยะดำขนาด24x28", "avg_monthly": 2.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B005", "name": "ถุงขยะดำขนาด 30x40", "avg_monthly": 2.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B006", "name": "น้ำยาล้างจาน", "avg_monthly": 0.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B007", "name": "น้ำยาดันฝุ่น", "avg_monthly": 2.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B008", "name": "กาแฟกล่อง", "avg_monthly": 2.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B009", "name": "น้ำตาลทราย", "avg_monthly": 1.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B010", "name": "ครีมเทียม", "avg_monthly": 0.7, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B011", "name": "กระดาษทิชชู่สำหรับเช็ดโต๊ะ", "avg_monthly": 3.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B012", "name": "กระดาษทิชชู่สำหรับเช็ดหน้า", "avg_monthly": 4.7, "safety_stock": 1, "reorder_point": 3, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B013", "name": "น้ำยาล้างมือ", "avg_monthly": 0.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B014", "name": "เมล็ดกาแฟ", "avg_monthly": 1.3, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A051", "name": "แผ่นเคลือบกระดาษ ขนาด A4", "avg_monthly": 0, "safety_stock": 0, "reorder_point": 0, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-B015", "name": "น้ำยาฆ่าเชื้อ ขนาด 1 ลิตร ( Dettol)", "avg_monthly": 0, "safety_stock": 0, "reorder_point": 0, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A052", "name": "ปากกาไวท์บอร์ด (น้ำตาลอ่อน)", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A053", "name": "ปากกาไวท์บอร์ด (ฟ้า)", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A054", "name": "ปากกาไวท์บอร์ด (ชมพู)", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}, {"sku": "RAPO-A055", "name": "กระดาษ A5", "avg_monthly": 1.0, "safety_stock": 1, "reorder_point": 2, "min_stock": 0, "max_stock": 0}];
+var FB = {
+  apiKey:"AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
+  authDomain:"rapo-system.firebaseapp.com",
+  projectId:"rapo-system",
+  storageBucket:"rapo-system.firebasestorage.app",
+  messagingSenderId:"87090183469",
+  appId:"1:87090183469:web:eafb1ded183755f329a7a4"
+};
+firebase.initializeApp(FB);
+var auth=firebase.auth(), db=firebase.firestore();
+
+auth.onAuthStateChanged(function(user){
+  var box=document.getElementById('auth-box'), btn=document.getElementById('btn');
+  if(user){box.className='auth-ok';box.textContent='Login: '+user.email+' — พร้อม';btn.disabled=false;}
+  else{box.className='auth-no';box.textContent='ยังไม่ได้ Login — เปิด stock.html login ก่อน';btn.disabled=true;}
+});
+
+function log(msg,cls){
+  var a=document.getElementById('log-area'),d=document.createElement('div');
+  d.className=cls||'log-info';d.textContent='['+new Date().toLocaleTimeString('th-TH')+'] '+msg;
+  a.appendChild(d);a.scrollTop=a.scrollHeight;
+}
+
+var running=false;
+function startUpdate(){
+  if(running)return;
+  running=true;
+  document.getElementById('btn').disabled=true;
+  document.getElementById('btn').textContent='กำลังอัปเดต...';
+  var total=UPDATES.length, done=0, errs=0;
+  log('เริ่มอัปเดต '+total+' สินค้า...','log-info');
+
+  // ค้นหา document id จาก sku แล้วอัปเดต
+  function doOne(i){
+    if(i>=total){
+      log('เสร็จ! อัปเดต '+done+'/'+total+' (error '+errs+')', done>0?'log-ok':'log-err');
+      document.getElementById('prog').style.background='#16a34a';
+      document.getElementById('prog-text').textContent='✅ เสร็จ '+done+'/'+total;
+      document.getElementById('btn').textContent='✅ เสร็จแล้ว';
+      document.getElementById('final-msg').innerHTML='กลับไปดูที่ <a href="stock.html" style="color:#002048;font-weight:700">stock.html</a> แล้ว refresh';
+      running=false;return;
+    }
+    var u=UPDATES[i];
+    db.collection('stock_products').where('sku','==',u.sku).get().then(function(snap){
+      if(snap.empty){log('ไม่พบ SKU: '+u.sku,'log-err');errs++;doOne(i+1);return;}
+      snap.docs[0].ref.update({
+        avg_monthly: u.avg_monthly,
+        safety_stock: u.safety_stock,
+        reorder_point: u.reorder_point,
+        min_stock: 0,
+        max_stock: 0,
+      }).then(function(){
+        done++;
+        var pct=Math.round(done/total*100);
+        document.getElementById('prog').style.width=pct+'%';
+        document.getElementById('prog-text').textContent=done+'/'+total+' ('+pct+'%)';
+        if(done%10===0||done===1) log(u.name+': avg='+u.avg_monthly+' safety='+u.safety_stock,'log-ok');
+        doOne(i+1);
+      }).catch(function(e){log('Error '+u.sku+': '+e.message,'log-err');errs++;doOne(i+1);});
+    }).catch(function(e){log('Query error: '+e.message,'log-err');errs++;doOne(i+1);});
+  }
+  doOne(0);
+}
+</script>
+</body>
+</html>
