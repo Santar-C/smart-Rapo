@@ -756,11 +756,20 @@ function renderList(){
       <td style="color:var(--purple);font-weight:700">${p.moq??'—'}</td>
       <td>${stockBar(p)}</td>
       <td>${statusBadge(p)}</td>
-      <td style="text-align:center;min-width:70px">
-        ${needOrder ? `<div style="background:#991b1b;color:#fff;border-radius:8px;
-            padding:.25rem .6rem;font-weight:900;font-size:.82rem;display:inline-block">
-            ${oQty}<span style="font-size:.65rem;opacity:.8;margin-left:2px">${p.unit??''}</span>
-          </div>` : '<span style="color:#cbd5e1;font-size:.75rem">—</span>'}
+      <td style="text-align:center;min-width:80px">
+        ${needOrder
+          ? `<div style="background:#991b1b;color:#fff;border-radius:8px;
+              padding:.3rem .7rem;font-weight:900;font-size:.85rem;display:inline-block;
+              box-shadow:0 2px 6px rgba(153,27,27,.35)">
+              ${oQty}
+              <span style="font-size:.65rem;opacity:.85;margin-left:2px">${p.unit??''}</span>
+             </div>`
+          : `<div style="color:#94a3b8;font-size:.78rem;
+              border:1px dashed #e2e8f0;border-radius:6px;padding:.2rem .55rem;
+              display:inline-block" title="จำนวนแนะนำสั่งครั้งต่อไป">
+              ${oQty}
+              <span style="font-size:.65rem;margin-left:1px">${p.unit??''}</span>
+             </div>`}
       </td>
       <td><span class="badge ${mv.cls}">${mv.label}</span></td>
       <td>${adminBtn}</td>
