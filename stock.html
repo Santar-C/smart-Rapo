@@ -934,8 +934,8 @@ function renderAll(){
 window.calcPreview = function(){
   const monthly = parseFloat(document.getElementById('m-monthly').value) || 0;
   const lead    = parseInt(document.getElementById('m-lead').value)      || 7;
-  const safetyInput = parseInt(document.getElementById('m-safety').value) || 0;
-  const safety  = safetyInput > 0 ? safetyInput : Math.ceil(monthly * 0.2);
+  // Safety Stock = Auto ROUNDUP(avg_monthly × 20%, 0)
+  const safety = Math.ceil(monthly * 0.2);
   const moq     = parseInt(document.getElementById('m-moq').value)       || 1;
   const daily   = monthly / 30;
   const rp      = Math.ceil(daily * lead + safety);
@@ -1099,7 +1099,7 @@ window.editP = function(id){
   document.getElementById('m-qty').value       = p.qty??0;
   document.getElementById('m-monthly').value   = p.avg_monthly??0;
   document.getElementById('m-lead').value      = p.lead_time_days??15;
-  document.getElementById('m-safety').value    = p.safety_stock??0;
+  // safety = Auto
   document.getElementById('m-moq').value       = p.moq??1;
   document.getElementById('m-min').value       = p.min_stock??0;
   document.getElementById('m-max').value       = p.max_stock??0;
@@ -1117,7 +1117,7 @@ window.deleteP = async function(id, name){
 };
 
 window.clearForm = function(){
-  ['m-sku','m-name','m-unit','m-location','m-qty','m-monthly','m-lead','m-safety',
+  ['m-sku','m-name','m-unit','m-location','m-qty','m-monthly','m-lead',
    'm-moq','m-min','m-max','m-dead','m-supplier','m-edit-id'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
@@ -1270,8 +1270,7 @@ function computeAvgMonthly(logs, products){
     p._avg_monthly_computed = avg; // เก็บค่าที่คำนวณไว้ใน field พิเศษ
     // ใช้ค่าที่คำนวณได้ถ้ายังไม่ได้กรอกเอง (avg_monthly === 0)
     if((p.avg_monthly ?? 0) === 0) p.avg_monthly = avg;
-    // Safety: ถ้ายังไม่กรอกเอง auto = ROUNDUP(avg × 0.2)
-    if((p.safety_stock ?? 0) === 0) p.safety_stock = Math.ceil(avg * 0.2);
+    p.safety_stock = Math.ceil(avg * 0.2); // Auto เสมอ
   });
 
   return months;
