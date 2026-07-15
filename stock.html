@@ -255,9 +255,9 @@
       <div style="background:#f0f9ff;border-left:3px solid #002048;padding:.75rem .9rem;border-radius:0 8px 8px 0">
         <div style="font-weight:700;font-size:.82rem;color:#002048;margin-bottom:.35rem">📋 ค่าเฉลี่ยใช้/เดือน (avg_monthly)</div>
         <div style="font-size:.78rem;color:#475569;line-height:1.7">
-          <b>ที่มา:</b> Manual — Admin กรอกเอง<br>
-          <b>วิธีคิด:</b> ดูจาก Transaction Out ย้อนหลัง 3-6 เดือน หารจำนวนเดือน<br>
-          <b>ใช้ใน:</b> คำนวณ Reorder Point และ Moving Status
+          <b>ที่มา:</b> 🧮 Auto — คำนวณจาก Transaction OUT จริง<br>
+          <b>สูตร:</b> sum(qty OUT ย้อนหลัง 3 เดือน) ÷ จำนวนเดือนที่มีข้อมูล<br>
+          <b>อัปเดต:</b> ทุกครั้งที่เปิดหน้า stock.html อัตโนมัติ
         </div>
       </div>
 
@@ -273,8 +273,8 @@
       <div style="background:#f0f9ff;border-left:3px solid #0284c7;padding:.75rem .9rem;border-radius:0 8px 8px 0">
         <div style="font-weight:700;font-size:.82rem;color:#0284c7;margin-bottom:.35rem">📋 Safety Stock</div>
         <div style="font-size:.78rem;color:#475569;line-height:1.7">
-          <b>ที่มา:</b> Manual — Admin กำหนดตามความเสี่ยง<br>
-          <b>แนวทาง:</b> avg_daily × จำนวนวัน buffer ที่รับได้<br>
+          <b>ที่มา:</b> 🧮 Auto — คำนวณอัตโนมัติ ไม่กรอกเอง<br>
+          <b>สูตร:</b> ROUNDUP(avg_monthly × 20%, 0)<br>
           <b>ความหมาย:</b> สต็อกกันฉุกเฉิน ถ้าต่ำกว่านี้ = วิกฤตสีแดง
         </div>
       </div>
