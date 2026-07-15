@@ -643,21 +643,18 @@ function movingStatus(p){
 
 // Stock Status
 function getStatus(p){
-  const q = p.qty ?? 0;
+  const q  = p.qty ?? 0;
   if(q <= 0) return 'out';
-  const rp  = calcRP(p);
-  const min = calcMin(p);
-  const ss  = p.safety_stock ?? 0;
-  if(q <= ss)  return 'low';       // ต่ำกว่า safety = วิกฤต
-  if(q <= rp)  return 'reorder';   // ถึงจุดสั่งซื้อ
-  if(q <= min) return 'low';
-  const max = calcMax(p);
-  if(max > 0 && q > max) return 'overstock';
-  // Dead stock — เช็คเฉพาะสินค้าที่เคยมี avg_monthly > 0
-  // (สินค้าที่ยังไม่กรอก avg_monthly จะไม่ถูก flag เป็น dead)
+  const ss  = calcSafety(p);   // Min = Safety = พื้น
+  const rp  = calcRP(p);       // Reorder Point = จุดสั่ง
+  const max = calcMax(p);      // Max = เพดาน
+  if(q <= ss)           return 'low';       // ต่ำกว่า Safety = วิกฤต (แดง)
+  if(q <= rp)           return 'reorder';   // อยู่ระหว่าง Safety-RP = ควรสั่ง (ส้ม)
+  if(max > 0 && q > max) return 'overstock'; // เกิน Max = มากเกิน (ม่วง)
+  // Dead stock
   if((p.avg_monthly ?? 0) > 0 && p.last_movement){
     const lm = p.last_movement.toDate ? p.last_movement.toDate() : new Date(p.last_movement);
-    if((Date.now() - lm.getTime())/86400000 > (p.dead_stock_days ?? 90)) return 'dead';
+    if((Date.now()-lm.getTime())/86400000 > (p.dead_stock_days??90)) return 'dead';
   }
   return 'ok';
 }
@@ -699,7 +696,8 @@ function renderStats(){
   const cnt={ok:0,low:0,reorder:0,out:0,dead:0,overstock:0};
   allProducts.forEach(p=>{ const s=getStatus(p); cnt[s]=(cnt[s]||0)+1; });
   document.getElementById('sv-all').textContent     = allProducts.length;
-  document.getElementById('sv-ok').textContent      = cnt.ok;
+  // ปกติ = ok + overstock (สต็อกมีเพียงพอ)
+  document.getElementById('sv-ok').textContent      = cnt.ok + cnt.overstock;
   document.getElementById('sv-reorder').textContent = cnt.reorder;
   document.getElementById('sv-low').textContent     = cnt.low + cnt.out;
   document.getElementById('sv-out').textContent     = cnt.out;
@@ -725,14 +723,20 @@ function renderList(){
   if(!data.length){ tbody.innerHTML=''; noDiv.style.display='block'; return; }
   noDiv.style.display='none';
   tbody.innerHTML = data.map(p=>{
-    const rp  = calcRP(p);
-    const min = calcMin(p);
-    const max = calcMax(p);
-    const mv  = movingStatus(p);
+    const rp       = calcRP(p);
+    const min      = calcMin(p);
+    const max      = calcMax(p);
+    const mv       = movingStatus(p);
+    const oQty     = calcOrderQty(p);
+    const st       = getStatus(p);
+    const needOrder = ['out','low','reorder'].includes(st);
+    const rowBg    = st==='out'     ? 'background:#fff5f5' :
+                     st==='low'     ? 'background:#fff9f0' :
+                     st==='reorder' ? 'background:#fffef0' : '';
     const adminBtn = currentRole==='admin' ?
       `<button class="btn btn-ghost btn-sm" onclick="window.editP('${p.id}')">✏️</button>
        <button class="btn btn-ghost btn-sm" onclick="window.deleteP('${p.id}','${p.name.replace(/'/g,'')}')" style="color:var(--red)">🗑️</button>` : '';
-    return `<tr>
+    return `<tr style="${rowBg}">
       <td style="font-weight:600">${p.name}</td>
       <td class="sku-cell">${p.sku}</td>
       <td>${p.unit??'—'}</td>
@@ -752,6 +756,12 @@ function renderList(){
       <td style="color:var(--purple);font-weight:700">${p.moq??'—'}</td>
       <td>${stockBar(p)}</td>
       <td>${statusBadge(p)}</td>
+      <td style="text-align:center;min-width:70px">
+        ${needOrder ? `<div style="background:#991b1b;color:#fff;border-radius:8px;
+            padding:.25rem .6rem;font-weight:900;font-size:.82rem;display:inline-block">
+            ${oQty}<span style="font-size:.65rem;opacity:.8;margin-left:2px">${p.unit??''}</span>
+          </div>` : '<span style="color:#cbd5e1;font-size:.75rem">—</span>'}
+      </td>
       <td><span class="badge ${mv.cls}">${mv.label}</span></td>
       <td>${adminBtn}</td>
     </tr>`;
