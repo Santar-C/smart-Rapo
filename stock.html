@@ -733,7 +733,11 @@ function renderList(){
       <td><span style="background:#f1f5f9;padding:.15rem .5rem;border-radius:6px;font-size:.72rem;font-weight:700">${p.category??'—'}</span></td>
       <td style="font-size:.75rem;color:var(--gray)">${p.location??'—'}</td>
       <td><b style="font-size:1rem">${p.qty??0}</b></td>
-      <td style="color:var(--gray)">${(p.avg_monthly??0).toFixed(1)}</td>
+      <td style="color:var(--gray)">
+        ${p._avg_monthly_computed !== undefined
+          ? `<span title="คำนวณจาก Transaction OUT จริง" style="color:var(--green)">${(p.avg_monthly??0).toFixed(1)}</span>`
+          : `<span title="กรอกเอง" style="color:var(--sky)">${(p.avg_monthly??0).toFixed(1)}</span>`}
+      </td>
       <td style="color:var(--sky);font-weight:700">${p.lead_time_days??'—'}</td>
       <td style="color:var(--sky);font-weight:700">${p.safety_stock??0}</td>
       <td style="color:var(--amber);font-weight:700">${rp}</td>
@@ -1198,20 +1202,82 @@ function toast(msg){ const el=document.getElementById('toast'); el.textContent=m
 // ══════════════════════════════════
 // FIREBASE
 // ══════════════════════════════════
+// ════════════════════════════════════════════════════
+// คำนวณ avg_monthly real-time จาก stock_logs จริง
+// ย้อนหลัง 3 เดือน → inject เข้า allProducts ทุกครั้ง
+// ════════════════════════════════════════════════════
+function computeAvgMonthly(logs, products){
+  const now      = new Date();
+  const cutoff   = new Date(now.getFullYear(), now.getMonth()-3, 1); // 3 เดือนที่แล้ว
+  const outLogs  = logs.filter(l=>{
+    if(l.type !== 'OUT') return false;
+    let d = null;
+    if(l.ts?.toDate)        d = l.ts.toDate();
+    else if(l.ts_import?.toDate) d = l.ts_import.toDate();
+    else if(l.date)         d = new Date(l.date+'T00:00:00');
+    return d && d >= cutoff;
+  });
+
+  // รวม qty OUT per ชื่อสินค้า
+  const sumByName = {};
+  outLogs.forEach(l=>{
+    const k = l.name ?? l.sku ?? '';
+    if(!k) return;
+    sumByName[k] = (sumByName[k]||0) + (l.qty??0);
+  });
+
+  // หาจำนวนเดือนจริงที่มีข้อมูล (1-3)
+  const monthsWithData = new Set();
+  outLogs.forEach(l=>{
+    let d = null;
+    if(l.ts?.toDate) d=l.ts.toDate();
+    else if(l.ts_import?.toDate) d=l.ts_import.toDate();
+    else if(l.date) d=new Date(l.date+'T00:00:00');
+    if(d) monthsWithData.add(d.getFullYear()+'-'+d.getMonth());
+  });
+  const months = Math.max(1, monthsWithData.size);
+
+  // inject avg_monthly และ safety_stock เข้า products
+  products.forEach(p=>{
+    const name = p.name ?? '';
+    const totalOut = sumByName[name] ?? 0;
+    const avg = Math.round((totalOut / months) * 10) / 10; // 1 decimal
+    p._avg_monthly_computed = avg; // เก็บค่าที่คำนวณไว้ใน field พิเศษ
+    // ใช้ค่าที่คำนวณได้ถ้ายังไม่ได้กรอกเอง (avg_monthly === 0)
+    if((p.avg_monthly ?? 0) === 0) p.avg_monthly = avg;
+    // Safety: ถ้ายังไม่กรอกเอง auto = ROUNDUP(avg × 0.2)
+    if((p.safety_stock ?? 0) === 0) p.safety_stock = Math.ceil(avg * 0.2);
+  });
+
+  return months;
+}
+
 function startListeners(){
   const qP = query(collection(db, COL_PRODUCTS), orderBy('sku'));
-  onSnapshot(qP, snap=>{ allProducts=snap.docs.map(d=>({id:d.id,...d.data()})); renderAll(); });
+  const qL  = query(collection(db, COL_LOGS), limit(3000));
 
-  // ดึง stock_logs ทั้งหมดโดยไม่ใช้ orderBy เพื่อ return ทุก document
-  // (Firestore จะข้าม documents ที่ไม่มี field ที่ใช้ใน orderBy)
-  // แล้ว sort และ filter ใน JS แทน
-  // ดึง logs ล่าสุด 2000 records โดยไม่ใช้ orderBy
-  // เพื่อให้ได้ทุก document ไม่ว่าจะมี field อะไร
-  const qL = query(collection(db, COL_LOGS), limit(2000));
+  // ใช้ Promise.all รอทั้งสองมาถึงพร้อมกันก่อน render ครั้งแรก
+  let productsReady = false, logsReady = false;
+  let pendingProducts = [], pendingLogs = [];
+
+  function tryRender(){
+    if(!productsReady || !logsReady) return;
+    const months = computeAvgMonthly(allLogs, allProducts);
+    console.log(`avg_monthly computed from ${months} months of logs`);
+    renderAll();
+  }
+
+  onSnapshot(qP, snap=>{
+    allProducts = snap.docs.map(d=>({id:d.id,...d.data()}));
+    productsReady = true;
+    if(logsReady){ computeAvgMonthly(allLogs, allProducts); renderAll(); }
+    else tryRender();
+  });
+
   onSnapshot(qL, snap=>{
     allLogs = snap.docs.map(d=>({id:d.id,...d.data()}));
     allLogs.sort((a,b)=>{
-      const getTime = r=>{
+      const getTime=r=>{
         if(r.ts?.toDate)        return r.ts.toDate().getTime();
         if(r.ts_import?.toDate) return r.ts_import.toDate().getTime();
         if(r.date)              return new Date(r.date+'T00:00:00').getTime();
@@ -1219,8 +1285,11 @@ function startListeners(){
       };
       return getTime(b)-getTime(a);
     });
+    logsReady = true;
     renderLog();
-  }, err=>console.warn('stock_logs listener error:', err.message));
+    if(productsReady){ computeAvgMonthly(allLogs, allProducts); renderAll(); }
+    else tryRender();
+  }, err=>console.warn('stock_logs:', err.message));
 }
 
 // ══════════════════════════════════
