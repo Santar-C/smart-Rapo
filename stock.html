@@ -923,7 +923,7 @@ window.calcPreview = function(){
     <div class="calc-row"><span>Max Point</span><span>${maxCalc}</span></div>
     <div class="calc-row"><span>แนะนำสั่งซื้อ (2×lead+safety)</span><span style="color:var(--red);font-weight:700"><b>${oQty}</b></span></div>`;
   document.getElementById('calc-formula').textContent =
-    \`สูตร: safety=${safety} | RP=(${daily.toFixed(2)}×${lead})+${safety}=${rp} | สั่ง=(${daily.toFixed(2)}×${lead}×2)+${safety}=${needed}→ปัด×${moq}=${oQty}\`;
+    `สูตร: safety=${safety} | RP=(${daily.toFixed(2)}×${lead})+${safety}=${rp} | สั่ง=(${daily.toFixed(2)}×${lead}×2)+${safety}=${needed}→ปัด×${moq}=${oQty}`;
 };
 
 // ══════════════════════════════════
