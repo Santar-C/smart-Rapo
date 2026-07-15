@@ -582,16 +582,19 @@ function calcRP(p){
   return Math.ceil(avgDaily(p) * (p.lead_time_days ?? 7) + calcSafety(p));
 }
 
-// Min Stock = Reorder Point (จุดแจ้งเตือนสีส้ม)
+// Min Stock = Safety Stock (สต็อกขั้นต่ำที่ยอมรับได้ก่อนวิกฤต)
+// ≠ Reorder Point — Min คือพื้น RP คือจุดกดสั่ง
+// ตัวอย่าง: safety=30 → Min=30 | RP=180 → สั่งตั้งแต่เหลือ 180 ไม่ใช่ 30
 function calcMin(p){
   if((p.min_stock ?? 0) > 0) return p.min_stock;
-  return calcRP(p);
+  return calcSafety(p); // Min = Safety Stock
 }
 
-// Max Stock = Min + (avg_daily × lead_time)  [เติมเผื่อ 1 รอบ lead time]
+// Max Stock = Reorder Point + (avg_daily × lead_time)
+// = เติมให้พอใช้ 1 รอบ lead time หลังของมาถึง
 function calcMax(p){
   if((p.max_stock ?? 0) > 0) return p.max_stock;
-  return Math.ceil(calcMin(p) + avgDaily(p) * (p.lead_time_days ?? 7));
+  return Math.ceil(calcRP(p) + avgDaily(p) * (p.lead_time_days ?? 7));
 }
 // จำนวนที่ควรสั่ง = cover Lead Time + Safety (ไม่ดูจาก Max Point)
 // สูตร: ROUNDUP((avg_daily × lead_time × 2) + safety - qty, 0) แล้วปัดเป็น × MOQ
@@ -704,9 +707,12 @@ function renderStats(){
   const alertN = cnt.reorder + cnt.low + cnt.out;
   const banner = document.getElementById('alert-banner');
   if(alertN > 0){
+    const totalOrder = allProducts
+      .filter(p=>['out','low','reorder'].includes(getStatus(p)))
+      .reduce((s,p)=>s+calcOrderQty(p), 0);
     banner.style.display = 'block';
     document.getElementById('alert-text').textContent =
-      `มีสินค้า ${alertN} รายการที่ต้องดำเนินการ (หมด/ควรสั่ง/ต่ำกว่า Safety)`;
+      `มี ${alertN} รายการถึงจุดสั่งซื้อ — รวมต้องสั่งทั้งหมด ${totalOrder.toLocaleString()} หน่วย — คลิกดูรายละเอียด`;
   } else { banner.style.display='none'; }
 }
 
