@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared.css">
   <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <style>
     .job-card { border:1.5px solid var(--border); border-radius:12px; padding:1rem; background:white; transition:all 0.2s; }
     .job-card.counting  { border-color:var(--indigo); }
@@ -110,16 +111,32 @@
         </div>
       </div>
 
-      <!-- ═══ สรุปตามพนักงาน ═══ -->
+      <!-- ═══ แนวโน้มข้ามรอบ ═══ -->
+      <div class="card">
+        <div style="font-weight:800;color:var(--blue);margin-bottom:0.6rem;">📈 แนวโน้มความแม่นยำข้ามรอบ</div>
+        <div style="position:relative;height:220px;"><canvas id="trend-chart"></canvas></div>
+      </div>
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="sec-head">
-          <span class="sec-title">👤 สรุปผลงานพนักงาน (รอบที่เลือก)</span>
-          <span style="font-size:0.75rem;color:var(--gray);">เวลาที่ใช้ = ผลรวม (จบนับ − เริ่มนับ) ของงานที่เสร็จแล้ว</span>
+          <span class="sec-title">🔁 Location ที่มีปัญหาซ้ำๆ (Chronic Problem Spots)</span>
+          <span style="font-size:0.75rem;color:var(--gray);">มี Short/Over ตั้งแต่ 2 รอบขึ้นไป</span>
+        </div>
+        <div id="chronic-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">กำลังคำนวณ...</div></div>
+      </div>
+
+      <!-- ═══ สรุปตามพนักงาน / Leaderboard ═══ -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="sec-head">
+          <span class="sec-title">🏆 สรุปผลงาน & Leaderboard (รอบที่เลือก)</span>
+        </div>
+        <div class="alert alert-info" style="margin:0.75rem 1.25rem 0;font-size:0.78rem;">
+          จัดอันดับตาม <b>ความแม่นยำ (%)</b> เป็นหลัก ไม่ใช่ความเร็ว — เพื่อไม่ให้กดดันจนรีบนับจนพลาด
+          &nbsp;|&nbsp; เวลาที่ใช้ = ผลรวม (จบนับ − เริ่มนับ) ของงานที่เสร็จแล้ว
         </div>
         <div class="table-wrap" style="border:none;border-radius:0;">
           <table>
-            <thead><tr><th>พนักงาน</th><th>Location ที่นับเสร็จ</th><th>จำนวนชิ้น/tag รวม</th><th>เวลารวมที่ใช้</th><th>เฉลี่ย/โล</th><th>ขาด</th><th>เกิน</th></tr></thead>
-            <tbody id="tag-staff-tbody"><tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+            <thead><tr><th>#</th><th>พนักงาน</th><th>ความแม่นยำ</th><th>Location เสร็จ</th><th>จำนวนชิ้น/tag รวม</th><th>เวลารวมที่ใช้</th><th>เฉลี่ย/โล</th><th>ขาด</th><th>เกิน</th></tr></thead>
+            <tbody id="tag-staff-tbody"><tr><td colspan="9" style="text-align:center;padding:1.5rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -140,6 +157,15 @@
         <div id="tag-table" style="max-height:480px;overflow-y:auto;"></div>
       </div>
 
+      <!-- ═══ Reconciliation: ตรวจ Short/Over + ระบุสาเหตุ ═══ -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="sec-head">
+          <span class="sec-title">🔍 Reconciliation — ตรวจสอบ Short/Over (รอบปัจจุบัน)</span>
+          <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;"><input type="checkbox" id="tag-recon-hide-reviewed" checked> ซ่อนที่ตรวจแล้ว</label>
+        </div>
+        <div id="tag-recon-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการต้องตรวจ</div></div>
+      </div>
+
       <!-- ═══ ประวัติ/Transactions ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="sec-head">
@@ -158,7 +184,7 @@
       <div class="card" style="text-align:center;">
         <div style="font-weight:700;color:var(--blue);margin-bottom:0.6rem;">⬇️ Export Excel — ครบทุกอย่างในไฟล์เดียว</div>
         <div style="font-size:0.78rem;color:var(--gray);margin-bottom:0.85rem;">
-          Coverage · สรุปตามโซน · สรุปพนักงาน · ประวัติ/Transactions (รอบที่เลือก) · Master + Status
+          Coverage · สรุปตามโซน · สรุปพนักงาน · ประวัติ/Transactions (รอบที่เลือก) · Master + Status · Reconciliation
         </div>
         <button class="btn btn-primary" id="btn-export-tag-xlsx" style="padding:0.75rem 2rem;">📥 Export Excel ทั้งหมด</button>
       </div>
@@ -650,22 +676,28 @@
     const staffMap = {};
     selJobs.forEach(j => {
       const name = j.created_name || "(ไม่ระบุชื่อ)";
-      if (!staffMap[name]) staffMap[name] = { name, locCount:0, itemCount:0, totalMs:0, shortSum:0, overSum:0 };
+      if (!staffMap[name]) staffMap[name] = { name, locCount:0, okCount:0, itemCount:0, totalMs:0, shortSum:0, overSum:0 };
       if (j.count_status === "Completed") {
         const s = staffMap[name];
         s.locCount++;
+        if ((j.short_count||0)===0 && (j.over_count||0)===0) s.okCount++;
         s.itemCount += (j.matched_count||0);
         s.shortSum  += (j.short_count||0);
         s.overSum   += (j.over_count||0);
         if (j.start_time?.toDate && j.end_time?.toDate) s.totalMs += (j.end_time.toDate() - j.start_time.toDate());
       }
     });
-    const staffRows = Object.values(staffMap).sort((a,b)=>b.locCount-a.locCount);
+    // จัดอันดับตามความแม่นยำ (%) เป็นหลัก แล้วค่อยดูจำนวนที่นับ (ไม่จัดตามความเร็ว โดยเจตนา)
+    const staffRows = Object.values(staffMap).map(s => ({...s, accuracy: s.locCount ? Math.round((s.okCount/s.locCount)*100) : 0}))
+      .sort((a,b) => b.accuracy - a.accuracy || b.locCount - a.locCount);
+    const medals = ["🥇","🥈","🥉"];
     const staffTbody = document.getElementById("tag-staff-tbody");
     if (staffTbody) {
-      staffTbody.innerHTML = staffRows.length ? staffRows.map(s => `
+      staffTbody.innerHTML = staffRows.length ? staffRows.map((s,i) => `
         <tr>
+          <td style="font-weight:900;">${medals[i]||i+1}</td>
           <td style="font-weight:700;">${s.name}</td>
+          <td style="font-weight:700;color:${s.accuracy>=95?'var(--green)':s.accuracy>=80?'var(--amber)':'var(--red)'};">${s.accuracy}%</td>
           <td>${s.locCount}</td>
           <td>${s.itemCount}</td>
           <td>${fmtDuration(s.totalMs)}</td>
@@ -673,7 +705,7 @@
           <td style="${s.shortSum>0?'color:var(--amber);font-weight:700;':''}">${s.shortSum||"—"}</td>
           <td style="${s.overSum>0?'color:var(--red);font-weight:700;':''}">${s.overSum||"—"}</td>
         </tr>
-      `).join("") : `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่พบข้อมูลในรอบนี้</td></tr>`;
+      `).join("") : `<tr><td colspan="9" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่พบข้อมูลในรอบนี้</td></tr>`;
     }
 
     // ── ประวัติ/Transactions (รอบที่เลือก) ──────────────────
@@ -706,12 +738,98 @@
       }).join("") : `<tr><td colspan="10" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่พบข้อมูลในรอบนี้</td></tr>`;
     }
 
+    // ── Reconciliation: Short/Over ในรอบปัจจุบันที่ยังไม่ได้ตรวจ ─
+    const reconJobs = curJobs.filter(j => j.count_status==="Completed" && ((j.short_count||0)>0 || (j.over_count||0)>0));
+    renderReconciliation(reconJobs);
+
+    renderTrend();
+
     window._tagRowsData  = rowsData;
     window._tagZoneRows  = zoneRows;
     window._tagStaffRows = staffRows;
     window._tagLogRows   = logRows;
+    window._tagReconJobs = reconJobs;
   }
   document.getElementById("tag-log-search")?.addEventListener("input", () => renderTagMonitor());
+
+  function renderTrend() {
+    const sorted = [...allRounds].sort((a,b) => {
+      const ta = a.started_at?.toDate ? a.started_at.toDate().getTime() : 0;
+      const tb = b.started_at?.toDate ? b.started_at.toDate().getTime() : 0;
+      return ta - tb;
+    });
+    const labels = [], accuracyData = [];
+    sorted.forEach(r => {
+      const jobs = tagJobs.filter(j=>j.round_id===r.round_id && j.count_status==="Completed");
+      labels.push(r.round_label || r.round_id);
+      if (!jobs.length) { accuracyData.push(null); return; }
+      const okCount = jobs.filter(j=>(j.short_count||0)===0 && (j.over_count||0)===0).length;
+      accuracyData.push(Math.round((okCount/jobs.length)*100));
+    });
+
+    const canvas = document.getElementById("trend-chart");
+    if (canvas && window.Chart) {
+      if (window._trendChartInstance) window._trendChartInstance.destroy();
+      window._trendChartInstance = new Chart(canvas, {
+        type: 'line',
+        data: { labels, datasets: [{ label:'ความแม่นยำ (%)', data: accuracyData, borderColor:'#4338ca', backgroundColor:'rgba(67,56,202,0.15)', fill:true, tension:0.3, spanGaps:true, pointRadius:4 }] },
+        options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ min:0, max:100, ticks:{callback:v=>v+'%'} } }, plugins:{legend:{display:false}} }
+      });
+    }
+
+    // Chronic problem locations: มีปัญหาในหลายรอบ (นับจากทุกรอบที่เคยเก็บ ไม่ใช่แค่รอบปัจจุบัน)
+    const locRoundDiff = {};
+    tagJobs.forEach(j => {
+      if (j.count_status==="Completed" && ((j.short_count||0)>0 || (j.over_count||0)>0) && j.round_id) {
+        if (!locRoundDiff[j.location_scan]) locRoundDiff[j.location_scan] = new Set();
+        locRoundDiff[j.location_scan].add(j.round_id);
+      }
+    });
+    const chronic = Object.entries(locRoundDiff).filter(([,set])=>set.size>=2)
+      .map(([loc,set])=>({loc, count:set.size})).sort((a,b)=>b.count-a.count);
+    const chronicEl = document.getElementById("chronic-list");
+    if (chronicEl) {
+      chronicEl.innerHTML = chronic.length ? chronic.map(c => `
+        <div style="display:flex;justify-content:space-between;padding:0.55rem 0.85rem;border-bottom:1px solid var(--border);font-size:0.85rem;">
+          <span style="font-weight:700;font-family:monospace;">${c.loc}</span>
+          <span style="color:var(--red);font-weight:700;">มีปัญหา ${c.count} รอบ</span>
+        </div>
+      `).join("") : `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ยังไม่พบ location ที่มีปัญหาซ้ำ 🎉</div>`;
+    }
+  }
+
+  const RECON_REASONS = ["ของหาย","วางผิด Location","เอกสาร/Waybill ผิด","รอ QC","ของเกินจากรอบก่อน","อื่นๆ"];
+
+  function renderReconciliation(jobs) {
+    const el = document.getElementById("tag-recon-list");
+    if (!el) return;
+    const hideReviewed = document.getElementById("tag-recon-hide-reviewed")?.checked;
+    const list = hideReviewed ? jobs.filter(j=>!j.reviewed) : jobs;
+    if (!list.length) { el.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการต้องตรวจ 🎉</div>`; return; }
+    el.innerHTML = list.map(j => `
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.85rem;border-bottom:1px solid var(--border);font-size:0.85rem;flex-wrap:wrap;${j.reviewed?'opacity:0.55;':''}">
+        <span style="font-weight:700;font-family:monospace;min-width:90px;">${j.location_scan}</span>
+        <span>${j.created_name||"—"}</span>
+        ${j.short_count>0?`<span style="color:var(--amber);font-weight:700;">ขาด ${j.short_count}</span>`:""}
+        ${j.over_count>0?`<span style="color:var(--red);font-weight:700;">เกิน ${j.over_count}</span>`:""}
+        <select id="recon-reason-${j.id}" style="padding:0.3rem 0.5rem;border:1.5px solid var(--border);border-radius:6px;font-size:0.78rem;" ${j.reviewed?"disabled":""}>
+          <option value="">-- เลือกสาเหตุ --</option>
+          ${RECON_REASONS.map(r=>`<option value="${r}" ${j.reason===r?"selected":""}>${r}</option>`).join("")}
+        </select>
+        ${j.reviewed
+          ? `<span style="color:var(--green);font-weight:700;font-size:0.78rem;">✅ ตรวจแล้ว: ${j.reason||"—"}</span>`
+          : `<button class="btn btn-sm" style="background:var(--indigo);color:white;border:none;" onclick="saveRecon('${j.id}')">✔️ บันทึก</button>`}
+      </div>
+    `).join("");
+  }
+  window.saveRecon = async (jobId) => {
+    const sel = document.getElementById(`recon-reason-${jobId}`);
+    const reason = sel?.value || "";
+    if (!reason) { toast("⚠️ เลือกสาเหตุก่อน"); return; }
+    await updateDoc(doc(db,"count_jobs",jobId), { reviewed: true, reason, reviewed_by: currentProfile.name, reviewed_at: serverTimestamp() });
+    toast("✅ บันทึกการตรวจแล้ว");
+  };
+  document.getElementById("tag-recon-hide-reviewed")?.addEventListener("change", () => renderReconciliation(window._tagReconJobs||[]));
 
   document.getElementById("btn-export-tag-xlsx")?.addEventListener("click", () => {
     const rows = window._tagRowsData || [];
@@ -734,8 +852,8 @@
 
     // Sheet 3: สรุปผลงานพนักงาน (รอบที่เลือกใน dropdown)
     const staffRows = window._tagStaffRows || [];
-    const staffSheet = [["พนักงาน","Location เสร็จ","จำนวนชิ้น/tag รวม","เวลารวม(นาที)","เฉลี่ยนาที/โล","ขาดรวม","เกินรวม"]];
-    staffRows.forEach(s => staffSheet.push([s.name, s.locCount, s.itemCount, Math.round(s.totalMs/60000), s.locCount?Math.round(s.totalMs/60000/s.locCount):"", s.shortSum, s.overSum]));
+    const staffSheet = [["อันดับ","พนักงาน","ความแม่นยำ(%)","Location เสร็จ","จำนวนชิ้น/tag รวม","เวลารวม(นาที)","เฉลี่ยนาที/โล","ขาดรวม","เกินรวม"]];
+    staffRows.forEach((s,i) => staffSheet.push([i+1, s.name, s.accuracy, s.locCount, s.itemCount, Math.round(s.totalMs/60000), s.locCount?Math.round(s.totalMs/60000/s.locCount):"", s.shortSum, s.overSum]));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(staffSheet), "สรุปพนักงาน");
 
     // Sheet 4: ประวัติ/Transactions (รอบที่เลือกใน dropdown)
@@ -760,6 +878,12 @@
       msSheet.push([m.location, m.zone, m.tag_barcode, m.sku||"", m.item_name||"", m.qty_system??"", status, j?.created_name||"", j?fmtDT(j.start_time):"", (j&&j.count_status==="Completed")?fmtDT(j.end_time):""]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(msSheet), "Master+Status");
+
+    // Sheet 6: Reconciliation — Short/Over พร้อมสาเหตุ (รอบปัจจุบัน)
+    const reconJobs = window._tagReconJobs || [];
+    const reconSheet = [["Location","ผู้นับ","ขาด","เกิน","ตรวจแล้ว?","สาเหตุ","ผู้ตรวจ"]];
+    reconJobs.forEach(j => reconSheet.push([j.location_scan, j.created_name||"", j.short_count||0, j.over_count||0, j.reviewed?"ตรวจแล้ว":"ยังไม่ตรวจ", j.reason||"", j.reviewed_by||""]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reconSheet), "Reconciliation");
 
     XLSX.writeFile(wb, `stocktake_dashboard_${new Date().toISOString().slice(0,10)}.xlsx`);
     toast("✅ Export Excel แล้ว (5 ชีท)");
