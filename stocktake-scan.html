@@ -39,28 +39,37 @@
 <body>
 <div class="page-body" style="max-width:520px;margin:0 auto;padding:1rem;">
 
-  <!-- ═══ SCREEN: PICK STAFF / START ═══ -->
+  <!-- ═══ SCREEN: PICK STAFF → ZONE → LOCATION ═══ -->
   <div id="screen-start">
     <div class="card" style="text-align:center;">
       <div class="big-title" style="color:var(--blue);">📝 นับสต็อก</div>
     </div>
-    <div class="card" id="loc-missing-card" style="display:none;">
-      <div class="alert alert-error" style="font-size:1rem;">⚠️ สแกน QR ที่ติดหน้าช่องเก็บของก่อนนะครับ/ค่ะ</div>
-      <button class="btn btn-primary btn-full big-btn" id="btn-rescan-missing" style="margin-top:0.75rem;">📷 สแกน QR</button>
-      <div id="rescan-missing-reader" style="margin-top:0.75rem;border-radius:12px;overflow:hidden;"></div>
+
+    <div class="card">
+      <label style="font-size:1rem;font-weight:700;">1️⃣ คุณคือใคร?</label>
+      <select id="staff-select" style="width:100%;padding:0.85rem;border:2px solid var(--border);border-radius:10px;font-family:Sarabun,sans-serif;font-size:1.15rem;font-weight:700;margin-top:0.5rem;">
+        <option value="">-- กำลังโหลด... --</option>
+      </select>
     </div>
-    <div class="card" id="loc-card" style="display:none;">
-      <div style="font-size:0.8rem;color:var(--gray);">📍 คุณอยู่ที่</div>
-      <div class="big-title" style="color:var(--blue);" id="loc-title">—</div>
-      <div style="font-size:0.9rem;margin-top:0.4rem;color:var(--gray);" id="loc-sub">—</div>
-      <div style="margin-top:1.25rem;" class="form-group">
-        <label style="font-size:1rem;">คุณคือใคร?</label>
-        <select id="staff-select" style="width:100%;padding:0.85rem;border:2px solid var(--border);border-radius:10px;font-family:Sarabun,sans-serif;font-size:1.15rem;font-weight:700;">
-          <option value="">-- กำลังโหลด... --</option>
-        </select>
-      </div>
-      <button class="btn btn-primary btn-full big-btn" id="btn-begin" style="margin-top:0.75rem;">▶ เริ่มนับ</button>
+
+    <div class="card">
+      <label style="font-size:1rem;font-weight:700;">2️⃣ เลือกโซน</label>
+      <select id="area-select" style="width:100%;padding:0.85rem;border:2px solid var(--border);border-radius:10px;font-family:Sarabun,sans-serif;font-size:1.15rem;font-weight:700;margin-top:0.5rem;">
+        <option value="">-- กำลังโหลด... --</option>
+      </select>
     </div>
+
+    <div class="card" id="loc-select-card" style="display:none;">
+      <label style="font-size:1rem;font-weight:700;">3️⃣ เลือก Location</label>
+      <select id="loc-select" style="width:100%;padding:0.85rem;border:2px solid var(--border);border-radius:10px;font-family:Sarabun,sans-serif;font-size:1.15rem;font-weight:700;margin-top:0.5rem;">
+        <option value="">-- เลือกโซนก่อน --</option>
+      </select>
+      <div style="font-size:0.85rem;color:var(--gray);margin-top:0.5rem;" id="loc-sub"></div>
+    </div>
+
+    <button class="btn btn-primary btn-full big-btn" id="btn-begin" style="margin-bottom:0.6rem;">▶ เริ่มนับ</button>
+    <button class="btn btn-outline btn-full" id="btn-use-qr" style="margin-bottom:1rem;">📷 หรือสแกน QR แทน (ถ้ามี)</button>
+    <div id="qr-picker-reader" style="display:none;border-radius:12px;overflow:hidden;min-height:220px;background:#1e293b;margin-bottom:1rem;"></div>
   </div>
 
   <!-- ═══ SCREEN: CHECKLIST (นับ) ═══ -->
@@ -119,10 +128,9 @@
       <div class="big-title" style="color:var(--blue);">นับเสร็จแล้ว</div>
       <div style="font-size:0.9rem;color:var(--gray);margin-top:0.5rem;" id="done-detail"></div>
     </div>
-    <div class="card" style="text-align:center;">
-      <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.75rem;">ไปช่องถัดไปแล้วสแกน QR ต่อได้เลย</div>
-      <div id="next-reader" style="border-radius:12px;overflow:hidden;min-height:220px;background:#1e293b;"></div>
-    </div>
+    <button class="btn btn-primary btn-full big-btn" id="btn-next-location" style="margin-bottom:0.6rem;">➕ นับ Location ถัดไป</button>
+    <button class="btn btn-outline btn-full" id="btn-next-qr" style="margin-bottom:1rem;">📷 หรือสแกน QR แทน (ถ้ามี)</button>
+    <div id="next-reader" style="display:none;border-radius:12px;overflow:hidden;min-height:220px;background:#1e293b;margin-bottom:1rem;"></div>
   </div>
 
 </div>
@@ -158,17 +166,11 @@
     });
   });
 
-  const params  = new URLSearchParams(location.search);
-  const locCode = (params.get("loc")||"").trim().toUpperCase();
-
+  let selLoc  = "";
   let masterStock = [], scanEvents = [], curJob = null, staffList = [];
-  let camStarted = false, html5Cam = null, lastScan = 0;
+  let allLocations = []; // [{location, zone, count}]
+  let camStarted = false, html5Cam = null, lastScan = 0, qrPickerCam = null;
 
-  function goToLocation(code) {
-    const url = new URL(location.href);
-    url.searchParams.set("loc", code.trim().toUpperCase());
-    location.href = url.toString();
-  }
   // เผื่อ QR encode เป็น URL เต็มแทนที่จะเป็นแค่รหัส location
   function extractLocFromScan(text) {
     try {
@@ -179,48 +181,113 @@
     return text;
   }
 
-  async function init() {
-    if (!locCode) {
-      document.getElementById("loc-missing-card").style.display="block";
-      setupMissingLocScanner();
-      return;
-    }
-    const s = await getDocs(query(collection(db,"master_stock"), where("location","==",locCode)));
-    masterStock = s.docs.map(d=>({id:d.id,...d.data()}));
-    const zone = masterStock[0]?.zone || "Normal";
-    document.getElementById("loc-card").style.display = "block";
-    document.getElementById("loc-title").textContent = locCode;
-    document.getElementById("loc-sub").textContent = `${masterStock.length} รายการที่ต้องนับ`;
+  function deriveArea(loc) { return (loc.split("-")[0]||"").toUpperCase(); }
+  function areaGroup(area) {
+    if (area.startsWith("B")) return "🟣 โซน B (Bulk — ติ๊กเจอ)";
+    if (area.startsWith("OVERFL")) return "🟠 Overflow (Bulk — ติ๊กเจอ)";
+    if (area.startsWith("A")) return "🔵 โซน A (นับจำนวนจริง)";
+    if (area.startsWith("C")) return "🔵 โซน C (นับจำนวนจริง)";
+    return "⚪ อื่นๆ";
+  }
 
+  async function init() {
+    // โหลด Master ทั้งหมดครั้งเดียว เพื่อสร้าง dropdown โซน/location
+    const s = await getDocs(collection(db,"master_stock"));
+    masterStock = s.docs.map(d=>({id:d.id,...d.data()}));
+
+    const byLoc = {};
+    masterStock.forEach(m => {
+      if (!m.location) return;
+      if (!byLoc[m.location]) byLoc[m.location] = { location:m.location, zone:m.zone||"Normal", count:0 };
+      byLoc[m.location].count++;
+    });
+    allLocations = Object.values(byLoc).sort((a,b)=>a.location.localeCompare(b.location));
+
+    // สร้างกลุ่มโซน (Area) เรียงตามหมวดแล้วเรียงชื่อในหมวด
+    const areaMap = {};
+    allLocations.forEach(l => {
+      const area = deriveArea(l.location);
+      if (!areaMap[area]) areaMap[area] = { area, group:areaGroup(area), count:0 };
+      areaMap[area].count++;
+    });
+    const areas = Object.values(areaMap).sort((a,b)=> a.group.localeCompare(b.group) || a.area.localeCompare(b.area));
+    const groups = {};
+    areas.forEach(a => { (groups[a.group] = groups[a.group]||[]).push(a); });
+
+    const areaSel = document.getElementById("area-select");
+    areaSel.innerHTML = `<option value="">-- เลือกโซน --</option>` +
+      Object.keys(groups).sort().map(g => `<optgroup label="${g}">` +
+        groups[g].map(a=>`<option value="${a.area}">${a.area} (${a.count} location)</option>`).join("") +
+        `</optgroup>`
+      ).join("");
+
+    // รายชื่อพนักงาน
     const staffSnap = await getDocs(query(collection(db,"staff_list"), orderBy("name")));
     staffList = staffSnap.docs.map(d=>d.data().name);
-    const sel = document.getElementById("staff-select");
-    sel.innerHTML = staffList.length
+    const staffSel = document.getElementById("staff-select");
+    staffSel.innerHTML = staffList.length
       ? `<option value="">-- เลือกชื่อ --</option>` + staffList.map(n=>`<option value="${n}">${n}</option>`).join("")
       : `<option value="">(ยังไม่มีรายชื่อ — แจ้ง Admin)</option>`;
-
-    // จำชื่อล่าสุดไว้ ไม่ต้องเลือกซ้ำทุกโล
     const last = localStorage.getItem(LAST_STAFF_KEY);
-    if (last && staffList.includes(last)) sel.value = last;
+    if (last && staffList.includes(last)) staffSel.value = last;
+
+    // ถ้าเข้ามาด้วย ?loc= (เช่น QR เก่าที่พิมพ์ไว้แล้ว) ให้ pre-select ให้เลย
+    const params = new URLSearchParams(location.search);
+    const preLoc = (params.get("loc")||"").trim().toUpperCase();
+    if (preLoc) selectLocation(preLoc);
   }
   init();
 
-  async function setupMissingLocScanner() {
-    document.getElementById("btn-rescan-missing").addEventListener("click", async () => {
-      const wrap = document.getElementById("rescan-missing-reader");
-      wrap.style.display="block"; wrap.innerHTML = `<div id="_mr"></div>`;
-      const cam = new Html5Qrcode("_mr");
-      await cam.start({facingMode:"environment"},{fps:10,qrbox:{width:220,height:220}},
-        text => { cam.stop().catch(()=>{}); goToLocation(extractLocFromScan(text)); }, ()=>{}
-      ).catch(()=>toast("❌ เปิดกล้องไม่ได้","err"));
-    });
+  document.getElementById("area-select").addEventListener("change", () => {
+    const area = document.getElementById("area-select").value;
+    const locSel = document.getElementById("loc-select");
+    const card = document.getElementById("loc-select-card");
+    if (!area) { card.style.display="none"; return; }
+    const locs = allLocations.filter(l => deriveArea(l.location)===area);
+    locSel.innerHTML = `<option value="">-- เลือก Location --</option>` +
+      locs.map(l=>`<option value="${l.location}">${l.location} (${l.count} รายการ)</option>`).join("");
+    card.style.display = "block";
+    document.getElementById("loc-sub").textContent = `${locs.length} location ในโซนนี้`;
+  });
+  document.getElementById("loc-select").addEventListener("change", () => {
+    selLoc = document.getElementById("loc-select").value;
+  });
+
+  // เลือก location ให้ตรงกับ dropdown อัตโนมัติ (ใช้ตอนมี ?loc= หรือสแกน QR)
+  function selectLocation(code) {
+    const loc = allLocations.find(l=>l.location===code);
+    if (!loc) { toast(`⚠️ ไม่พบ location ${code} ใน Master`, "err"); return; }
+    document.getElementById("area-select").value = deriveArea(code);
+    document.getElementById("area-select").dispatchEvent(new Event("change"));
+    setTimeout(() => {
+      document.getElementById("loc-select").value = code;
+      selLoc = code;
+    }, 30);
   }
+
+  document.getElementById("btn-use-qr").addEventListener("click", async () => {
+    const wrap = document.getElementById("qr-picker-reader");
+    if (qrPickerCam) { await qrPickerCam.stop().catch(()=>{}); qrPickerCam=null; wrap.style.display="none"; return; }
+    wrap.style.display="block";
+    qrPickerCam = new Html5Qrcode("qr-picker-reader");
+    await qrPickerCam.start({facingMode:"environment"},{fps:10,qrbox:{width:220,height:220}},
+      async text => {
+        await qrPickerCam.stop().catch(()=>{}); qrPickerCam=null; wrap.style.display="none";
+        selectLocation(extractLocFromScan(text).trim().toUpperCase());
+      }, ()=>{}
+    ).catch(()=>toast("❌ เปิดกล้องไม่ได้","err"));
+  });
 
   document.getElementById("btn-begin").addEventListener("click", async () => {
     const name = document.getElementById("staff-select").value;
     if (!name) { toast("⚠️ เลือกชื่อก่อนนะครับ/ค่ะ"); return; }
+    if (!selLoc) { toast("⚠️ เลือกโซนและ location ก่อนนะครับ/ค่ะ"); return; }
     localStorage.setItem(LAST_STAFF_KEY, name);
+    await beginCounting(name, selLoc);
+  });
 
+  async function beginCounting(name, locCode) {
+    const locRows = masterStock.filter(m=>m.location===locCode);
     const existing = await getDocs(query(
       collection(db,"count_jobs"), where("location_scan","==",locCode), where("count_status","==","In Progress")
     ));
@@ -229,22 +296,44 @@
       const jd = j.data();
       const dd = await getDocs(query(collection(db,"count_details"), where("job_id","==",j.id), orderBy("timestamp")));
       scanEvents = dd.docs.map(d=>({docId:d.id,...d.data()}));
-      curJob = { id:j.id, location:locCode, zone:jd.zone_type, createdName: jd.created_name };
+      curJob = { id:j.id, location:locCode, zone:jd.zone_type, createdName: jd.created_name, rows: locRows };
     } else {
-      const zone = masterStock[0]?.zone || "Normal";
+      const zone = locRows[0]?.zone || "Normal";
       const ref = await addDoc(collection(db,"count_jobs"), {
         location_scan: locCode, zone_type: zone,
         start_time: serverTimestamp(), count_status: "In Progress",
-        expected_target: masterStock.length, matched_count: 0, short_count: 0, over_count: 0,
+        expected_target: locRows.length, matched_count: 0, short_count: 0, over_count: 0,
         created_by: currentUser.uid, created_name: name
       });
       scanEvents = [];
-      curJob = { id: ref.id, location: locCode, zone, createdName: name };
+      curJob = { id: ref.id, location: locCode, zone, createdName: name, rows: locRows };
     }
     showScanScreen();
+  }
+
+  document.getElementById("btn-next-location").addEventListener("click", () => {
+    document.getElementById("screen-done").style.display  = "none";
+    document.getElementById("screen-start").style.display  = "block";
+    document.getElementById("loc-select-card").style.display = "none";
+    document.getElementById("area-select").value = "";
+    selLoc = ""; curJob = null; scanEvents = [];
+  });
+  document.getElementById("btn-next-qr").addEventListener("click", async () => {
+    const wrap = document.getElementById("next-reader");
+    wrap.style.display = "block";
+    const cam = new Html5Qrcode("next-reader");
+    await cam.start({facingMode:"environment"},{fps:10,qrbox:{width:220,height:220}},
+      async text => {
+        await cam.stop().catch(()=>{});
+        const code = extractLocFromScan(text).trim().toUpperCase();
+        document.getElementById("screen-done").style.display  = "none";
+        document.getElementById("screen-start").style.display = "block";
+        selectLocation(code);
+      }, ()=>{}
+    ).catch(()=>toast("❌ เปิดกล้องไม่ได้","err"));
   });
 
-  function masterRows() { return masterStock; }
+  function masterRows() { return curJob?.rows || []; }
   function targetFor(row) { return isBulkZone(curJob.zone) ? 1 : (row.qty_system ?? null); }
   function countFor(tag) { return scanEvents.filter(e=>e.scanned_tag===tag).length; }
 
@@ -396,16 +485,7 @@
     document.getElementById("screen-done").style.display="block";
     document.getElementById("done-icon").textContent = (shortNow+st.over)>0 ? "⚠️" : "🎉";
     document.getElementById("done-detail").textContent = `${curJob.location} — ตรง ${st.matched}/${st.total}${shortNow>0?` · ขาด ${shortNow}`:""}${st.over>0?` · เกิน ${st.over}`:""}`;
-    startNextScanner();
   });
-
-  // ── ต่อ QR ถัดไปในหน้าเดียว ไม่ต้องออกจากหน้าเว็บ ─────────
-  async function startNextScanner() {
-    const cam = new Html5Qrcode("next-reader");
-    await cam.start({facingMode:"environment"},{fps:10,qrbox:{width:230,height:230}},
-      text => { cam.stop().catch(()=>{}); goToLocation(extractLocFromScan(text)); }, ()=>{}
-    ).catch(()=>toast("❌ เปิดกล้องไม่ได้ — ลองรีเฟรชหน้านี้ใหม่","err"));
-  }
 </script>
 </body>
 </html>
