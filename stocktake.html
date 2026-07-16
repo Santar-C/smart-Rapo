@@ -9,25 +9,35 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared.css">
   <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
   <style>
     .zone-badge-normal   { background:#dbeafe; color:#1d4ed8; }
     .zone-badge-zoneb    { background:#f3e8ff; color:#7e22ce; }
     .zone-badge-overflow { background:#ffedd5; color:#c2410c; }
     .scan-input-big { font-size:1.3rem !important; font-weight:700 !important; text-align:center; letter-spacing:0.06em; background:#f0fdf4 !important; border-color:var(--green) !important; }
     .scan-input-big:focus { box-shadow:0 0 0 4px rgba(22,163,74,0.15) !important; }
-    .scanned-list { display:flex; flex-direction:column; gap:0.4rem; max-height:260px; overflow-y:auto; }
-    .scanned-item { display:flex; align-items:center; gap:0.6rem; padding:0.45rem 0.75rem; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; font-size:0.85rem; animation:slideDown 0.2s ease; }
-    .scanned-item .seq { width:22px; height:22px; border-radius:50%; background:var(--green); color:white; font-size:0.68rem; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-    .scanned-item .tag { font-weight:700; font-family:monospace; flex:1; }
-    .scanned-item .tm  { font-size:0.7rem; color:var(--gray); flex-shrink:0; }
     @keyframes slideDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
     @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
     .shake { animation:shake 0.4s ease; }
     .dup-bg { background:#fef2f2 !important; border-color:#fca5a5 !important; }
-    .job-card { border:2px solid var(--border); border-radius:14px; background:white; cursor:pointer; transition:all 0.2s; }
-    .job-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.08); }
-    .job-card.counting { border-color:var(--indigo); }
-    .job-card.finished { opacity:0.65; }
+
+    /* Checklist rows */
+    .chk-list { display:flex; flex-direction:column; gap:0.4rem; max-height:420px; overflow-y:auto; }
+    .chk-row { display:flex; align-items:center; gap:0.6rem; padding:0.5rem 0.75rem; border-radius:10px; border:1.5px solid var(--border); background:white; animation:slideDown 0.15s ease; }
+    .chk-row.pending  { background:#f8fafc; }
+    .chk-row.matched  { background:#f0fdf4; border-color:#bbf7d0; }
+    .chk-row.over     { background:#fef2f2; border-color:#fca5a5; }
+    .chk-row .tick { width:26px; height:26px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:0.85rem; cursor:pointer; background:#e2e8f0; color:#94a3b8; }
+    .chk-row.matched .tick  { background:var(--green); color:white; }
+    .chk-row.over .tick     { background:var(--red); color:white; }
+    .chk-row .tag  { font-family:monospace; font-weight:700; flex:1; font-size:0.85rem; }
+    .chk-row .name { font-size:0.72rem; color:var(--gray); }
+    .chk-row .cnt  { font-size:0.8rem; font-weight:700; padding:0.15rem 0.55rem; border-radius:6px; background:#e0e7ff; color:#4338ca; white-space:nowrap; }
+    .chk-row.over .cnt { background:#fee2e2; color:#dc2626; }
+    .stepper { display:flex; align-items:center; gap:0.3rem; }
+    .stepper button { width:26px; height:26px; border-radius:50%; border:1.5px solid var(--border); background:white; font-weight:900; cursor:pointer; }
+    .extra-row { display:flex; align-items:center; gap:0.6rem; padding:0.45rem 0.75rem; background:#fffbeb; border:1.5px solid #fde68a; border-radius:10px; font-size:0.85rem; }
+
     .progress-wrap { display:flex; align-items:center; gap:1.25rem; }
     .ring-svg { transform:rotate(-90deg); }
     .ring-num { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
@@ -35,6 +45,12 @@
     #toast.show { transform:translateX(-50%) translateY(0); }
     #toast.err  { background:#dc2626; }
     #toast.ok   { background:#16a34a; }
+
+    .job-card { border:2px solid var(--border); border-radius:14px; background:white; cursor:pointer; transition:all 0.2s; }
+    .job-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.08); }
+    .job-card.counting { border-color:var(--indigo); }
+    .job-card.finished { opacity:0.65; }
+    .job-card.has-mismatch { border-color:var(--red); }
   </style>
 </head>
 <body>
@@ -46,7 +62,6 @@
     <div class="tab-bar">
       <button class="tab-btn active" data-tab="my-jobs">📋 งานของฉัน</button>
       <button class="tab-btn" data-tab="new-job">➕ เริ่มงานใหม่</button>
-      <button class="tab-btn" data-tab="master" id="tab-master-btn">🗄️ Master</button>
     </div>
 
     <!-- งานของฉัน -->
@@ -72,47 +87,16 @@
         <div id="cam-reader-loc" style="display:none; margin-bottom:0.75rem; border-radius:12px; overflow:hidden;"></div>
         <div id="loc-info" style="display:none;" class="alert alert-info">
           <div style="font-weight:700;font-size:1rem;" id="loc-info-name">—</div>
-          <div style="font-size:0.85rem;margin-top:4px;">Zone: <b id="loc-info-zone">—</b> &nbsp;|&nbsp; สินค้าใน Master: <b id="loc-info-count">—</b> ชิ้น</div>
+          <div style="font-size:0.85rem;margin-top:4px;">Zone: <b id="loc-info-zone">—</b> &nbsp;|&nbsp; รายการใน Master: <b id="loc-info-count">—</b></div>
         </div>
         <button class="btn btn-primary btn-full" id="btn-start-job" style="margin-top:0.75rem;">▶ เริ่มนับ Location นี้</button>
       </div>
     </div>
 
-    <!-- Master Stock -->
-    <div id="tab-master" style="display:none">
-      <div class="card">
-        <div class="card-title">🗄️ Import Master Stock</div>
-        <div class="alert alert-warning" style="font-size:0.82rem;margin-bottom:0.75rem;">
-          <b>Format CSV หัวคอลัมน์:</b> <code>location, zone, tag_barcode, item_name</code><br>
-          <small>zone = Normal | Zone B | Overflow</small>
-        </div>
-        <div class="form-group"><label>เลือกไฟล์ CSV</label><input type="file" id="master-csv" accept=".csv"></div>
-        <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;cursor:pointer;font-size:0.9rem;">
-          <input type="checkbox" id="master-clear"> ล้างข้อมูล Master เก่าก่อน Import
-        </label>
-        <button class="btn btn-primary btn-full" id="btn-import-master">📥 Import Master Stock</button>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden;">
-        <div style="padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-weight:700;color:var(--blue);">Master Stock ปัจจุบัน</span>
-          <span class="badge badge-gray" id="master-count-badge">0 รายการ</span>
-        </div>
-        <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);">
-          <input type="text" id="master-search" placeholder="ค้นหา Location / Barcode..." style="width:100%;padding:0.55rem 0.9rem;border:1.5px solid var(--border);border-radius:9px;font-family:Sarabun,sans-serif;font-size:0.9rem;outline:none;">
-        </div>
-        <div class="table-wrap" style="border:none;border-radius:0;">
-          <table>
-            <thead><tr><th>Location</th><th>Zone</th><th>Barcode</th><th>ชื่อสินค้า</th><th>ลบ</th></tr></thead>
-            <tbody id="master-tbody"><tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
   </div><!-- end screen-home -->
 
-  <!-- ═══ SCREEN: SCAN ═══ -->
+  <!-- ═══ SCREEN: SCAN (Checklist) ═══ -->
   <div id="screen-scan" style="display:none">
-    <!-- Header sticky -->
     <div class="card" style="position:sticky;top:60px;z-index:50;margin-bottom:0.75rem;padding:0.85rem 1.25rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
         <div>
@@ -127,7 +111,10 @@
       </div>
     </div>
 
-    <!-- Progress -->
+    <div class="alert alert-error" id="mismatch-banner" style="display:none;margin-bottom:0.75rem;font-size:0.85rem;">
+      ⚠️ <b id="short-count">0</b> รายการขาด (Short) &nbsp;|&nbsp; <b id="over-count">0</b> รายการเกิน (Over) — ต้องยืนยันก่อนปิดงาน
+    </div>
+
     <div class="card" style="margin-bottom:0.75rem;padding:0.85rem 1.25rem;">
       <div class="progress-wrap">
         <div style="position:relative;width:100px;height:100px;flex-shrink:0;">
@@ -142,70 +129,64 @@
             <div style="font-size:0.72rem;color:var(--gray);">/<span id="ring-e">?</span></div>
           </div>
         </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:0.5rem;">
-          <div><div style="font-size:0.72rem;color:var(--gray);">สแกนแล้ว</div><div style="font-size:1.4rem;font-weight:900;color:var(--green);" id="p-scanned">0</div></div>
-          <div style="display:flex;gap:1.5rem;">
-            <div><div style="font-size:0.72rem;color:var(--gray);">Master</div><div style="font-weight:700;" id="p-expected">—</div></div>
-            <div><div style="font-size:0.72rem;color:var(--gray);">เหลือ</div><div style="font-weight:700;color:var(--amber);" id="p-remain">—</div></div>
-          </div>
-          <div id="zone-hint-normal" style="display:none;background:#eff6ff;border-radius:8px;padding:0.35rem 0.6rem;font-size:0.72rem;color:#1d4ed8;font-weight:700;">🔵 Normal — เด้งอัตโนมัติเมื่อครบ</div>
-          <div id="zone-hint-zoneb"  style="display:none;background:#fdf4ff;border-radius:8px;padding:0.35rem 0.6rem;font-size:0.72rem;color:#7e22ce;font-weight:700;">🟣 Zone B — สแกนได้เรื่อยๆ กดปิดเอง</div>
-          <div id="zone-hint-overflow" style="display:none;background:#fff7ed;border-radius:8px;padding:0.35rem 0.6rem;font-size:0.72rem;color:#c2410c;font-weight:700;">🟠 Overflow — ไม่จำกัด กดปิดเอง</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:0.4rem;">
+          <div id="zone-hint-zoneb"    style="display:none;background:#fdf4ff;border-radius:8px;padding:0.4rem 0.6rem;font-size:0.75rem;color:#7e22ce;font-weight:700;">🟣 Zone B — ไปที่ location เจอ tag ไหน สแกน (หรือแตะ) เพื่อติ๊กเจอ</div>
+          <div id="zone-hint-overflow" style="display:none;background:#fff7ed;border-radius:8px;padding:0.4rem 0.6rem;font-size:0.75rem;color:#c2410c;font-weight:700;">🟠 Overflow — เจอ tag ไหนสแกน (หรือแตะ) เพื่อติ๊กเจอ</div>
+          <div id="zone-hint-normal"   style="display:none;background:#eff6ff;border-radius:8px;padding:0.4rem 0.6rem;font-size:0.75rem;color:#1d4ed8;font-weight:700;">🔵 Normal — ยิงบาร์โค้ดซ้ำทีละชิ้น ระบบนับให้อัตโนมัติ เทียบกับ Qty System</div>
         </div>
       </div>
     </div>
 
-    <!-- Scan Input -->
     <div class="card" style="margin-bottom:0.75rem;">
-      <div class="card-title" style="font-size:0.9rem;margin-bottom:0.75rem;">📦 สแกน Barcode สินค้า</div>
+      <div class="card-title" style="font-size:0.9rem;margin-bottom:0.75rem;">📦 สแกน Barcode</div>
       <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
         <button class="btn btn-sm" id="btn-mode-text" style="flex:1;background:var(--green);color:white;border:none;">⌨️ พิมพ์ / ปืนยิง</button>
         <button class="btn btn-outline btn-sm" id="btn-mode-cam" style="flex:1;">📷 กล้อง</button>
       </div>
-      <!-- Text mode -->
       <div id="mode-text-wrap">
         <input type="text" id="tag-input" placeholder="สแกนหรือพิมพ์ Barcode แล้วกด Enter"
           autocomplete="off" autocorrect="off" spellcheck="false" class="scan-input-big">
-        <div id="dup-error" style="display:none;color:var(--red);font-size:0.82rem;font-weight:700;margin-top:0.4rem;padding:0.4rem 0.75rem;background:#fef2f2;border-radius:8px;">
-          ⚠️ บาร์โค้ดนี้ถูกสแกนไปแล้วใน Job นี้!
+        <div id="dup-error" style="display:none;color:var(--amber);font-size:0.82rem;font-weight:700;margin-top:0.4rem;padding:0.4rem 0.75rem;background:#fffbeb;border-radius:8px;">
+          ⚠️ tag นี้ถูกติ๊กว่าเจอแล้ว
         </div>
       </div>
-      <!-- Camera mode -->
       <div id="mode-cam-wrap" style="display:none;">
         <div id="cam-reader" style="width:100%;background:#1e293b;border-radius:12px;min-height:200px;"></div>
         <button class="btn btn-outline btn-sm btn-full" id="btn-stop-cam" style="margin-top:0.5rem;display:none;">⏹ หยุดกล้อง</button>
       </div>
-      <!-- No barcode -->
       <div style="margin-top:0.75rem;border-top:1px dashed var(--border);padding-top:0.65rem;">
         <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--gray);cursor:pointer;">
-          <input type="checkbox" id="chk-no-bc"> บาร์โค้ดเสีย / ไม่มีบาร์โค้ด
+          <input type="checkbox" id="chk-no-bc"> บาร์โค้ดเสีย / ไม่มีบาร์โค้ด (แต่มีใน Master) — เพิ่มด้วยมือ
         </label>
         <div id="no-bc-wrap" style="display:none;margin-top:0.5rem;">
-          <div class="form-row">
-            <div class="form-group" style="margin-bottom:0;"><input type="text" id="manual-tag" placeholder="ระบุรหัสเอง (หรือเว้นว่าง)"></div>
-            <div class="form-group" style="margin-bottom:0;"><input type="file" id="photo-file" accept="image/*" capture="environment" style="padding:0.45rem;font-size:0.8rem;"></div>
-          </div>
+          <div class="form-group" style="margin-bottom:0;"><input type="text" id="manual-tag" placeholder="ระบุรหัสเอง"></div>
           <button class="btn btn-sm btn-full" id="btn-add-manual" style="margin-top:0.4rem;background:var(--amber);color:white;border:none;">➕ เพิ่มรายการนี้</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem;color:var(--gray);cursor:pointer;margin-top:0.6rem;">
+          <input type="checkbox" id="chk-over"> 🔺 พบของเกิน (ไม่อยู่ใน Master ที่ Location นี้) — แจ้ง Over
+        </label>
+        <div id="over-wrap" style="display:none;margin-top:0.5rem;">
+          <div class="form-group" style="margin-bottom:0;"><input type="text" id="over-tag" placeholder="สแกนหรือระบุรหัสของที่เกิน"></div>
+          <button class="btn btn-sm btn-full" id="btn-add-over" style="margin-top:0.4rem;background:var(--red);color:white;border:none;">🔺 บันทึกของเกิน (Over)</button>
         </div>
       </div>
     </div>
 
-    <!-- Scanned list -->
+    <!-- Checklist -->
     <div class="card" style="margin-bottom:0.75rem;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;">
-        <div class="card-title" style="margin-bottom:0;font-size:0.9rem;">✅ รายการที่สแกนแล้ว</div>
-        <button class="btn btn-outline btn-sm" id="btn-export-scan">⬇️ Export</button>
-      </div>
-      <div class="scanned-list" id="scanned-list">
-        <div style="text-align:center;color:var(--gray);font-size:0.875rem;padding:1rem 0;">ยังไม่มีรายการ</div>
-      </div>
+      <div class="card-title" style="font-size:0.9rem;margin-bottom:0.75rem;">✅ รายการใน Master ที่ Location นี้</div>
+      <div class="chk-list" id="chk-list"></div>
     </div>
 
-    <!-- Action buttons -->
+    <!-- Extra items (พบแต่ไม่อยู่ใน Master = Over) -->
+    <div class="card" id="extra-card" style="display:none;margin-bottom:0.75rem;">
+      <div class="card-title" style="font-size:0.9rem;margin-bottom:0.75rem;color:var(--red);">🔺 ของเกิน (Over) — พบแต่ไม่อยู่ใน Master ที่ Location นี้</div>
+      <div id="extra-list" style="display:flex;flex-direction:column;gap:0.4rem;"></div>
+    </div>
+
     <div style="display:flex;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
       <button class="btn btn-outline" id="btn-back-home" style="flex:1;">← กลับ</button>
-      <button class="btn btn-green" id="btn-finish-job" style="flex:2;display:none;">🏁 เสร็จสิ้น — ปิด Job</button>
-      <button class="btn btn-primary" id="btn-done-normal" style="flex:2;display:none;">✅ นับครบ — ดูสรุป</button>
+      <button class="btn btn-green" id="btn-finish-job" style="flex:2;">🏁 เสร็จสิ้น — ปิด Job</button>
     </div>
   </div><!-- end screen-scan -->
 
@@ -215,24 +196,29 @@
       <div style="font-size:2.5rem;margin-bottom:0.4rem;" id="sum-icon">🎉</div>
       <div style="font-size:1.2rem;font-weight:900;color:var(--blue);" id="sum-loc">—</div>
       <div style="margin-top:0.4rem;"><span class="badge" id="sum-zone-badge" style="font-size:0.82rem;padding:0.3rem 0.75rem;">—</span></div>
+      <div style="font-size:0.78rem;color:var(--gray);margin-top:0.5rem;">
+        เริ่ม <b id="sum-start-time">—</b> &nbsp;→&nbsp; จบ <b id="sum-end-time">—</b>
+      </div>
     </div>
-    <div class="stats-row" style="margin-bottom:1rem;">
-      <div class="stat-card"><div class="stat-value" style="color:var(--green);" id="sum-scanned">—</div><div class="stat-label">สแกนได้</div></div>
+    <div class="stats-row" style="margin-bottom:1rem;flex-wrap:wrap;">
+      <div class="stat-card"><div class="stat-value" style="color:var(--green);" id="sum-matched">—</div><div class="stat-label">ตรง</div></div>
       <div class="stat-card"><div class="stat-value" id="sum-expected">—</div><div class="stat-label">Master</div></div>
-      <div class="stat-card"><div class="stat-value" id="sum-diff">—</div><div class="stat-label">ส่วนต่าง</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--amber);" id="sum-short">—</div><div class="stat-label">ขาด (Short)</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--red);" id="sum-over">—</div><div class="stat-label">เกิน (Over)</div></div>
     </div>
     <div class="card" style="padding:0;overflow:hidden;">
-      <div style="padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);font-weight:700;color:var(--blue);">รายการบาร์โค้ดทั้งหมด</div>
+      <div style="padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);font-weight:700;color:var(--blue);">รายละเอียดตาม Master</div>
       <div class="table-wrap" style="border:none;border-radius:0;">
         <table>
-          <thead><tr><th>#</th><th>Barcode</th><th>เวลา</th><th>หมายเหตุ</th></tr></thead>
+          <thead><tr><th>Barcode</th><th>ชื่อสินค้า</th><th>Target</th><th>นับได้</th><th>สถานะ</th></tr></thead>
           <tbody id="sum-tbody"></tbody>
         </table>
       </div>
     </div>
     <div style="display:flex;gap:0.75rem;margin-top:1rem;flex-wrap:wrap;">
       <button class="btn btn-outline" id="btn-sum-back" style="flex:1;">← กลับ</button>
-      <button class="btn btn-primary" id="btn-sum-export" style="flex:1;">⬇️ Export CSV</button>
+      <button class="btn btn-primary" id="btn-sum-export-xlsx" style="flex:1;">⬇️ Export Excel</button>
+      <button class="btn btn-outline" id="btn-sum-export" style="flex:1;">⬇️ Export CSV</button>
     </div>
   </div>
 </div><!-- end page-body -->
@@ -246,11 +232,16 @@
     query, orderBy, where, onSnapshot, serverTimestamp, writeBatch, limit
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const CIRC = 2 * Math.PI * 43; // ~270
+  const CIRC = 2 * Math.PI * 43;
+  const Z  = {"Normal":"zone-badge-normal","Zone B":"zone-badge-zoneb","Overflow":"zone-badge-overflow"};
+  const ZL = {"Normal":"Normal Zone","Zone B":"Zone B","Overflow":"Overflow"};
+  // Zone B / Overflow = "Bulk": ไปที่ location เจอ tag ไหนติ๊กเจอ (target ต่อ tag = 1 เสมอ)
+  // Normal = "Quantity": ยิงบาร์โค้ดซ้ำทีละชิ้นเพื่อนับจำนวน เทียบ Qty System
+  function isBulkZone(zone) { return zone === "Zone B" || zone === "Overflow"; }
 
   let currentUser, profile;
   let masterStock = [], allJobs = [], masterSearch = "";
-  let curJob = null, scannedTags = new Set(), scannedDetails = [];
+  let curJob = null, scanEvents = []; // scanEvents: {docId, scanned_tag, timestamp/scan_time}
   let camStarted = false, html5Cam = null, locCam = null, lastScan = 0;
 
   const { user, prof } = await (async () => {
@@ -269,7 +260,7 @@
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
     </nav>`;
 
-  if (profile.role !== "admin") document.getElementById("tab-master-btn").style.display = "none";
+  const isAdmin = profile.role === "admin";
 
   let toastTimer;
   function toast(msg, cls="", dur=2500) {
@@ -285,80 +276,23 @@
       document.querySelectorAll("[data-tab]").forEach(x => x.classList.remove("active"));
       b.classList.add("active");
       const tab = b.dataset.tab;
-      document.getElementById("tab-my-jobs").style.display = tab==="my-jobs" ? "block":"none";
-      document.getElementById("tab-new-job").style.display = tab==="new-job" ? "block":"none";
-      document.getElementById("tab-master").style.display  = tab==="master"  ? "block":"none";
-      if (tab==="master") renderMaster();
+      document.getElementById("tab-my-jobs").style.display  = tab==="my-jobs"  ? "block":"none";
+      document.getElementById("tab-new-job").style.display   = tab==="new-job"  ? "block":"none";
     });
   });
 
-  // ══ MASTER STOCK ══════════════════════════════════════════
+  // ══ MASTER STOCK — โหลดพื้นหลังเงียบๆ เท่านั้น (ใช้แค่ประกอบ checklist) ══
+  // การ Import/ลบ Master ย้ายไปจัดการที่ monitor.html (แท็บ Stock Take (Tag) > Master + พนักงาน) แล้ว
   async function loadMaster() {
     const s = await getDocs(query(collection(db,"master_stock"), orderBy("location"), orderBy("tag_barcode")));
     masterStock = s.docs.map(d => ({id:d.id,...d.data()}));
-    document.getElementById("master-count-badge").textContent = `${masterStock.length} รายการ`;
-    renderMaster();
   }
   loadMaster();
 
-  function renderMaster() {
-    const q = masterSearch.toLowerCase();
-    const data = masterStock.filter(m =>
-      (m.location||"").toLowerCase().includes(q) ||
-      (m.tag_barcode||"").toLowerCase().includes(q) ||
-      (m.item_name||"").toLowerCase().includes(q)
-    );
-    const Z = {"Normal":"zone-badge-normal","Zone B":"zone-badge-zoneb","Overflow":"zone-badge-overflow"};
-    const tbody = document.getElementById("master-tbody");
-    tbody.innerHTML = data.length
-      ? data.map(m => `<tr>
-          <td style="font-weight:700;">${m.location}</td>
-          <td><span class="badge ${Z[m.zone]||"badge-gray"}">${m.zone||"Normal"}</span></td>
-          <td style="font-family:monospace;font-size:0.85rem;">${m.tag_barcode}</td>
-          <td>${m.item_name||"—"}</td>
-          <td><button onclick="delMaster('${m.id}')" class="btn btn-red btn-sm">🗑️</button></td>
-        </tr>`).join("")
-      : `<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--gray);">ยังไม่มี Master</td></tr>`;
-  }
-  document.getElementById("master-search").addEventListener("input", e => { masterSearch=e.target.value; renderMaster(); });
-  window.delMaster = async id => {
-    if (!confirm("ลบ?")) return;
-    await deleteDoc(doc(db,"master_stock",id));
-    masterStock = masterStock.filter(m=>m.id!==id);
-    document.getElementById("master-count-badge").textContent = `${masterStock.length} รายการ`;
-    renderMaster(); toast("🗑️ ลบแล้ว");
-  };
-
-  document.getElementById("btn-import-master").addEventListener("click", async () => {
-    const file = document.getElementById("master-csv").files[0];
-    const clear = document.getElementById("master-clear").checked;
-    if (!file) { toast("⚠️ เลือกไฟล์ก่อน"); return; }
-    const text  = await file.text();
-    const lines = text.split("\n").filter(l=>l.trim());
-    const hdrs  = lines[0].split(",").map(h=>h.trim().replace(/^"|"$/g,"").toLowerCase());
-    const batch = writeBatch(db);
-    let count = 0;
-    if (clear) masterStock.forEach(m => batch.delete(doc(db,"master_stock",m.id)));
-    for (let i=1;i<lines.length;i++) {
-      const vals = lines[i].split(",").map(v=>v.trim().replace(/^"|"$/g,""));
-      const obj  = {}; hdrs.forEach((h,idx)=>{ obj[h]=vals[idx]||""; });
-      const loc  = (obj.location||"").toUpperCase().trim();
-      const tag  = (obj.tag_barcode||obj.barcode||"").trim();
-      if (!loc||!tag) continue;
-      batch.set(doc(collection(db,"master_stock")), {
-        location: loc, zone: obj.zone||"Normal",
-        tag_barcode: tag, item_name: obj.item_name||obj.name||"",
-        imported_at: serverTimestamp()
-      }); count++;
-    }
-    await batch.commit(); await loadMaster();
-    toast(`✅ Import ${count} รายการ`, "ok");
-  });
-
-  // ══ JOBS ══════════════════════════════════════════════════
-  onSnapshot(query(collection(db,"count_jobs"), orderBy("start_time","desc"), limit(60)), snap => {
+  // ══ JOBS (list + realtime) ═══════════════════════════════
+  onSnapshot(query(collection(db,"count_jobs"), orderBy("start_time","desc"), limit(300)), snap => {
     allJobs = snap.docs.map(d=>({id:d.id,...d.data()}));
-    const myJobs = profile.role==="admin" ? allJobs : allJobs.filter(j=>j.created_by===currentUser.uid);
+    const myJobs = isAdmin ? allJobs : allJobs.filter(j=>j.created_by===currentUser.uid);
     renderJobList(myJobs);
     document.getElementById("sj-total").textContent = myJobs.length;
     document.getElementById("sj-prog").textContent  = myJobs.filter(j=>j.count_status==="In Progress").length;
@@ -368,18 +302,21 @@
   function renderJobList(jobs) {
     const el = document.getElementById("jobs-list");
     if (!jobs.length) { el.innerHTML=`<div class="empty-state"><div class="empty-icon">📭</div><p>ยังไม่มีงาน — กด "เริ่มงานใหม่"</p></div>`; return; }
-    const Z = {"Normal":"zone-badge-normal","Zone B":"zone-badge-zoneb","Overflow":"zone-badge-overflow"};
     el.innerHTML = jobs.map(j => {
-      const ts = j.start_time?.toDate ? j.start_time.toDate().toLocaleString("th-TH",{hour:"2-digit",minute:"2-digit",day:"numeric",month:"short"}) : "—";
+      const startTs = j.start_time?.toDate ? j.start_time.toDate().toLocaleString("th-TH",{hour:"2-digit",minute:"2-digit",day:"numeric",month:"short"}) : "—";
+      const endTs   = j.end_time?.toDate ? j.end_time.toDate().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"}) : null;
       const statusBadge = j.count_status==="Completed" ? `<span class="badge badge-green">เสร็จ</span>` : `<span class="badge badge-indigo">กำลังนับ</span>`;
-      return `<div class="job-card ${j.count_status==="Completed"?"finished":"counting"}" onclick="openJob('${j.id}')">
+      const hasDiff = (j.short_count>0 || j.over_count>0);
+      const mismatchCls = hasDiff ? "has-mismatch" : "";
+      return `<div class="job-card ${j.count_status==="Completed"?"finished":"counting"} ${mismatchCls}" onclick="openJob('${j.id}')">
         <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-          <div><div style="font-weight:700;">📍 ${j.location_scan}</div><div style="font-size:0.75rem;color:var(--gray);">${ts}</div></div>
+          <div><div style="font-weight:700;">📍 ${j.location_scan}</div><div style="font-size:0.75rem;color:var(--gray);">${j.created_name||""} · เริ่ม ${startTs}${endTs?` → จบ ${endTs}`:""}</div></div>
           <div style="display:flex;align-items:center;gap:0.4rem;"><span class="badge ${Z[j.zone_type]||"badge-gray"}">${j.zone_type}</span>${statusBadge}</div>
         </div>
-        <div style="padding:0.55rem 1rem;display:flex;gap:1.5rem;font-size:0.82rem;color:var(--gray);">
-          <span>สแกน: <b style="color:var(--green);">${j.total_scanned||0}</b></span>
-          <span>Master: <b>${j.expected_target??'?'}</b></span>
+        <div style="padding:0.55rem 1rem;display:flex;gap:1.5rem;font-size:0.82rem;color:var(--gray);flex-wrap:wrap;">
+          <span>ตรง: <b style="color:var(--green);">${j.matched_count??0}</b> / ${j.expected_target??'?'}</span>
+          ${j.short_count>0 ? `<span style="color:var(--amber);font-weight:700;">ขาด ${j.short_count}</span>` : ""}
+          ${j.over_count>0 ? `<span style="color:var(--red);font-weight:700;">เกิน ${j.over_count}</span>` : ""}
           ${j.count_status!=="Completed"?`<span style="margin-left:auto;color:var(--red);font-size:0.75rem;" onclick="event.stopPropagation();delJob('${j.id}')">🗑️ ลบ</span>`:""}
         </div>
       </div>`;
@@ -389,12 +326,10 @@
   window.openJob = async id => {
     const j = allJobs.find(x=>x.id===id);
     if (!j) return;
-    if (j.count_status==="Completed") { await showSummary(j); return; }
     const s = await getDocs(query(collection(db,"count_details"),where("job_id","==",id),orderBy("timestamp")));
-    scannedDetails = s.docs.map(d=>({docId:d.id,...d.data()}));
-    scannedTags    = new Set(scannedDetails.map(d=>d.scanned_tag));
-    const exp      = await getExpected(j.location_scan);
-    curJob         = {id, location:j.location_scan, zone:j.zone_type, expected:exp};
+    scanEvents = s.docs.map(d=>({docId:d.id,...d.data()}));
+    curJob = {id, location:j.location_scan, zone:j.zone_type, startTime:j.start_time, endTime:j.end_time, createdName:j.created_name};
+    if (j.count_status==="Completed") { await showSummary(); return; }
     showScanScreen();
   };
 
@@ -429,20 +364,18 @@
     ).catch(()=>toast("❌ ไม่สามารถเปิดกล้องได้","err"));
   });
 
-  locInput.addEventListener("input", async () => {
+  locInput.addEventListener("input", () => {
     const loc = locInput.value.trim().toUpperCase();
     if (!loc) { document.getElementById("loc-info").style.display="none"; return; }
-    const exp  = await getExpected(loc);
-    const zone = getZone(loc);
+    const rows = masterRowsAt(loc);
     document.getElementById("loc-info").style.display="flex";
     document.getElementById("loc-info-name").textContent  = `📍 ${loc}`;
-    document.getElementById("loc-info-zone").textContent  = zone;
-    document.getElementById("loc-info-count").textContent = exp ?? "ยังไม่มีใน Master";
+    document.getElementById("loc-info-zone").textContent  = rows[0]?.zone || "Normal (ยังไม่มีใน Master)";
+    document.getElementById("loc-info-count").textContent = rows.length ? `${rows.length} รายการ` : "ยังไม่มีใน Master";
   });
 
-  function getExpected(loc) {
-    const rows = masterStock.filter(m=>m.location===loc.toUpperCase());
-    return rows.length ? rows.length : null;
+  function masterRowsAt(loc) {
+    return masterStock.filter(m=>m.location===loc.toUpperCase());
   }
   function getZone(loc) {
     return masterStock.find(m=>m.location===loc.toUpperCase())?.zone || "Normal";
@@ -451,121 +384,178 @@
   document.getElementById("btn-start-job").addEventListener("click", async () => {
     const loc  = locInput.value.trim().toUpperCase();
     if (!loc) { toast("⚠️ ระบุ Location ก่อน"); return; }
-    const zone = getZone(loc);
-    const exp  = getExpected(loc);
+    const rows = masterRowsAt(loc);
+    const zone = rows[0]?.zone || "Normal";
+    const nowClient = new Date();
     const ref  = await addDoc(collection(db,"count_jobs"), {
       location_scan: loc, zone_type: zone,
       start_time: serverTimestamp(), count_status: "In Progress",
-      total_scanned: 0, expected_target: exp,
+      expected_target: rows.length, matched_count: 0, short_count: 0, over_count: 0,
       created_by: currentUser.uid, created_name: profile.name
     });
-    scannedDetails=[]; scannedTags=new Set();
-    curJob={id:ref.id, location:loc, zone, expected:exp};
+    scanEvents=[];
+    curJob={id:ref.id, location:loc, zone, startTime:{toDate:()=>nowClient}, endTime:null, createdName:profile.name};
     locInput.value=""; document.getElementById("loc-info").style.display="none";
     showScanScreen();
   });
 
-  // ══ SCAN SCREEN ═══════════════════════════════════════════
+  // ══ SCAN / CHECKLIST SCREEN ═══════════════════════════════
   function showScanScreen() {
     document.getElementById("screen-home").style.display    = "none";
     document.getElementById("screen-summary").style.display = "none";
     document.getElementById("screen-scan").style.display    = "block";
     document.getElementById("scan-loc-title").textContent   = curJob.location;
     document.getElementById("scan-job-id").textContent      = curJob.id.slice(-6).toUpperCase();
-    const ZL = {"Normal":"Normal Zone","Zone B":"Zone B","Overflow":"Overflow"};
-    const ZC = {"Normal":"zone-badge-normal","Zone B":"zone-badge-zoneb","Overflow":"zone-badge-overflow"};
     const badge = document.getElementById("scan-zone-badge");
     badge.textContent = ZL[curJob.zone]||curJob.zone;
-    badge.className   = `badge ${ZC[curJob.zone]||"badge-gray"}`;
-    ["normal","zoneb","overflow"].forEach(z => document.getElementById(`zone-hint-${z}`).style.display="none");
-    const hintId = curJob.zone==="Normal"?"zone-hint-normal":curJob.zone==="Zone B"?"zone-hint-zoneb":"zone-hint-overflow";
+    badge.className   = `badge ${Z[curJob.zone]||"badge-gray"}`;
+    ["zoneb","overflow","normal"].forEach(z => document.getElementById(`zone-hint-${z}`).style.display="none");
+    const hintId = curJob.zone==="Zone B"?"zone-hint-zoneb":curJob.zone==="Overflow"?"zone-hint-overflow":"zone-hint-normal";
     document.getElementById(hintId).style.display = "block";
-    const isManual = curJob.zone !== "Normal";
-    document.getElementById("btn-finish-job").style.display  = isManual ? "flex" : "none";
-    document.getElementById("btn-done-normal").style.display = "none";
-    updateProgress(); renderScannedList();
+    renderChecklist(); updateProgress();
     setTimeout(() => document.getElementById("tag-input").focus(), 200);
   }
 
+  // นับจำนวนครั้งที่ tag ถูกสแกนใน job นี้
+  function countFor(tag) {
+    return scanEvents.filter(e=>e.scanned_tag===tag).length;
+  }
+  function masterRows() { return masterRowsAt(curJob.location); }
+  function targetFor(row) { return isBulkZone(curJob.zone) ? 1 : (row.qty_system ?? null); }
+
+  function checklistStats() {
+    const rows = masterRows();
+    let matched=0, short=0, overRows=0;
+    rows.forEach(r => {
+      const c = countFor(r.tag_barcode), t = targetFor(r);
+      if (t==null) return; // ไม่มี qty_system กำหนดไว้ ข้ามการเทียบ
+      if (c===t) matched++;
+      else if (c<t) short++;
+      else overRows++; // c>t = นับเกิน target ของรายการนี้เอง
+    });
+    const extraTags = new Set(scanEvents.filter(e=>!rows.some(r=>r.tag_barcode===e.scanned_tag)).map(e=>e.scanned_tag)).size;
+    return { total: rows.length, matched, short, over: overRows + extraTags };
+  }
+
+  function renderChecklist() {
+    const rows = masterRows();
+    const el = document.getElementById("chk-list");
+    if (!rows.length) {
+      el.innerHTML = `<div style="text-align:center;color:var(--gray);font-size:0.85rem;padding:1rem 0;">ไม่มี Master ที่ Location นี้ — ทุกอย่างที่สแกนจะถือเป็นของเกิน (Over)</div>`;
+    } else {
+      el.innerHTML = rows.map(r => {
+        const c = countFor(r.tag_barcode), t = targetFor(r);
+        const cls = (t==null) ? (c>0?"matched":"pending") : (c===t ? "matched" : (c>t ? "over" : "pending"));
+        const tickIcon = cls==="matched" ? "✓" : cls==="over" ? "!" : "";
+        const stepper = isBulkZone(curJob.zone)
+          ? `<div class="tick" onclick="toggleTick('${r.tag_barcode}')">${tickIcon}</div>`
+          : `<div class="stepper">
+               <button onclick="stepQty('${r.tag_barcode}',-1)">−</button>
+               <div class="cnt">${c}${t!=null?` / ${t}`:""}</div>
+               <button onclick="stepQty('${r.tag_barcode}',1)">+</button>
+             </div>`;
+        return `<div class="chk-row ${cls}">
+          ${isBulkZone(curJob.zone) ? `<div class="tick" onclick="toggleTick('${r.tag_barcode}')" style="background:${cls==='matched'?'#16a34a':cls==='over'?'#dc2626':'#e2e8f0'};color:${cls==='pending'?'#94a3b8':'white'};">${tickIcon}</div>` : ""}
+          <div style="flex:1;min-width:0;">
+            <div class="tag">${r.tag_barcode}</div>
+            ${r.item_name?`<div class="name">${r.item_name}</div>`:""}
+          </div>
+          ${!isBulkZone(curJob.zone) ? stepper : ""}
+        </div>`;
+      }).join("");
+    }
+    // ของเกิน (Over) — สแกนแล้วไม่ตรงกับ Master ที่ location นี้เลย
+    const extras = {};
+    scanEvents.forEach(e => { if (!rows.some(r=>r.tag_barcode===e.scanned_tag)) extras[e.scanned_tag] = (extras[e.scanned_tag]||0)+1; });
+    const extraKeys = Object.keys(extras);
+    document.getElementById("extra-card").style.display = extraKeys.length ? "block" : "none";
+    document.getElementById("extra-list").innerHTML = extraKeys.map(tag => `
+      <div class="extra-row"><div class="tag" style="font-family:monospace;font-weight:700;flex:1;">${tag}</div><div class="cnt">×${extras[tag]}</div></div>
+    `).join("");
+  }
+
+  window.toggleTick = async (tag) => {
+    if (countFor(tag) > 0) {
+      // ยกเลิกติ๊ก = ลบ event ล่าสุดของ tag นี้ทั้งหมด (Bulk target=1 เอาแค่ล่าสุดพอ)
+      const evs = scanEvents.filter(e=>e.scanned_tag===tag);
+      for (const e of evs) { await deleteDoc(doc(db,"count_details",e.docId)); }
+      scanEvents = scanEvents.filter(e=>e.scanned_tag!==tag);
+    } else {
+      await commitScan(tag);
+    }
+    await syncJobProgress();
+    renderChecklist(); updateProgress();
+  };
+
+  window.stepQty = async (tag, delta) => {
+    if (delta > 0) {
+      await commitScan(tag);
+    } else {
+      const evs = scanEvents.filter(e=>e.scanned_tag===tag);
+      if (evs.length) {
+        const last = evs[evs.length-1];
+        await deleteDoc(doc(db,"count_details",last.docId));
+        scanEvents = scanEvents.filter(e=>e.docId!==last.docId);
+      }
+    }
+    await syncJobProgress();
+    renderChecklist(); updateProgress();
+  };
+
+  async function commitScan(tag) {
+    const timeStr = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+    const payload = { job_id: curJob.id, scanned_tag: tag, scan_time: timeStr, timestamp: serverTimestamp() };
+    const ref = await addDoc(collection(db,"count_details"), payload);
+    scanEvents.push({docId:ref.id, ...payload});
+  }
+
+  async function syncJobProgress() {
+    const st = checklistStats();
+    await updateDoc(doc(db,"count_jobs",curJob.id), {
+      matched_count: st.matched, short_count: st.short, over_count: st.over, expected_target: st.total
+    });
+  }
+
   function updateProgress() {
-    const n = scannedDetails.length;
-    const e = curJob?.expected || 0;
-    const r = e > 0 ? Math.max(0, e-n) : null;
-    document.getElementById("ring-n").textContent    = n;
-    document.getElementById("ring-e").textContent    = e||"?";
-    document.getElementById("p-scanned").textContent = n;
-    document.getElementById("p-expected").textContent = e||"—";
-    document.getElementById("p-remain").textContent   = r!==null ? r : "—";
-    const pct  = e>0 ? Math.min(n/e,1) : 0;
-    const dash = CIRC - pct*CIRC;
+    const st = checklistStats();
+    document.getElementById("ring-n").textContent = st.matched;
+    document.getElementById("ring-e").textContent = st.total||"?";
+    const pct  = st.total>0 ? Math.min(st.matched/st.total,1) : 0;
     const ring = document.getElementById("ring-dash");
-    ring.style.strokeDashoffset = dash;
-    ring.style.stroke = pct>=1 ? "#16a34a" : pct>=0.5 ? "#f59e0b" : "#6366f1";
-    if (curJob?.zone==="Normal" && e>0 && n>=e) {
-      document.getElementById("btn-done-normal").style.display="flex";
-    }
+    ring.style.strokeDashoffset = CIRC - pct*CIRC;
+    ring.style.stroke = st.over>0 ? "#dc2626" : pct>=1 ? "#16a34a" : pct>=0.5 ? "#f59e0b" : "#6366f1";
+    // แจ้งเฉพาะ Over แบบสด (ปัญหาจริงตอนนี้) ส่วน Short คือ "ยังนับไม่ครบ" ซึ่งเป็นปกติ
+    // ระหว่างกำลังนับอยู่ — จะถูกฟันธงว่า Short ตอนกด "เสร็จสิ้น" เท่านั้น
+    document.getElementById("mismatch-banner").style.display = st.over>0 ? "block" : "none";
+    document.getElementById("short-count").textContent = st.short;
+    document.getElementById("over-count").textContent = st.over;
   }
 
-  function renderScannedList() {
-    const el = document.getElementById("scanned-list");
-    if (!scannedDetails.length) {
-      el.innerHTML=`<div style="text-align:center;color:var(--gray);font-size:0.875rem;padding:1rem 0;">ยังไม่มีรายการ — เริ่มสแกนได้เลย</div>`;
-      return;
-    }
-    el.innerHTML = [...scannedDetails].reverse().map((d,i) => `
-      <div class="scanned-item">
-        <div class="seq">${scannedDetails.length-i}</div>
-        <div class="tag">${d.scanned_tag}</div>
-        ${d.no_barcode?`<span class="badge badge-amber" style="font-size:0.65rem;">ไม่มีบาร์โค้ด</span>`:""}
-        <div class="tm">${d.scan_time||"—"}</div>
-      </div>`).join("");
-  }
-
-  // ── CORE SCAN HANDLER ─────────────────────────────────────
+  // ── SCAN INPUT (พิมพ์ / ปืนยิง / กล้อง) ──────────────────
   async function handleScan(raw) {
     if (!curJob) return;
     const tag = raw.trim().toUpperCase();
     if (!tag) return;
     const now = Date.now();
-    if (now - lastScan < 500) return;
+    if (now - lastScan < 350) return;
     lastScan = now;
-
-    // ── ป้องกันซ้ำ (AppSheet: NOT IN existing scans) ──────
-    if (scannedTags.has(tag)) {
-      const inp = document.getElementById("tag-input");
-      inp.classList.add("shake","dup-bg");
-      document.getElementById("dup-error").style.display="block";
-      toast("⚠️ สแกนซ้ำ! บาร์โค้ดนี้ถูกสแกนไปแล้ว","err");
-      setTimeout(() => {
-        inp.classList.remove("shake","dup-bg");
-        document.getElementById("dup-error").style.display="none";
-        inp.value=""; inp.focus();
-      }, 1800);
-      return;
-    }
-
-    const timeStr = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
-    const ref = await addDoc(collection(db,"count_details"), {
-      job_id: curJob.id, scanned_tag: tag,
-      scan_time: timeStr, no_barcode: false,
-      timestamp: serverTimestamp()
-    });
-    scannedTags.add(tag);
-    scannedDetails.push({docId:ref.id, scanned_tag:tag, scan_time:timeStr, no_barcode:false});
-    await updateDoc(doc(db,"count_jobs",curJob.id), {total_scanned: scannedDetails.length});
-
     document.getElementById("tag-input").value="";
-    document.getElementById("tag-input").focus();
-    document.getElementById("dup-error").style.display="none";
-    updateProgress(); renderScannedList();
 
-    // ── Zone Logic (AppSheet 3.1) ─────────────────────────
-    // Normal: เด้งอัตโนมัติเมื่อสแกนครบ expected
-    // Zone B / Overflow: ไม่เด้ง รอกดเอง
-    if (curJob.zone==="Normal" && curJob.expected>0 && scannedDetails.length>=curJob.expected) {
-      toast(`✅ นับครบ ${curJob.expected} ชิ้น!`, "ok", 1500);
-      setTimeout(() => finishJob(true), 1600);
+    const row = masterRows().find(r=>r.tag_barcode===tag);
+    if (isBulkZone(curJob.zone)) {
+      if (row && countFor(tag) >= 1) {
+        // ติ๊กแล้ว เตือนเบาๆ ไม่บล็อก (ยังบันทึกเป็น extra ซ้ำได้ถ้าจงใจสแกนซ้ำ)
+        document.getElementById("dup-error").style.display="block";
+        setTimeout(()=>document.getElementById("dup-error").style.display="none", 1500);
+        toast("⚠️ tag นี้ติ๊กว่าเจอไปแล้ว", "");
+        document.getElementById("tag-input").focus();
+        return;
+      }
     }
+    await commitScan(tag);
+    await syncJobProgress();
+    renderChecklist(); updateProgress();
+    document.getElementById("tag-input").focus();
   }
 
   document.getElementById("tag-input").addEventListener("keydown", e => {
@@ -575,7 +565,6 @@
     const v=e.target.value.trim(); if(v) handleScan(v);
   });
 
-  // Camera
   document.getElementById("btn-mode-text").addEventListener("click", () => {
     document.getElementById("mode-text-wrap").style.display="block";
     document.getElementById("mode-cam-wrap").style.display="none";
@@ -605,96 +594,157 @@
   }
   document.getElementById("btn-stop-cam").addEventListener("click", ()=>{ stopCam(); document.getElementById("btn-mode-text").click(); });
 
-  // No barcode
   document.getElementById("chk-no-bc").addEventListener("change", e => {
     document.getElementById("no-bc-wrap").style.display = e.target.checked?"block":"none";
   });
   document.getElementById("btn-add-manual").addEventListener("click", async () => {
     const tag = (document.getElementById("manual-tag").value.trim().toUpperCase()) ||
-                `NOBC-${String(scannedDetails.length+1).padStart(3,"0")}`;
-    if (scannedTags.has(tag)) { toast("⚠️ รหัสซ้ำ","err"); return; }
-    const ts = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
-    const ref = await addDoc(collection(db,"count_details"),{
-      job_id:curJob.id, scanned_tag:tag, scan_time:ts, no_barcode:true, timestamp:serverTimestamp()
-    });
-    scannedTags.add(tag);
-    scannedDetails.push({docId:ref.id, scanned_tag:tag, scan_time:ts, no_barcode:true});
-    await updateDoc(doc(db,"count_jobs",curJob.id),{total_scanned:scannedDetails.length});
+                `NOBC-${scanEvents.length+1}`;
+    await commitScan(tag);
+    await syncJobProgress();
+    renderChecklist(); updateProgress();
     document.getElementById("manual-tag").value="";
     document.getElementById("chk-no-bc").checked=false;
     document.getElementById("no-bc-wrap").style.display="none";
-    updateProgress(); renderScannedList();
     toast(`✅ เพิ่ม ${tag}`, "ok");
   });
 
+  document.getElementById("chk-over").addEventListener("change", e => {
+    document.getElementById("over-wrap").style.display = e.target.checked?"block":"none";
+    if (e.target.checked) setTimeout(()=>document.getElementById("over-tag").focus(), 50);
+  });
+  document.getElementById("btn-add-over").addEventListener("click", async () => {
+    const tag = document.getElementById("over-tag").value.trim().toUpperCase();
+    if (!tag) { toast("⚠️ ระบุรหัสของที่เกินก่อน"); return; }
+    if (masterRows().some(r=>r.tag_barcode===tag)) {
+      toast("⚠️ รหัสนี้มีอยู่ใน Master ที่ location นี้ ไม่ใช่ของเกิน — ใช้ช่องสแกนปกติแทน","err");
+      return;
+    }
+    await commitScan(tag);
+    await syncJobProgress();
+    renderChecklist(); updateProgress();
+    document.getElementById("over-tag").value="";
+    document.getElementById("chk-over").checked=false;
+    document.getElementById("over-wrap").style.display="none";
+    toast(`🔺 บันทึกของเกิน ${tag} แล้ว`, "ok");
+  });
+
   // Finish
-  async function finishJob() {
+  document.getElementById("btn-finish-job").addEventListener("click", async () => {
     if (!curJob) return;
+    const st = checklistStats();
+    if (st.over > 0) {
+      const ok = confirm(`🔺 มีของเกิน (Over) ${st.over} รายการ\n\nยืนยันปิดงานทั้งที่ยังมีของเกินอยู่ใช่หรือไม่?\n(จะถูกบันทึกไว้ให้ Admin เห็นใน Monitor & Audit)`);
+      if (!ok) return;
+    }
+    if (st.matched < st.total) {
+      const shortNow = st.total - st.matched - st.over; // จำนวนที่ยังไม่ครบ = จะถูกฟันธงว่า Short
+      const ok = confirm(`⚠️ นับได้ ${st.matched} จาก ${st.total} รายการใน Master — จะถูกบันทึกเป็น "ขาด (Short)" ${Math.max(0,shortNow)} รายการ\n\nยืนยันปิดงานทั้งที่นับไม่ครบใช่หรือไม่?`);
+      if (!ok) return;
+    }
+    const finalShort = Math.max(0, st.total - st.matched - st.over);
     await updateDoc(doc(db,"count_jobs",curJob.id), {
-      count_status:"Completed", end_time:serverTimestamp(), total_scanned:scannedDetails.length
+      count_status:"Completed", end_time:serverTimestamp(),
+      matched_count: st.matched, expected_target: st.total,
+      short_count: finalShort, over_count: st.over
     });
+    curJob.endTime = {toDate:()=>new Date()};
     await stopCam();
-    await showSummary({...curJob, location_scan:curJob.location, zone_type:curJob.zone, total_scanned:scannedDetails.length, expected_target:curJob.expected});
-  }
-  document.getElementById("btn-finish-job").addEventListener("click", ()=>finishJob());
-  document.getElementById("btn-done-normal").addEventListener("click", ()=>finishJob());
+    await showSummary();
+  });
 
   document.getElementById("btn-back-home").addEventListener("click", async ()=>{
     await stopCam();
     document.getElementById("screen-scan").style.display="none";
     document.getElementById("screen-home").style.display="block";
-    curJob=null; scannedDetails=[]; scannedTags=new Set();
-  });
-
-  document.getElementById("btn-export-scan").addEventListener("click", ()=>{
-    if (!scannedDetails.length) { toast("ไม่มีข้อมูล"); return; }
-    dlCSV([["#","Barcode","เวลา","หมายเหตุ"],...scannedDetails.map((d,i)=>[i+1,d.scanned_tag,d.scan_time,d.no_barcode?"ไม่มีบาร์โค้ด":""])],
-      `scan_${curJob?.location}_${new Date().toISOString().slice(0,10)}.csv`);
-    toast("✅ Export แล้ว","ok");
+    curJob=null; scanEvents=[];
   });
 
   // ══ SUMMARY ═══════════════════════════════════════════════
-  async function showSummary(job) {
+  function fmtTime(t) {
+    if (!t) return "—";
+    const d = t.toDate ? t.toDate() : t;
+    return d.toLocaleString("th-TH",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"});
+  }
+  async function showSummary() {
     await stopCam();
     document.getElementById("screen-scan").style.display    = "none";
     document.getElementById("screen-home").style.display    = "none";
     document.getElementById("screen-summary").style.display = "block";
-    const n = job.total_scanned ?? scannedDetails.length;
-    const e = job.expected_target ?? job.expected ?? 0;
-    const d = n-e;
-    document.getElementById("sum-icon").textContent    = d===0?"🎉":d>0?"📦":"⚠️";
-    document.getElementById("sum-loc").textContent     = job.location_scan||job.location;
-    const ZC = {"Normal":"zone-badge-normal","Zone B":"zone-badge-zoneb","Overflow":"zone-badge-overflow"};
+    const st = checklistStats();
+    const finalShort = Math.max(0, st.total - st.matched - st.over);
+    document.getElementById("sum-icon").textContent = (finalShort+st.over)>0 ? "⚠️" : "🎉";
+    document.getElementById("sum-loc").textContent  = curJob.location;
     const sb = document.getElementById("sum-zone-badge");
-    sb.textContent = job.zone_type||job.zone||"—";
-    sb.className   = `badge ${ZC[job.zone_type||job.zone]||"badge-gray"}`;
-    document.getElementById("sum-scanned").textContent  = n;
-    document.getElementById("sum-expected").textContent = e||"—";
-    const diffEl = document.getElementById("sum-diff");
-    diffEl.textContent = d===0?"0 ✅":d>0?`+${d} 📦`:`${d} ⚠️`;
-    diffEl.style.color = d===0?"var(--green)":d>0?"var(--amber)":"var(--red)";
-    let details = scannedDetails;
-    if (!details.length && job.id) {
-      const s = await getDocs(query(collection(db,"count_details"),where("job_id","==",job.id),orderBy("timestamp")));
-      details = s.docs.map(dd=>({docId:dd.id,...dd.data()}));
-    }
-    document.getElementById("sum-tbody").innerHTML = details.map((x,i)=>`
-      <tr><td>${i+1}</td><td style="font-family:monospace;">${x.scanned_tag}</td>
-      <td>${x.scan_time||"—"}</td>
-      <td>${x.no_barcode?`<span class="badge badge-amber">ไม่มีบาร์โค้ด</span>`:"—"}</td></tr>`).join("")
-      || `<tr><td colspan="4" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่มีข้อมูล</td></tr>`;
-    scannedDetails = details;
+    sb.textContent = ZL[curJob.zone]||curJob.zone;
+    sb.className   = `badge ${Z[curJob.zone]||"badge-gray"}`;
+    document.getElementById("sum-start-time").textContent = fmtTime(curJob.startTime);
+    document.getElementById("sum-end-time").textContent   = fmtTime(curJob.endTime);
+    document.getElementById("sum-matched").textContent  = st.matched;
+    document.getElementById("sum-expected").textContent = st.total||"—";
+    document.getElementById("sum-short").textContent = finalShort;
+    document.getElementById("sum-over").textContent  = st.over;
+
+    const rows = masterRows();
+    document.getElementById("sum-tbody").innerHTML = rows.map(r => {
+      const c = countFor(r.tag_barcode), t = targetFor(r);
+      const ok = (t==null) ? (c>0) : (c===t);
+      const label = ok ? "✅ ตรง" : (t!=null && c<t) ? "⚠️ ขาด (Short)" : "🔺 เกิน (Over)";
+      return `<tr style="${ok?'':'background:#fef2f2;'}">
+        <td style="font-family:monospace;">${r.tag_barcode}</td>
+        <td>${r.item_name||"—"}</td>
+        <td>${t??"—"}</td>
+        <td style="font-weight:700;${ok?'':'color:#dc2626;'}">${c}</td>
+        <td>${label}</td>
+      </tr>`;
+    }).join("") || `<tr><td colspan="5" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่มี Master</td></tr>`;
   }
   document.getElementById("btn-sum-back").addEventListener("click", ()=>{
     document.getElementById("screen-summary").style.display="none";
     document.getElementById("screen-home").style.display="block";
-    curJob=null; scannedDetails=[]; scannedTags=new Set();
+    curJob=null; scanEvents=[];
   });
+
+  function summaryRows() {
+    const rows = masterRows();
+    const extras = {};
+    scanEvents.forEach(e => { if (!rows.some(r=>r.tag_barcode===e.scanned_tag)) extras[e.scanned_tag]=(extras[e.scanned_tag]||0)+1; });
+    const masterRowsOut = rows.map(r=>{
+      const c=countFor(r.tag_barcode), t=targetFor(r);
+      const ok=(t==null)?(c>0):(c===t);
+      const status = ok ? "OK" : (t!=null && c<t) ? "Short" : "Over";
+      return [curJob.location, r.tag_barcode, r.item_name||"", t??"", c, status];
+    });
+    const extraRowsOut = Object.keys(extras).map(tag => [curJob.location, tag, "(ไม่อยู่ใน Master)", "", extras[tag], "Over"]);
+    return [["Location","Barcode","ชื่อสินค้า","Target","นับได้","สถานะ"], ...masterRowsOut, ...extraRowsOut];
+  }
+
   document.getElementById("btn-sum-export").addEventListener("click", ()=>{
-    if (!scannedDetails.length) { toast("ไม่มีข้อมูล"); return; }
-    dlCSV([["#","Barcode","เวลา","หมายเหตุ"],...scannedDetails.map((d,i)=>[i+1,d.scanned_tag,d.scan_time,d.no_barcode?"ไม่มีบาร์โค้ด":""])],
-      `summary_${new Date().toISOString().slice(0,10)}.csv`);
-    toast("✅ Export แล้ว","ok");
+    dlCSV(summaryRows(), `summary_${curJob?.location}_${new Date().toISOString().slice(0,10)}.csv`);
+    toast("✅ Export CSV แล้ว","ok");
+  });
+
+  document.getElementById("btn-sum-export-xlsx").addEventListener("click", ()=>{
+    const rows = summaryRows();
+    const wb = XLSX.utils.book_new();
+    const detailSheet = XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, detailSheet, "รายละเอียด");
+    const st = checklistStats();
+    const finalShort = Math.max(0, st.total - st.matched - st.over);
+    const infoSheet = XLSX.utils.aoa_to_sheet([
+      ["Location", curJob.location],
+      ["Zone", curJob.zone],
+      ["ผู้นับ", curJob.createdName||"—"],
+      ["เวลาเริ่ม", fmtTime(curJob.startTime)],
+      ["เวลาจบ", fmtTime(curJob.endTime)],
+      ["Master ทั้งหมด", st.total],
+      ["ตรง", st.matched],
+      ["ขาด (Short)", finalShort],
+      ["เกิน (Over)", st.over],
+    ]);
+    XLSX.utils.book_append_sheet(wb, infoSheet, "สรุป");
+    XLSX.writeFile(wb, `summary_${curJob?.location}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast("✅ Export Excel แล้ว","ok");
   });
 
   function dlCSV(rows, name) {
