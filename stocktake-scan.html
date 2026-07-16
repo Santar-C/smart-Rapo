@@ -74,6 +74,7 @@
 
   <!-- ═══ SCREEN: CHECKLIST (นับ) ═══ -->
   <div id="screen-scan" style="display:none">
+    <div id="offline-badge" style="display:none;align-items:center;gap:0.5rem;padding:0.55rem 0.9rem;border-radius:10px;color:white;font-weight:700;font-size:0.85rem;margin-bottom:0.6rem;"></div>
     <div class="card" style="position:sticky;top:0.5rem;z-index:50;margin-bottom:0.75rem;padding:0.9rem 1.25rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
         <div>
@@ -122,11 +123,43 @@
   </div>
 
   <!-- ═══ SCREEN: DONE → ต่อ QR ถัดไปได้เลย ═══ -->
+  <!-- ═══ MODAL: แจ้งของเกิน (Over) — รหัส + เหตุผล + รูปถ่าย (ไม่บังคับ) ═══ -->
+  <div id="over-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;align-items:center;justify-content:center;padding:1rem;">
+    <div class="card" style="max-width:420px;width:100%;margin:0;">
+      <div style="font-weight:900;font-size:1.1rem;color:var(--red);margin-bottom:0.8rem;">🔺 แจ้งของเกิน</div>
+      <div class="form-group">
+        <label>รหัส Tag / Barcode</label>
+        <input type="text" id="over-modal-tag" placeholder="สแกนหรือพิมพ์รหัส" class="scan-input-big" style="font-size:1.1rem !important;">
+      </div>
+      <div class="form-group">
+        <label>สาเหตุ (เลือกถ้าพอทราบ)</label>
+        <select id="over-modal-reason" style="width:100%;padding:0.7rem;border:2px solid var(--border);border-radius:10px;font-family:Sarabun,sans-serif;font-size:1rem;">
+          <option value="">-- ไม่ระบุ --</option>
+          <option value="วางผิด location">📍 วางผิด Location</option>
+          <option value="เอกสาร/waybill ผิด">📄 เอกสาร/Waybill ผิด</option>
+          <option value="รอ QC">🔍 รอ QC</option>
+          <option value="ของเกินจากรอบก่อน">🔁 ของเกินจากรอบก่อน</option>
+          <option value="อื่นๆ">❓ อื่นๆ</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>📷 ถ่ายรูปแนบ (ไม่บังคับ)</label>
+        <input type="file" id="over-modal-photo" accept="image/*" capture="environment">
+        <div id="over-modal-photo-preview" style="margin-top:0.5rem;display:none;"><img style="max-width:100%;border-radius:8px;max-height:160px;"></div>
+      </div>
+      <div style="display:flex;gap:0.6rem;margin-top:0.5rem;">
+        <button class="btn btn-outline" id="over-modal-cancel" style="flex:1;">ยกเลิก</button>
+        <button class="btn btn-primary" id="over-modal-confirm" style="flex:2;background:var(--red);border:none;">🔺 บันทึกของเกิน</button>
+      </div>
+    </div>
+  </div>
+
   <div id="screen-done" style="display:none">
     <div class="card" style="text-align:center;padding:1.5rem;">
       <div style="font-size:2.8rem;margin-bottom:0.4rem;" id="done-icon">🎉</div>
       <div class="big-title" style="color:var(--blue);">นับเสร็จแล้ว</div>
       <div style="font-size:0.9rem;color:var(--gray);margin-top:0.5rem;" id="done-detail"></div>
+      <div style="font-size:0.95rem;color:var(--indigo);font-weight:700;margin-top:0.7rem;" id="done-encourage"></div>
     </div>
     <button class="btn btn-primary btn-full big-btn" id="btn-next-location" style="margin-bottom:0.6rem;">➕ นับ Location ถัดไป</button>
     <button class="btn btn-outline btn-full" id="btn-next-qr" style="margin-bottom:1rem;">📷 หรือสแกน QR แทน (ถ้ามี)</button>
@@ -137,7 +170,8 @@
 <div id="toast">—</div>
 
 <script type="module">
-  import { auth, db } from "./firebase-config.js";
+  import { auth, db, storage } from "./firebase-config.js";
+  import { ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
   import { signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     collection, doc, addDoc, updateDoc, deleteDoc, getDocs, getDoc,
@@ -149,6 +183,98 @@
   const ZL = {"Normal":"Normal Zone","Zone B":"Zone B","Overflow":"Overflow"};
   function isBulkZone(zone) { return zone === "Zone B" || zone === "Overflow"; }
   const LAST_STAFF_KEY = "rapo_stocktake_last_staff";
+
+  // ══ OFFLINE QUEUE (IndexedDB) ═══════════════════════════════
+  // แก้ปัญหาสัญญาณหลุดกลางโกดัง (มุมอับสัญญาณ): ถ้าเขียน Firestore ไม่ได้
+  // ให้เก็บ operation ไว้ใน IndexedDB ก่อน แล้ว sync อัตโนมัติเมื่อกลับมามีเน็ต
+  // โดย UI ของพนักงานยังทำงานต่อได้ปกติ (optimistic update) ไม่สะดุด
+  const QDB_NAME = "rapo_stocktake_queue", QSTORE = "ops";
+  function openQueueDB() {
+    return new Promise((resolve,reject) => {
+      const req = indexedDB.open(QDB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(QSTORE, {keyPath:"id"}); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function queuePut(item) {
+    const idb = await openQueueDB();
+    return new Promise((resolve,reject) => {
+      const tx = idb.transaction(QSTORE,"readwrite");
+      tx.objectStore(QSTORE).put(item);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function queueDelete(id) {
+    const idb = await openQueueDB();
+    return new Promise((resolve,reject) => {
+      const tx = idb.transaction(QSTORE,"readwrite");
+      tx.objectStore(QSTORE).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function queueGetAll() {
+    const idb = await openQueueDB();
+    return new Promise((resolve,reject) => {
+      const tx = idb.transaction(QSTORE,"readonly");
+      const req = tx.objectStore(QSTORE).getAll();
+      req.onsuccess = () => resolve(req.result||[]);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  let flushingQueue = false;
+  async function flushQueue() {
+    if (flushingQueue || !navigator.onLine) return;
+    flushingQueue = true;
+    try {
+      const items = (await queueGetAll()).sort((a,b)=>a.ts-b.ts);
+      for (const item of items) {
+        try {
+          if (item.type === "add_detail") {
+            const ref = await addDoc(collection(db,"count_details"), {...item.data, timestamp: serverTimestamp()});
+            const idx = scanEvents.findIndex(e=>e.docId===item.id);
+            if (idx>-1) scanEvents[idx] = {...scanEvents[idx], docId:ref.id, _pending:false};
+          } else if (item.type === "delete_detail") {
+            await deleteDoc(doc(db,"count_details", item.data.realDocId));
+          } else if (item.type === "update_progress" || item.type === "finish_job") {
+            const fields = {...item.data.fields};
+            Object.keys(fields).forEach(k => { if (fields[k] === "__SERVER_TIMESTAMP__") fields[k] = serverTimestamp(); });
+            await updateDoc(doc(db,"count_jobs", item.data.jobId), fields);
+          }
+          await queueDelete(item.id);
+        } catch (err) { break; } // ยังออฟไลน์จริงๆ อยู่ — หยุดรอบนี้ ลองใหม่รอบหน้า
+      }
+    } finally {
+      flushingQueue = false;
+      updateOfflineBadge();
+      if (document.getElementById("screen-scan").style.display !== "none") renderChecklist();
+    }
+  }
+  window.addEventListener("online", flushQueue);
+  window.addEventListener("offline", updateOfflineBadge);
+  setInterval(flushQueue, 15000);
+
+  async function updateOfflineBadge() {
+    const badge = document.getElementById("offline-badge");
+    if (!badge) return;
+    let items = [];
+    try { items = await queueGetAll(); } catch(e) {}
+    if (!navigator.onLine) {
+      badge.style.display="flex"; badge.style.background="#dc2626";
+      badge.textContent = `📴 ออฟไลน์ — ข้อมูลจะ sync อัตโนมัติเมื่อมีเน็ต (ค้าง ${items.length} รายการ)`;
+    } else if (items.length>0) {
+      badge.style.display="flex"; badge.style.background="#f59e0b";
+      badge.textContent = `🔄 กำลัง sync ข้อมูลที่ค้างไว้... (เหลือ ${items.length})`;
+      flushQueue();
+    } else {
+      badge.style.display="none";
+    }
+  }
+  setInterval(updateOfflineBadge, 5000);
+
 
   let toastTimer;
   function toast(msg, cls="", dur=2200) {
@@ -282,8 +408,18 @@
     const name = document.getElementById("staff-select").value;
     if (!name) { toast("⚠️ เลือกชื่อก่อนนะครับ/ค่ะ"); return; }
     if (!selLoc) { toast("⚠️ เลือกโซนและ location ก่อนนะครับ/ค่ะ"); return; }
+    if (!navigator.onLine) { toast("📴 ต้องมีเน็ตตอนเริ่มนับ Location ใหม่ครั้งแรก — เชื่อมต่อแล้วลองใหม่ครับ/ค่ะ", "err", 4000); return; }
     localStorage.setItem(LAST_STAFF_KEY, name);
-    await beginCounting(name, selLoc);
+    const btn = document.getElementById("btn-begin");
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "⏳ กำลังเริ่ม...";
+    try {
+      await beginCounting(name, selLoc);
+    } catch (err) {
+      toast("❌ เริ่มนับไม่สำเร็จ (เช็คสัญญาณเน็ต): "+err.message, "err", 5000);
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
   });
 
   async function getCurrentRoundId() {
@@ -370,7 +506,7 @@
     document.getElementById("zone-hint").innerHTML = isBulkZone(curJob.zone)
       ? `🟣 เจอ tag ไหน สแกนเลย — ติ๊กให้อัตโนมัติ`
       : `🔵 ยิงบาร์โค้ดซ้ำทีละชิ้น ระบบนับให้`;
-    renderChecklist(); updateProgress();
+    renderChecklist(); updateProgress(); updateOfflineBadge();
     setTimeout(()=>document.getElementById("tag-input").focus(), 200);
   }
 
@@ -381,42 +517,73 @@
       const c=countFor(r.tag_barcode), t=targetFor(r);
       const cls = (t==null) ? (c>0?"matched":"pending") : (c===t ? "matched" : (c>t ? "over":"pending"));
       const tickIcon = cls==="matched" ? "✓" : cls==="over" ? "!" : "";
+      const hasPending = scanEvents.some(e=>e.scanned_tag===r.tag_barcode && e._pending);
       const stepper = isBulkZone(curJob.zone)
         ? `<div class="tick" onclick="toggleTick('${r.tag_barcode}')" style="background:${cls==='matched'?'#16a34a':cls==='over'?'#dc2626':'#e2e8f0'};color:${cls==='pending'?'#94a3b8':'white'};">${tickIcon}</div>`
         : `<div class="stepper"><button onclick="stepQty('${r.tag_barcode}',-1)">−</button><div class="cnt">${c}${t!=null?` / ${t}`:""}</div><button onclick="stepQty('${r.tag_barcode}',1)">+</button></div>`;
       return `<div class="chk-row ${cls}">
-        <div style="flex:1;min-width:0;"><div class="tag">${r.tag_barcode}</div>${(r.sku||r.item_name)?`<div class="name">${r.sku?`<b>${r.sku}</b>`:""}${r.sku&&r.item_name?" — ":""}${r.item_name||""}</div>`:""}</div>
+        <div style="flex:1;min-width:0;"><div class="tag">${r.tag_barcode}${hasPending?' <span style="font-size:0.7rem;color:var(--amber);">⏳ รอ sync</span>':''}</div>${(r.sku||r.item_name)?`<div class="name">${r.sku?`<b>${r.sku}</b>`:""}${r.sku&&r.item_name?" — ":""}${r.item_name||""}</div>`:""}</div>
         ${stepper}
       </div>`;
     }).join("") : `<div style="text-align:center;color:var(--gray);font-size:0.9rem;padding:1rem 0;">ไม่มีรายการที่ต้องนับที่นี่</div>`;
   }
 
+  async function removeScanEvent(e) {
+    if (e.docId.startsWith("local_")) {
+      // ยังไม่เคย sync เลย แค่ยกเลิก operation ที่ค้างอยู่ใน queue
+      try { await queueDelete(e.docId); } catch(err) {}
+    } else {
+      try {
+        if (!navigator.onLine) throw new Error("offline");
+        await deleteDoc(doc(db,"count_details", e.docId));
+      } catch (err) {
+        await queuePut({ id:"del_"+e.docId, type:"delete_detail", data:{realDocId:e.docId}, ts:Date.now() });
+      }
+    }
+  }
+
   window.toggleTick = async (tag) => {
     if (countFor(tag) > 0) {
       const evs = scanEvents.filter(e=>e.scanned_tag===tag);
-      for (const e of evs) await deleteDoc(doc(db,"count_details",e.docId));
+      for (const e of evs) await removeScanEvent(e);
       scanEvents = scanEvents.filter(e=>e.scanned_tag!==tag);
     } else { await commitScan(tag); }
-    await syncJobProgress(); renderChecklist(); updateProgress();
+    await syncJobProgress(); renderChecklist(); updateProgress(); updateOfflineBadge();
   };
   window.stepQty = async (tag, delta) => {
     if (delta>0) { await commitScan(tag); }
     else {
       const evs = scanEvents.filter(e=>e.scanned_tag===tag);
-      if (evs.length) { const last=evs[evs.length-1]; await deleteDoc(doc(db,"count_details",last.docId)); scanEvents=scanEvents.filter(e=>e.docId!==last.docId); }
+      if (evs.length) { const last=evs[evs.length-1]; await removeScanEvent(last); scanEvents=scanEvents.filter(e=>e.docId!==last.docId); }
     }
-    await syncJobProgress(); renderChecklist(); updateProgress();
+    await syncJobProgress(); renderChecklist(); updateProgress(); updateOfflineBadge();
   };
 
-  async function commitScan(tag) {
+  async function commitScan(tag, extra) {
     const timeStr = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
-    const payload = { job_id: curJob.id, scanned_tag: tag, scan_time: timeStr, timestamp: serverTimestamp() };
-    const ref = await addDoc(collection(db,"count_details"), payload);
-    scanEvents.push({docId:ref.id, ...payload});
+    const data = { job_id: curJob.id, scanned_tag: tag, scan_time: timeStr, ...(extra||{}) };
+    const localId = "local_"+Date.now()+"_"+Math.random().toString(36).slice(2,8);
+    scanEvents.push({docId:localId, ...data, _pending:true}); // optimistic — UI ทำงานต่อได้ทันทีไม่ว่าจะออนไลน์หรือไม่
+    try {
+      if (!navigator.onLine) throw new Error("offline");
+      const ref = await addDoc(collection(db,"count_details"), {...data, timestamp: serverTimestamp()});
+      const idx = scanEvents.findIndex(e=>e.docId===localId);
+      if (idx>-1) scanEvents[idx] = {...scanEvents[idx], docId:ref.id, _pending:false};
+    } catch (err) {
+      await queuePut({ id:localId, type:"add_detail", data, ts:Date.now() });
+    }
+    updateOfflineBadge();
   }
   async function syncJobProgress() {
     const st = checklistStats();
-    await updateDoc(doc(db,"count_jobs",curJob.id), { matched_count: st.matched, over_count: st.over, expected_target: st.total });
+    const fields = { matched_count: st.matched, over_count: st.over, expected_target: st.total };
+    try {
+      if (!navigator.onLine) throw new Error("offline");
+      await updateDoc(doc(db,"count_jobs",curJob.id), fields);
+    } catch (err) {
+      // ใช้ id คงที่ต่อ job (progress_<jobId>) — เขียนทับกันเอง ไม่สะสม queue บวมจากการสแกนรัวๆ
+      await queuePut({ id:"progress_"+curJob.id, type:"update_progress", data:{jobId:curJob.id, fields}, ts:Date.now() });
+    }
   }
   function updateProgress() {
     const st = checklistStats();
@@ -467,15 +634,56 @@
     if (html5Cam && camStarted) { await html5Cam.stop().catch(()=>{}); html5Cam=null; camStarted=false; }
   }
 
-  // ── แจ้งของเกิน: แตะเดียวเปิด prompt ทันที (ลดขั้นตอน) ────
-  document.getElementById("btn-report-over").addEventListener("click", async () => {
-    const tag = prompt("สแกนหรือพิมพ์รหัสของที่เกิน:");
-    if (!tag || !tag.trim()) return;
-    const t = tag.trim().toUpperCase();
-    if (masterRows().some(r=>r.tag_barcode===t)) { toast("อันนี้อยู่ในรายการอยู่แล้ว สแกนช่องปกติได้เลย","err"); return; }
-    await commitScan(t);
-    await syncJobProgress(); renderChecklist(); updateProgress();
-    toast(`🔺 บันทึกของเกินแล้ว`, "ok");
+  // ── แจ้งของเกิน: modal พร้อมสาเหตุ + รูปแนบ (ไม่บังคับ) ────
+  let overModalPhotoFile = null;
+  document.getElementById("btn-report-over").addEventListener("click", () => {
+    document.getElementById("over-modal-tag").value = "";
+    document.getElementById("over-modal-reason").value = "";
+    document.getElementById("over-modal-photo").value = "";
+    document.getElementById("over-modal-photo-preview").style.display = "none";
+    overModalPhotoFile = null;
+    document.getElementById("over-modal").style.display = "flex";
+    setTimeout(()=>document.getElementById("over-modal-tag").focus(), 50);
+  });
+  document.getElementById("over-modal-cancel").addEventListener("click", () => {
+    document.getElementById("over-modal").style.display = "none";
+  });
+  document.getElementById("over-modal-photo").addEventListener("change", e => {
+    const f = e.target.files[0];
+    overModalPhotoFile = f || null;
+    const prev = document.getElementById("over-modal-photo-preview");
+    if (f) {
+      const url = URL.createObjectURL(f);
+      prev.querySelector("img").src = url;
+      prev.style.display = "block";
+    } else prev.style.display = "none";
+  });
+  document.getElementById("over-modal-confirm").addEventListener("click", async () => {
+    const tag = document.getElementById("over-modal-tag").value.trim().toUpperCase();
+    if (!tag) { toast("⚠️ ระบุรหัสของที่เกินก่อน"); return; }
+    if (masterRows().some(r=>r.tag_barcode===tag)) { toast("อันนี้อยู่ในรายการอยู่แล้ว สแกนช่องปกติได้เลย","err"); return; }
+    const reason = document.getElementById("over-modal-reason").value || "";
+    const btn = document.getElementById("over-modal-confirm");
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "⏳ กำลังบันทึก...";
+    let photoUrl = "", photoWarning = false;
+    if (overModalPhotoFile) {
+      try {
+        if (!navigator.onLine) throw new Error("offline");
+        btn.textContent = "⏳ กำลังอัปโหลดรูป...";
+        const path = `stocktake_evidence/${curJob.id}/${Date.now()}_${overModalPhotoFile.name}`;
+        const sref = storageRef(storage, path);
+        await uploadBytes(sref, overModalPhotoFile);
+        photoUrl = await getDownloadURL(sref);
+      } catch (err) {
+        photoWarning = true; // ไม่บล็อกการบันทึก แค่ไม่มีรูปแนบ (เช่น ตอนนี้ออฟไลน์ อัปโหลดรูปไม่ได้)
+      }
+    }
+    await commitScan(tag, { reason, photo_url: photoUrl, is_over: true });
+    await syncJobProgress(); renderChecklist(); updateProgress(); updateOfflineBadge();
+    document.getElementById("over-modal").style.display = "none";
+    toast(photoWarning ? `🔺 บันทึกของเกินแล้ว (รูปแนบไม่ได้ตอนนี้ — ลองแนบใหม่ทีหลัง)` : `🔺 บันทึกของเกินแล้ว`, "ok", 3500);
+    btn.disabled = false; btn.textContent = orig;
   });
 
   document.getElementById("btn-finish-job").addEventListener("click", async () => {
@@ -486,15 +694,30 @@
       const ok = confirm(`ตรง ${st.matched}/${st.total}${shortNow>0?` · ขาด ${shortNow}`:""}${st.over>0?` · เกิน ${st.over}`:""}\n\nยืนยันปิดโลนี้?`);
       if (!ok) return;
     }
-    await updateDoc(doc(db,"count_jobs",curJob.id), {
-      count_status:"Completed", end_time:serverTimestamp(),
+    const fields = {
+      count_status:"Completed",
       matched_count: st.matched, expected_target: st.total, short_count: shortNow, over_count: st.over
-    });
+    };
+    let queuedOffline = false;
+    try {
+      if (!navigator.onLine) throw new Error("offline");
+      await updateDoc(doc(db,"count_jobs",curJob.id), {...fields, end_time: serverTimestamp()});
+    } catch (err) {
+      // "__SERVER_TIMESTAMP__" คือ marker ข้อความล้วน (เก็บใน IndexedDB ได้จริง)
+      // จะถูกแปลงเป็น serverTimestamp() จริงตอน flushQueue() sync กลับออนไลน์
+      await queuePut({ id:"finish_"+curJob.id, type:"finish_job", data:{jobId:curJob.id, fields:{...fields, end_time:"__SERVER_TIMESTAMP__"}}, ts:Date.now() });
+      queuedOffline = true;
+    }
     await stopCam();
     document.getElementById("screen-scan").style.display="none";
     document.getElementById("screen-done").style.display="block";
     document.getElementById("done-icon").textContent = (shortNow+st.over)>0 ? "⚠️" : "🎉";
-    document.getElementById("done-detail").textContent = `${curJob.location} — ตรง ${st.matched}/${st.total}${shortNow>0?` · ขาด ${shortNow}`:""}${st.over>0?` · เกิน ${st.over}`:""}`;
+    document.getElementById("done-detail").textContent = `${curJob.location} — ตรง ${st.matched}/${st.total}${shortNow>0?` · ขาด ${shortNow}`:""}${st.over>0?` · เกิน ${st.over}`:""}${queuedOffline?" (รอ sync)":""}`;
+    const encourageEl = document.getElementById("done-encourage");
+    if (encourageEl) {
+      encourageEl.textContent = (shortNow+st.over)===0 ? "เยี่ยมมาก! นับตรงเป๊ะ ขอบคุณสำหรับความละเอียดครับ/ค่ะ 👏" : "ขอบคุณที่นับให้ครับ/ค่ะ มีของไม่ตรงนิดหน่อย เดี๋ยวหัวหน้างานจะตรวจสอบต่อเอง 🙏";
+    }
+    updateOfflineBadge();
   });
 </script>
 </body>
