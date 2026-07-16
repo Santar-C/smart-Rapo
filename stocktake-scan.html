@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>สแกนนับสต็อก - RAPO</title>
+  <link rel="manifest" href="manifest-scan.json">
+  <meta name="theme-color" content="#021D49">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { font-family:'Sarabun',sans-serif; }
+    .big-title { font-size:1.8rem; font-weight:900; }
+    .big-btn { font-size:1.15rem !important; padding:1rem !important; }
+    .scan-input-big { font-size:1.5rem !important; font-weight:700 !important; text-align:center; letter-spacing:0.06em; background:#f0fdf4 !important; border-color:var(--green) !important; padding:1rem !important; }
+    .chk-list { display:flex; flex-direction:column; gap:0.5rem; max-height:440px; overflow-y:auto; }
+    .chk-row { display:flex; align-items:center; gap:0.7rem; padding:0.7rem 0.9rem; border-radius:12px; border:2px solid var(--border); background:white; }
+    .chk-row.pending { background:#f8fafc; }
+    .chk-row.matched { background:#f0fdf4; border-color:#86efac; }
+    .chk-row.over    { background:#fef2f2; border-color:#fca5a5; }
+    .chk-row .tick { width:34px; height:34px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.1rem; cursor:pointer; background:#e2e8f0; color:#94a3b8; }
+    .chk-row .tag  { font-family:monospace; font-weight:700; flex:1; font-size:1rem; }
+    .chk-row .name { font-size:0.78rem; color:var(--gray); }
+    .chk-row .cnt  { font-size:0.95rem; font-weight:900; padding:0.2rem 0.65rem; border-radius:8px; background:#e0e7ff; color:#4338ca; white-space:nowrap; }
+    .chk-row.over .cnt { background:#fee2e2; color:#dc2626; }
+    .stepper { display:flex; align-items:center; gap:0.4rem; }
+    .stepper button { width:36px; height:36px; border-radius:50%; border:2px solid var(--border); background:white; font-weight:900; font-size:1.2rem; cursor:pointer; }
+    .progress-wrap { display:flex; align-items:center; gap:1.25rem; }
+    .ring-svg { transform:rotate(-90deg); }
+    .ring-num { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.85rem 1.5rem; border-radius:12px; font-size:1rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); white-space:nowrap; }
+    #toast.show { transform:translateX(-50%) translateY(0); }
+    #toast.err  { background:#dc2626; }
+    #toast.ok   { background:#16a34a; }
+    #reader__dashboard_section_csr, #reader__dashboard_section_swaplink { display:none !important; }
+  </style>
+</head>
+<body>
+<div class="page-body" style="max-width:520px;margin:0 auto;padding:1rem;">
+
+  <!-- ═══ SCREEN: PICK STAFF / START ═══ -->
+  <div id="screen-start">
+    <div class="card" style="text-align:center;">
+      <div class="big-title" style="color:var(--blue);">📝 นับสต็อก</div>
+    </div>
+    <div class="card" id="loc-missing-card" style="display:none;">
+      <div class="alert alert-error" style="font-size:1rem;">⚠️ สแกน QR ที่ติดหน้าช่องเก็บของก่อนนะครับ/ค่ะ</div>
+      <button class="btn btn-primary btn-full big-btn" id="btn-rescan-missing" style="margin-top:0.75rem;">📷 สแกน QR</button>
+      <div id="rescan-missing-reader" style="margin-top:0.75rem;border-radius:12px;overflow:hidden;"></div>
+    </div>
+    <div class="card" id="loc-card" style="display:none;">
+      <div style="font-size:0.8rem;color:var(--gray);">📍 คุณอยู่ที่</div>
+      <div class="big-title" style="color:var(--blue);" id="loc-title">—</div>
+      <div style="font-size:0.9rem;margin-top:0.4rem;color:var(--gray);" id="loc-sub">—</div>
+      <div style="margin-top:1.25rem;" class="form-group">
+        <label style="font-size:1rem;">คุณคือใคร?</label>
+        <select id="staff-select" style="width:100%;padding:0.85rem;border:2px solid var(--border);border-radius:10px;font-family:Sarabun,sans-serif;font-size:1.15rem;font-weight:700;">
+          <option value="">-- กำลังโหลด... --</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-full big-btn" id="btn-begin" style="margin-top:0.75rem;">▶ เริ่มนับ</button>
+    </div>
+  </div>
+
+  <!-- ═══ SCREEN: CHECKLIST (นับ) ═══ -->
+  <div id="screen-scan" style="display:none">
+    <div class="card" style="position:sticky;top:0.5rem;z-index:50;margin-bottom:0.75rem;padding:0.9rem 1.25rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+        <div>
+          <div style="font-size:0.78rem;color:var(--gray);" id="scan-who"></div>
+          <div class="big-title" style="color:var(--blue);" id="scan-loc-title">—</div>
+        </div>
+        <span class="badge" id="scan-zone-badge" style="font-size:0.85rem;padding:0.35rem 0.8rem;">—</span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:0.75rem;padding:0.9rem 1.25rem;">
+      <div class="progress-wrap">
+        <div style="position:relative;width:110px;height:110px;flex-shrink:0;">
+          <svg width="110" height="110" viewBox="0 0 100 100" class="ring-svg">
+            <circle cx="50" cy="50" r="43" fill="none" stroke="#e2e8f0" stroke-width="10"/>
+            <circle cx="50" cy="50" r="43" fill="none" stroke="#16a34a" stroke-width="10"
+              id="ring-dash" stroke-dasharray="270" stroke-dashoffset="270"
+              stroke-linecap="round" style="transition:all 0.5s ease;"/>
+          </svg>
+          <div class="ring-num">
+            <div style="font-size:1.9rem;font-weight:900;line-height:1;color:var(--green);" id="ring-n">0</div>
+            <div style="font-size:0.8rem;color:var(--gray);">/<span id="ring-e">?</span></div>
+          </div>
+        </div>
+        <div style="flex:1;">
+          <div id="zone-hint" style="font-size:0.82rem;font-weight:700;"></div>
+          <div id="over-hint" style="display:none;margin-top:0.4rem;color:var(--red);font-weight:900;font-size:1rem;">🔺 ของเกิน <span id="over-count">0</span> ชิ้น</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:0.75rem;">
+      <input type="text" id="tag-input" placeholder="สแกนบาร์โค้ดตรงนี้ (ปืนยิง) หรือแตะ 📷"
+        autocomplete="off" autocorrect="off" spellcheck="false" class="scan-input-big">
+      <button class="btn btn-outline btn-full big-btn" id="btn-toggle-cam" style="margin-top:0.6rem;">📷 เปิดกล้องสแกน</button>
+      <div id="cam-reader" style="display:none;width:100%;background:#1e293b;border-radius:12px;min-height:220px;margin-top:0.6rem;"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:0.75rem;">
+      <div class="card-title" style="font-size:1rem;margin-bottom:0.75rem;">✅ รายการที่ต้องนับ</div>
+      <div class="chk-list" id="chk-list"></div>
+    </div>
+
+    <button class="btn btn-outline btn-full big-btn" id="btn-report-over" style="margin-bottom:0.6rem;">🔺 เจอของเกิน (ไม่มีในรายการ)</button>
+    <button class="btn btn-green btn-full big-btn" id="btn-finish-job" style="margin-bottom:1rem;">🏁 นับเสร็จ — โลนี้จบ</button>
+  </div>
+
+  <!-- ═══ SCREEN: DONE → ต่อ QR ถัดไปได้เลย ═══ -->
+  <div id="screen-done" style="display:none">
+    <div class="card" style="text-align:center;padding:1.5rem;">
+      <div style="font-size:2.8rem;margin-bottom:0.4rem;" id="done-icon">🎉</div>
+      <div class="big-title" style="color:var(--blue);">นับเสร็จแล้ว</div>
+      <div style="font-size:0.9rem;color:var(--gray);margin-top:0.5rem;" id="done-detail"></div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.75rem;">ไปช่องถัดไปแล้วสแกน QR ต่อได้เลย</div>
+      <div id="next-reader" style="border-radius:12px;overflow:hidden;min-height:220px;background:#1e293b;"></div>
+    </div>
+  </div>
+
+</div>
+<div id="toast">—</div>
+
+<script type="module">
+  import { auth, db } from "./firebase-config.js";
+  import { signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
+    query, where, orderBy, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const CIRC = 2 * Math.PI * 43;
+  const Z  = {"Normal":"badge-blue","Zone B":"badge-purple","Overflow":"badge-orange"};
+  const ZL = {"Normal":"Normal Zone","Zone B":"Zone B","Overflow":"Overflow"};
+  function isBulkZone(zone) { return zone === "Zone B" || zone === "Overflow"; }
+  const LAST_STAFF_KEY = "rapo_stocktake_last_staff";
+
+  let toastTimer;
+  function toast(msg, cls="", dur=2200) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.className = cls ? `show ${cls}` : "show";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.className="", dur);
+  }
+
+  // ── Anonymous sign-in อัตโนมัติ ไม่ต้องมี UI login ─────────
+  const currentUser = await new Promise((resolve) => {
+    onAuthStateChanged(auth, user => {
+      if (user) { resolve(user); return; }
+      signInAnonymously(auth).catch(err => toast("❌ เข้าระบบไม่ได้: "+err.message, "err"));
+    });
+  });
+
+  const params  = new URLSearchParams(location.search);
+  const locCode = (params.get("loc")||"").trim().toUpperCase();
+
+  let masterStock = [], scanEvents = [], curJob = null, staffList = [];
+  let camStarted = false, html5Cam = null, lastScan = 0;
+
+  function goToLocation(code) {
+    const url = new URL(location.href);
+    url.searchParams.set("loc", code.trim().toUpperCase());
+    location.href = url.toString();
+  }
+  // เผื่อ QR encode เป็น URL เต็มแทนที่จะเป็นแค่รหัส location
+  function extractLocFromScan(text) {
+    try {
+      const u = new URL(text);
+      const l = u.searchParams.get("loc");
+      if (l) return l;
+    } catch(e) {}
+    return text;
+  }
+
+  async function init() {
+    if (!locCode) {
+      document.getElementById("loc-missing-card").style.display="block";
+      setupMissingLocScanner();
+      return;
+    }
+    const s = await getDocs(query(collection(db,"master_stock"), where("location","==",locCode)));
+    masterStock = s.docs.map(d=>({id:d.id,...d.data()}));
+    const zone = masterStock[0]?.zone || "Normal";
+    document.getElementById("loc-card").style.display = "block";
+    document.getElementById("loc-title").textContent = locCode;
+    document.getElementById("loc-sub").textContent = `${masterStock.length} รายการที่ต้องนับ`;
+
+    const staffSnap = await getDocs(query(collection(db,"staff_list"), orderBy("name")));
+    staffList = staffSnap.docs.map(d=>d.data().name);
+    const sel = document.getElementById("staff-select");
+    sel.innerHTML = staffList.length
+      ? `<option value="">-- เลือกชื่อ --</option>` + staffList.map(n=>`<option value="${n}">${n}</option>`).join("")
+      : `<option value="">(ยังไม่มีรายชื่อ — แจ้ง Admin)</option>`;
+
+    // จำชื่อล่าสุดไว้ ไม่ต้องเลือกซ้ำทุกโล
+    const last = localStorage.getItem(LAST_STAFF_KEY);
+    if (last && staffList.includes(last)) sel.value = last;
+  }
+  init();
+
+  async function setupMissingLocScanner() {
+    document.getElementById("btn-rescan-missing").addEventListener("click", async () => {
+      const wrap = document.getElementById("rescan-missing-reader");
+      wrap.style.display="block"; wrap.innerHTML = `<div id="_mr"></div>`;
+      const cam = new Html5Qrcode("_mr");
+      await cam.start({facingMode:"environment"},{fps:10,qrbox:{width:220,height:220}},
+        text => { cam.stop().catch(()=>{}); goToLocation(extractLocFromScan(text)); }, ()=>{}
+      ).catch(()=>toast("❌ เปิดกล้องไม่ได้","err"));
+    });
+  }
+
+  document.getElementById("btn-begin").addEventListener("click", async () => {
+    const name = document.getElementById("staff-select").value;
+    if (!name) { toast("⚠️ เลือกชื่อก่อนนะครับ/ค่ะ"); return; }
+    localStorage.setItem(LAST_STAFF_KEY, name);
+
+    const existing = await getDocs(query(
+      collection(db,"count_jobs"), where("location_scan","==",locCode), where("count_status","==","In Progress")
+    ));
+    if (!existing.empty) {
+      const j = existing.docs[0];
+      const jd = j.data();
+      const dd = await getDocs(query(collection(db,"count_details"), where("job_id","==",j.id), orderBy("timestamp")));
+      scanEvents = dd.docs.map(d=>({docId:d.id,...d.data()}));
+      curJob = { id:j.id, location:locCode, zone:jd.zone_type, createdName: jd.created_name };
+    } else {
+      const zone = masterStock[0]?.zone || "Normal";
+      const ref = await addDoc(collection(db,"count_jobs"), {
+        location_scan: locCode, zone_type: zone,
+        start_time: serverTimestamp(), count_status: "In Progress",
+        expected_target: masterStock.length, matched_count: 0, short_count: 0, over_count: 0,
+        created_by: currentUser.uid, created_name: name
+      });
+      scanEvents = [];
+      curJob = { id: ref.id, location: locCode, zone, createdName: name };
+    }
+    showScanScreen();
+  });
+
+  function masterRows() { return masterStock; }
+  function targetFor(row) { return isBulkZone(curJob.zone) ? 1 : (row.qty_system ?? null); }
+  function countFor(tag) { return scanEvents.filter(e=>e.scanned_tag===tag).length; }
+
+  function checklistStats() {
+    const rows = masterRows();
+    let matched=0, overRows=0;
+    rows.forEach(r => {
+      const c=countFor(r.tag_barcode), t=targetFor(r);
+      if (t==null) return;
+      if (c===t) matched++; else if (c>t) overRows++;
+    });
+    const extraTags = new Set(scanEvents.filter(e=>!rows.some(r=>r.tag_barcode===e.scanned_tag)).map(e=>e.scanned_tag)).size;
+    return { total: rows.length, matched, over: overRows+extraTags };
+  }
+
+  function showScanScreen() {
+    document.getElementById("screen-start").style.display = "none";
+    document.getElementById("screen-scan").style.display  = "block";
+    document.getElementById("scan-loc-title").textContent = curJob.location;
+    document.getElementById("scan-who").textContent = `👤 ${curJob.createdName}`;
+    const badge = document.getElementById("scan-zone-badge");
+    badge.textContent = ZL[curJob.zone]||curJob.zone;
+    badge.className   = `badge ${Z[curJob.zone]||"badge-gray"}`;
+    document.getElementById("zone-hint").innerHTML = isBulkZone(curJob.zone)
+      ? `🟣 เจอ tag ไหน สแกนเลย — ติ๊กให้อัตโนมัติ`
+      : `🔵 ยิงบาร์โค้ดซ้ำทีละชิ้น ระบบนับให้`;
+    renderChecklist(); updateProgress();
+    setTimeout(()=>document.getElementById("tag-input").focus(), 200);
+  }
+
+  function renderChecklist() {
+    const rows = masterRows();
+    const el = document.getElementById("chk-list");
+    el.innerHTML = rows.length ? rows.map(r => {
+      const c=countFor(r.tag_barcode), t=targetFor(r);
+      const cls = (t==null) ? (c>0?"matched":"pending") : (c===t ? "matched" : (c>t ? "over":"pending"));
+      const tickIcon = cls==="matched" ? "✓" : cls==="over" ? "!" : "";
+      const stepper = isBulkZone(curJob.zone)
+        ? `<div class="tick" onclick="toggleTick('${r.tag_barcode}')" style="background:${cls==='matched'?'#16a34a':cls==='over'?'#dc2626':'#e2e8f0'};color:${cls==='pending'?'#94a3b8':'white'};">${tickIcon}</div>`
+        : `<div class="stepper"><button onclick="stepQty('${r.tag_barcode}',-1)">−</button><div class="cnt">${c}${t!=null?` / ${t}`:""}</div><button onclick="stepQty('${r.tag_barcode}',1)">+</button></div>`;
+      return `<div class="chk-row ${cls}">
+        <div style="flex:1;min-width:0;"><div class="tag">${r.tag_barcode}</div>${r.item_name?`<div class="name">${r.item_name}</div>`:""}</div>
+        ${stepper}
+      </div>`;
+    }).join("") : `<div style="text-align:center;color:var(--gray);font-size:0.9rem;padding:1rem 0;">ไม่มีรายการที่ต้องนับที่นี่</div>`;
+  }
+
+  window.toggleTick = async (tag) => {
+    if (countFor(tag) > 0) {
+      const evs = scanEvents.filter(e=>e.scanned_tag===tag);
+      for (const e of evs) await deleteDoc(doc(db,"count_details",e.docId));
+      scanEvents = scanEvents.filter(e=>e.scanned_tag!==tag);
+    } else { await commitScan(tag); }
+    await syncJobProgress(); renderChecklist(); updateProgress();
+  };
+  window.stepQty = async (tag, delta) => {
+    if (delta>0) { await commitScan(tag); }
+    else {
+      const evs = scanEvents.filter(e=>e.scanned_tag===tag);
+      if (evs.length) { const last=evs[evs.length-1]; await deleteDoc(doc(db,"count_details",last.docId)); scanEvents=scanEvents.filter(e=>e.docId!==last.docId); }
+    }
+    await syncJobProgress(); renderChecklist(); updateProgress();
+  };
+
+  async function commitScan(tag) {
+    const timeStr = new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+    const payload = { job_id: curJob.id, scanned_tag: tag, scan_time: timeStr, timestamp: serverTimestamp() };
+    const ref = await addDoc(collection(db,"count_details"), payload);
+    scanEvents.push({docId:ref.id, ...payload});
+  }
+  async function syncJobProgress() {
+    const st = checklistStats();
+    await updateDoc(doc(db,"count_jobs",curJob.id), { matched_count: st.matched, over_count: st.over, expected_target: st.total });
+  }
+  function updateProgress() {
+    const st = checklistStats();
+    document.getElementById("ring-n").textContent = st.matched;
+    document.getElementById("ring-e").textContent = st.total||"?";
+    const pct = st.total>0 ? Math.min(st.matched/st.total,1) : 0;
+    const ring = document.getElementById("ring-dash");
+    ring.style.strokeDashoffset = CIRC - pct*CIRC;
+    ring.style.stroke = st.over>0 ? "#dc2626" : pct>=1 ? "#16a34a" : pct>=0.5 ? "#f59e0b" : "#6366f1";
+    document.getElementById("over-hint").style.display = st.over>0 ? "block" : "none";
+    document.getElementById("over-count").textContent = st.over;
+  }
+
+  async function handleScan(raw) {
+    if (!curJob) return;
+    const tag = extractLocFromScan(raw).trim().toUpperCase();
+    if (!tag) return;
+    const now = Date.now();
+    if (now - lastScan < 350) return;
+    lastScan = now;
+    document.getElementById("tag-input").value="";
+    if (isBulkZone(curJob.zone) && masterRows().some(r=>r.tag_barcode===tag) && countFor(tag)>=1) {
+      toast("✅ อันนี้ติ๊กไปแล้ว");
+      document.getElementById("tag-input").focus();
+      return;
+    }
+    await commitScan(tag);
+    await syncJobProgress();
+    renderChecklist(); updateProgress();
+    document.getElementById("tag-input").focus();
+    if (navigator.vibrate) navigator.vibrate(60);
+  }
+  document.getElementById("tag-input").addEventListener("keydown", e => {
+    if (e.key==="Enter") { e.preventDefault(); const v=e.target.value.trim(); if(v) handleScan(v); }
+  });
+
+  document.getElementById("btn-toggle-cam").addEventListener("click", async () => {
+    const wrap = document.getElementById("cam-reader");
+    const btn  = document.getElementById("btn-toggle-cam");
+    if (camStarted) { await stopCam(); wrap.style.display="none"; btn.textContent="📷 เปิดกล้องสแกน"; return; }
+    wrap.style.display="block"; btn.textContent="⏹ ปิดกล้อง";
+    html5Cam = new Html5Qrcode("cam-reader");
+    await html5Cam.start({facingMode:"environment"},{fps:15,qrbox:{width:230,height:180}}, text=>handleScan(text), ()=>{})
+      .then(()=>{ camStarted=true; })
+      .catch(()=>{ toast("❌ เปิดกล้องไม่ได้","err"); wrap.style.display="none"; btn.textContent="📷 เปิดกล้องสแกน"; });
+  });
+  async function stopCam() {
+    if (html5Cam && camStarted) { await html5Cam.stop().catch(()=>{}); html5Cam=null; camStarted=false; }
+  }
+
+  // ── แจ้งของเกิน: แตะเดียวเปิด prompt ทันที (ลดขั้นตอน) ────
+  document.getElementById("btn-report-over").addEventListener("click", async () => {
+    const tag = prompt("สแกนหรือพิมพ์รหัสของที่เกิน:");
+    if (!tag || !tag.trim()) return;
+    const t = tag.trim().toUpperCase();
+    if (masterRows().some(r=>r.tag_barcode===t)) { toast("อันนี้อยู่ในรายการอยู่แล้ว สแกนช่องปกติได้เลย","err"); return; }
+    await commitScan(t);
+    await syncJobProgress(); renderChecklist(); updateProgress();
+    toast(`🔺 บันทึกของเกินแล้ว`, "ok");
+  });
+
+  document.getElementById("btn-finish-job").addEventListener("click", async () => {
+    if (!curJob) return;
+    const st = checklistStats();
+    const shortNow = Math.max(0, st.total - st.matched - st.over);
+    if (st.over>0 || shortNow>0) {
+      const ok = confirm(`ตรง ${st.matched}/${st.total}${shortNow>0?` · ขาด ${shortNow}`:""}${st.over>0?` · เกิน ${st.over}`:""}\n\nยืนยันปิดโลนี้?`);
+      if (!ok) return;
+    }
+    await updateDoc(doc(db,"count_jobs",curJob.id), {
+      count_status:"Completed", end_time:serverTimestamp(),
+      matched_count: st.matched, expected_target: st.total, short_count: shortNow, over_count: st.over
+    });
+    await stopCam();
+    document.getElementById("screen-scan").style.display="none";
+    document.getElementById("screen-done").style.display="block";
+    document.getElementById("done-icon").textContent = (shortNow+st.over)>0 ? "⚠️" : "🎉";
+    document.getElementById("done-detail").textContent = `${curJob.location} — ตรง ${st.matched}/${st.total}${shortNow>0?` · ขาด ${shortNow}`:""}${st.over>0?` · เกิน ${st.over}`:""}`;
+    startNextScanner();
+  });
+
+  // ── ต่อ QR ถัดไปในหน้าเดียว ไม่ต้องออกจากหน้าเว็บ ─────────
+  async function startNextScanner() {
+    const cam = new Html5Qrcode("next-reader");
+    await cam.start({facingMode:"environment"},{fps:10,qrbox:{width:230,height:230}},
+      text => { cam.stop().catch(()=>{}); goToLocation(extractLocFromScan(text)); }, ()=>{}
+    ).catch(()=>toast("❌ เปิดกล้องไม่ได้ — ลองรีเฟรชหน้านี้ใหม่","err"));
+  }
+</script>
+</body>
+</html>
