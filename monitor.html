@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#021D49">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared.css">
+  <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
   <style>
     .job-card { border:1.5px solid var(--border); border-radius:12px; padding:1rem; background:white; transition:all 0.2s; }
     .job-card.counting  { border-color:var(--indigo); }
@@ -31,6 +32,7 @@
     <button class="tab-btn" data-tab="audit">🔍 ผลการนับ & ส่วนต่าง</button>
     <button class="tab-btn" data-tab="import">📥 Import Master CSV</button>
     <button class="tab-btn" data-tab="status">📊 สถานะสินค้า</button>
+    <button class="tab-btn" data-tab="tagcount">🏷️ Stock Take (Tag)</button>
   </div>
 
   <!-- TAB: Jobs Overview -->
@@ -155,6 +157,94 @@
     </div>
   </div>
 
+  <!-- TAB: Stock Take (Tag) -->
+  <div id="tab-tagcount" style="display:none">
+    <div class="alert alert-info" style="font-size:0.82rem;margin-bottom:0.75rem;">
+      ข้อมูลจากระบบ Stock Take แบบ Zone/Tag (<code>master_stock</code> / <code>count_jobs</code>) — คนละชุดกับแท็บด้านบน
+    </div>
+    <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+      <button class="btn btn-sm" id="tagcount-sub-overview" style="flex:1;background:var(--indigo);color:white;border:none;">📊 ภาพรวม</button>
+      <button class="btn btn-outline btn-sm" id="tagcount-sub-manage" style="flex:1;">🗄️ Master + พนักงาน</button>
+    </div>
+
+    <!-- SUB: ภาพรวม/มอนิเตอร์ -->
+    <div id="tagcount-overview">
+      <div class="stats-row" style="flex-wrap:wrap;">
+        <div class="stat-card"><div class="stat-value" id="tag-total">—</div><div class="stat-label">Location ทั้งหมด</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--indigo)" id="tag-inprog">—</div><div class="stat-label">กำลังนับ</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--green)" id="tag-done">—</div><div class="stat-label">เสร็จแล้ว (ตรง)</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--amber)" id="tag-short">—</div><div class="stat-label">มีขาด (Short)</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--red)" id="tag-over">—</div><div class="stat-label">มีเกิน (Over)</div></div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+          <div style="font-weight:700;color:var(--blue);">ความคืบหน้ารวม</div>
+          <div id="tag-pct" style="font-weight:700;color:var(--indigo);font-size:1.2rem;">0%</div>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="tag-bar" style="width:0%"></div></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);font-weight:700;color:var(--indigo);">🟢 กำลังนับอยู่ตอนนี้</div>
+        <div id="tag-active-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีใครกำลังนับอยู่</div></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+          <span style="font-weight:700;color:var(--blue);">ตารางความคืบหน้าตาม Location</span>
+          <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="tag-search" placeholder="ค้นหา Location..." style="padding:0.4rem 0.7rem;border:1.5px solid var(--border);border-radius:8px;font-size:0.8rem;">
+            <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;"><input type="checkbox" id="tag-diff-only"> เฉพาะที่มี diff</label>
+            <button class="btn btn-outline btn-sm" id="btn-export-tag-xlsx">⬇️ Export Excel</button>
+          </div>
+        </div>
+        <div id="tag-table" style="max-height:480px;overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- SUB: จัดการ Master Stock + พนักงาน (ย้ายมาจาก stocktake.html) -->
+    <div id="tagcount-manage" style="display:none">
+      <div class="card">
+        <div class="card-title">🗄️ Import Master Stock (Tag/Zone)</div>
+        <div class="alert alert-warning" style="font-size:0.82rem;margin-bottom:0.75rem;">
+          <b>Format CSV หัวคอลัมน์:</b> <code>location, zone, tag_barcode, item_name, qty_system</code><br>
+          <small>zone = Normal | Zone B | Overflow<br>
+          Zone B / Overflow: 1 tag = 1 ชิ้น (ไม่ต้องใส่ qty_system ก็ได้)<br>
+          Normal: ยิงบาร์โค้ดซ้ำเพื่อนับจำนวน เทียบกับ qty_system ที่ต้องใส่</small>
+        </div>
+        <div class="alert alert-error" style="font-size:0.8rem;margin-bottom:0.75rem;">
+          ⚠️ ก่อนเริ่ม Stock Take รอบใหม่ ต้อง <b>ล้าง Master เก่าออกก่อนแล้วค่อย Import ใหม่</b>
+        </div>
+        <div class="form-group"><label>เลือกไฟล์ CSV</label><input type="file" id="tag-master-csv" accept=".csv"></div>
+        <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;cursor:pointer;font-size:0.9rem;">
+          <input type="checkbox" id="tag-master-clear" checked> ล้างข้อมูล Master เก่าก่อน Import
+        </label>
+        <button class="btn btn-primary btn-full" id="btn-tag-import-master">📥 Import Master Stock</button>
+        <button class="btn btn-outline btn-full" id="btn-tag-clear-master-only" style="margin-top:0.5rem;">🗑️ ล้าง Master ทั้งหมด (ไม่ import)</button>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;color:var(--blue);">Master Stock ปัจจุบัน</span>
+          <span class="badge badge-gray" id="tag-master-count-badge">0 รายการ</span>
+        </div>
+        <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);">
+          <input type="text" id="tag-master-search" placeholder="ค้นหา Location / Barcode..." style="width:100%;padding:0.55rem 0.9rem;border:1.5px solid var(--border);border-radius:9px;font-family:Sarabun,sans-serif;font-size:0.9rem;outline:none;">
+        </div>
+        <div class="table-wrap" style="border:none;border-radius:0;">
+          <table>
+            <thead><tr><th>Location</th><th>Zone</th><th>Barcode</th><th>ชื่อสินค้า</th><th>Qty System</th><th>ลบ</th></tr></thead>
+            <tbody id="tag-master-tbody"><tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">👤 รายชื่อพนักงาน (สำหรับ Dropdown ตอนเริ่มนับ)</div>
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
+          <input type="text" id="staff-name-input" placeholder="ชื่อพนักงาน" style="flex:1;">
+          <button class="btn btn-primary btn-sm" id="btn-add-staff">➕ เพิ่ม</button>
+        </div>
+        <div id="staff-list-el" style="display:flex;flex-direction:column;gap:0.35rem;"></div>
+      </div>
+    </div>
+  </div>
 </div>
 <div id="toast">—</div>
 
@@ -195,12 +285,13 @@
       document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       const tab = btn.dataset.tab;
-      ["jobs","audit","import","status"].forEach(t =>
+      ["jobs","audit","import","status","tagcount"].forEach(t =>
         document.getElementById(`tab-${t}`).style.display = t === tab ? "block" : "none"
       );
-      if (tab === "audit")  renderAudit();
-      if (tab === "status") renderStatus();
-      if (tab === "import") updateImportCounts();
+      if (tab === "audit")    renderAudit();
+      if (tab === "status")   renderStatus();
+      if (tab === "import")   updateImportCounts();
+      if (tab === "tagcount") loadTagMonitor();
     });
   });
 
@@ -442,6 +533,227 @@
       return `<tr><td style="font-weight:600;color:var(--blue)">${p.id}</td><td>${p.name}</td><td>${p.location||"—"}</td><td><b>${p.quantity}</b> ${p.unit}</td><td>${p.min_stock}</td><td>${badge}</td></tr>`;
     }).join("");
   }
+
+  // ══════════════════════════════════════════════════════════
+  // TAB: Stock Take (Tag) — ผูกกับ schema ของ stocktake.html จริง
+  // (master_stock / count_jobs / count_details — คนละชุดกับ
+  // products / stock_take_jobs ที่ใช้ในแท็บด้านบน)
+  // ══════════════════════════════════════════════════════════
+  let tagMasterStock = [], tagJobs = [], tagLoaded = false;
+  let tagSearch = "", tagDiffOnly = false;
+  const TAG_Z = {"Normal":"badge-blue","Zone B":"badge-purple","Overflow":"badge-orange"};
+
+  function loadTagMonitor() {
+    if (tagLoaded) return;
+    tagLoaded = true;
+    onSnapshot(query(collection(db,"master_stock"), orderBy("location")), snap => {
+      tagMasterStock = snap.docs.map(d=>({id:d.id,...d.data()}));
+      renderTagMonitor();
+      renderTagMasterTable();
+    });
+    onSnapshot(query(collection(db,"count_jobs"), orderBy("start_time","desc")), snap => {
+      tagJobs = snap.docs.map(d=>({id:d.id,...d.data()}));
+      renderTagMonitor();
+    });
+    loadStaffList();
+  }
+
+  // ── sub-tab: ภาพรวม vs จัดการ Master+พนักงาน ──────────────
+  document.getElementById("tagcount-sub-overview")?.addEventListener("click", () => {
+    document.getElementById("tagcount-overview").style.display = "block";
+    document.getElementById("tagcount-manage").style.display   = "none";
+    document.getElementById("tagcount-sub-overview").style.cssText = "flex:1;background:var(--indigo);color:white;border:none;";
+    document.getElementById("tagcount-sub-manage").className = "btn btn-outline btn-sm";
+    document.getElementById("tagcount-sub-manage").style.cssText = "flex:1;";
+  });
+  document.getElementById("tagcount-sub-manage")?.addEventListener("click", () => {
+    document.getElementById("tagcount-overview").style.display = "none";
+    document.getElementById("tagcount-manage").style.display   = "block";
+    document.getElementById("tagcount-sub-manage").style.cssText = "flex:1;background:var(--indigo);color:white;border:none;";
+    document.getElementById("tagcount-sub-overview").className = "btn btn-outline btn-sm";
+    document.getElementById("tagcount-sub-overview").style.cssText = "flex:1;";
+  });
+
+  // ── Master Stock (Tag/Zone) management — ย้ายมาจาก stocktake.html ──
+  let tagMasterSearch = "";
+  function renderTagMasterTable() {
+    const tbody = document.getElementById("tag-master-tbody");
+    if (!tbody) return;
+    document.getElementById("tag-master-count-badge").textContent = `${tagMasterStock.length} รายการ`;
+    const q = tagMasterSearch.toLowerCase();
+    const data = tagMasterStock.filter(m =>
+      (m.location||"").toLowerCase().includes(q) ||
+      (m.tag_barcode||"").toLowerCase().includes(q) ||
+      (m.item_name||"").toLowerCase().includes(q)
+    );
+    tbody.innerHTML = data.length ? data.map(m => `<tr>
+        <td style="font-weight:700;">${m.location}</td>
+        <td><span class="badge ${TAG_Z[m.zone]||"badge-gray"}">${m.zone||"Normal"}</span></td>
+        <td style="font-family:monospace;font-size:0.85rem;">${m.tag_barcode}</td>
+        <td>${m.item_name||"—"}</td>
+        <td>${m.qty_system ?? "—"}</td>
+        <td><button onclick="delTagMaster('${m.id}')" class="btn btn-red btn-sm">🗑️</button></td>
+      </tr>`).join("") : `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--gray);">ยังไม่มี Master</td></tr>`;
+  }
+  document.getElementById("tag-master-search")?.addEventListener("input", e => { tagMasterSearch=e.target.value; renderTagMasterTable(); });
+  window.delTagMaster = async id => {
+    if (!confirm("ลบ?")) return;
+    await deleteDoc(doc(db,"master_stock",id));
+    toast("🗑️ ลบแล้ว");
+  };
+  document.getElementById("btn-tag-clear-master-only")?.addEventListener("click", async () => {
+    if (!tagMasterStock.length) { toast("ไม่มี Master ให้ล้าง"); return; }
+    if (!confirm(`ล้าง Master ทั้งหมด ${tagMasterStock.length} รายการ?`)) return;
+    const batch = writeBatch(db);
+    tagMasterStock.forEach(m => batch.delete(doc(db,"master_stock",m.id)));
+    await batch.commit();
+    toast("🗑️ ล้าง Master ทั้งหมดแล้ว");
+  });
+  document.getElementById("btn-tag-import-master")?.addEventListener("click", async () => {
+    const file = document.getElementById("tag-master-csv").files[0];
+    const clear = document.getElementById("tag-master-clear").checked;
+    if (!file) { toast("⚠️ เลือกไฟล์ก่อน"); return; }
+    const text  = await file.text();
+    const lines = text.split("\n").filter(l=>l.trim());
+    const hdrs  = lines[0].split(",").map(h=>h.trim().replace(/^"|"$/g,"").toLowerCase());
+    const batch = writeBatch(db);
+    let count = 0;
+    if (clear) tagMasterStock.forEach(m => batch.delete(doc(db,"master_stock",m.id)));
+    for (let i=1;i<lines.length;i++) {
+      const vals = lines[i].split(",").map(v=>v.trim().replace(/^"|"$/g,""));
+      const obj  = {}; hdrs.forEach((h,idx)=>{ obj[h]=vals[idx]||""; });
+      const loc  = (obj.location||"").toUpperCase().trim();
+      const tag  = (obj.tag_barcode||obj.barcode||"").trim();
+      if (!loc||!tag) continue;
+      const qtySys = obj.qty_system!=="" ? Number(obj.qty_system) : null;
+      batch.set(doc(collection(db,"master_stock")), {
+        location: loc, zone: obj.zone||"Normal",
+        tag_barcode: tag, item_name: obj.item_name||obj.name||"",
+        qty_system: (qtySys!==null && !isNaN(qtySys)) ? qtySys : null,
+        imported_at: serverTimestamp()
+      }); count++;
+    }
+    await batch.commit();
+    toast(`✅ Import ${count} รายการ`);
+  });
+
+  // ── Staff List management — ย้ายมาจาก stocktake.html ────────
+  let staffListData = [];
+  async function loadStaffList() {
+    const s = await getDocs(query(collection(db,"staff_list"), orderBy("name")));
+    staffListData = s.docs.map(d=>({id:d.id,...d.data()}));
+    renderStaffList();
+  }
+  function renderStaffList() {
+    const el = document.getElementById("staff-list-el");
+    if (!el) return;
+    el.innerHTML = staffListData.length ? staffListData.map(s => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.7rem;background:#f8fafc;border-radius:8px;">
+        <span>${s.name}</span>
+        <button class="btn btn-red btn-sm" onclick="delStaff('${s.id}')">🗑️</button>
+      </div>`).join("") : `<div style="color:var(--gray);font-size:0.85rem;padding:0.5rem 0;">ยังไม่มีรายชื่อ</div>`;
+  }
+  document.getElementById("btn-add-staff")?.addEventListener("click", async () => {
+    const inp = document.getElementById("staff-name-input");
+    const name = inp.value.trim();
+    if (!name) { toast("⚠️ ระบุชื่อก่อน"); return; }
+    await addDoc(collection(db,"staff_list"), { name, created_at: serverTimestamp() });
+    inp.value=""; await loadStaffList();
+    toast(`✅ เพิ่ม ${name}`);
+  });
+  window.delStaff = async id => {
+    if (!confirm("ลบชื่อนี้?")) return;
+    await deleteDoc(doc(db,"staff_list",id));
+    await loadStaffList(); toast("🗑️ ลบแล้ว");
+  };
+
+  document.getElementById("tag-search")?.addEventListener("input", e => { tagSearch=e.target.value; renderTagMonitor(); });
+  document.getElementById("tag-diff-only")?.addEventListener("change", e => { tagDiffOnly=e.target.checked; renderTagMonitor(); });
+
+  function renderTagMonitor() {
+    const latestByLoc = {};
+    tagJobs.forEach(j => { if (!latestByLoc[j.location_scan]) latestByLoc[j.location_scan] = j; });
+
+    const distinctLocs = [...new Set(tagMasterStock.map(m=>m.location))];
+    let done=0, hasShort=0, hasOver=0, inProg=0;
+    const rowsData = distinctLocs.map(loc => {
+      const j = latestByLoc[loc];
+      let status="idle", label="ยังไม่เริ่ม", who="";
+      if (j) {
+        if (j.count_status==="In Progress") { status="inprogress"; label=`กำลังนับ (${j.matched_count??0}/${j.expected_target??"?"})`; who=j.created_name||""; inProg++; }
+        else if (j.count_status==="Completed") {
+          const sc=j.short_count||0, oc=j.over_count||0;
+          if (sc>0) hasShort++;
+          if (oc>0) hasOver++;
+          if (sc===0 && oc===0) { status="ok"; label="เสร็จ — ตรง"; done++; }
+          else { status="diff"; label=`เสร็จ — ${sc>0?`ขาด ${sc} `:""}${oc>0?`เกิน ${oc}`:""}`.trim(); }
+          who = j.created_name||"";
+        }
+      }
+      const zone = tagMasterStock.find(m=>m.location===loc)?.zone || "Normal";
+      return { loc, zone, status, label, who, job:j };
+    });
+
+    if (document.getElementById("tag-total"))  document.getElementById("tag-total").textContent  = distinctLocs.length;
+    if (document.getElementById("tag-inprog")) document.getElementById("tag-inprog").textContent = inProg;
+    if (document.getElementById("tag-done"))   document.getElementById("tag-done").textContent   = done;
+    if (document.getElementById("tag-short"))  document.getElementById("tag-short").textContent  = hasShort;
+    if (document.getElementById("tag-over"))   document.getElementById("tag-over").textContent   = hasOver;
+    const pct = distinctLocs.length ? Math.round(((done+hasShort+hasOver)/distinctLocs.length)*100) : 0;
+    if (document.getElementById("tag-pct")) document.getElementById("tag-pct").textContent = `${pct}%`;
+    if (document.getElementById("tag-bar")) document.getElementById("tag-bar").style.width = `${pct}%`;
+
+    const active = tagJobs.filter(j=>j.count_status==="In Progress");
+    const activeEl = document.getElementById("tag-active-list");
+    if (activeEl) {
+      activeEl.innerHTML = active.length ? active.map(j => {
+        const ts = j.start_time?.toDate ? j.start_time.toDate().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"}) : "—";
+        return `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.85rem;border-bottom:1px solid var(--border);font-size:0.85rem;flex-wrap:wrap;">
+          <span style="font-weight:700;font-family:monospace;">📍 ${j.location_scan}</span>
+          <span class="badge ${TAG_Z[j.zone_type]||"badge-gray"}">${j.zone_type}</span>
+          <span>${j.created_name||"—"}</span>
+          <span style="color:var(--gray);font-size:0.78rem;">เริ่ม ${ts}</span>
+          <span style="margin-left:auto;font-weight:700;">${j.matched_count??0}/${j.expected_target??"?"}</span>
+          ${j.over_count>0?`<span class="diff-minus">🔺 ${j.over_count}</span>`:""}
+        </div>`;
+      }).join("") : `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีใครกำลังนับอยู่</div>`;
+    }
+
+    let filtered = rowsData;
+    if (tagSearch) filtered = filtered.filter(r=>r.loc.toLowerCase().includes(tagSearch.toLowerCase()));
+    if (tagDiffOnly) filtered = filtered.filter(r=>r.status==="diff");
+    const tbl = document.getElementById("tag-table");
+    if (tbl) {
+      tbl.innerHTML = filtered.map(r => `
+        <div style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.85rem;border-bottom:1px solid var(--border);font-size:0.85rem;flex-wrap:wrap;">
+          <span style="font-weight:700;font-family:monospace;min-width:90px;">${r.loc}</span>
+          <span class="badge ${TAG_Z[r.zone]||"badge-gray"}">${r.zone}</span>
+          <span style="${r.status==='diff'?'color:var(--red);font-weight:700;':r.status==='ok'?'color:var(--green);font-weight:700;':r.status==='inprogress'?'color:var(--indigo);font-weight:700;':'color:var(--gray);'}">
+            ${r.status==="idle"?"⬜":r.status==="inprogress"?"🔵":r.status==="ok"?"✅":"⚠️"} ${r.label}
+          </span>
+          ${r.who?`<span style="color:var(--gray);font-size:0.78rem;">— ${r.who}</span>`:""}
+        </div>
+      `).join("") || `<div style="padding:1.5rem;text-align:center;color:var(--gray);">ไม่พบข้อมูล</div>`;
+    }
+
+    window._tagRowsData = rowsData; // เก็บไว้ให้ export ใช้
+  }
+
+  document.getElementById("btn-export-tag-xlsx")?.addEventListener("click", () => {
+    const rows = window._tagRowsData || [];
+    if (!rows.length) { toast("ไม่มีข้อมูล"); return; }
+    const wb = XLSX.utils.book_new();
+    const coverage = [["Location","Zone","สถานะ","ผู้นับ","เริ่มนับ","จบนับ","ตรง","ขาด(Short)","เกิน(Over)"]];
+    rows.forEach(r => {
+      const j = r.job;
+      const st = j?.start_time?.toDate ? j.start_time.toDate().toLocaleString("th-TH") : "";
+      const et = j?.end_time?.toDate ? j.end_time.toDate().toLocaleString("th-TH") : "";
+      coverage.push([r.loc, r.zone, r.label, r.who, st, et, j?.matched_count??"", j?.short_count??"", j?.over_count??""]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(coverage), "Coverage");
+    XLSX.writeFile(wb, `stocktake_monitor_${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast("✅ Export Excel แล้ว");
+  });
 </script>
 </body>
 </html>
