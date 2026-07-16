@@ -14,12 +14,40 @@
     .job-card.counting  { border-color:var(--indigo); }
     .job-card.finished  { border-color:var(--green); opacity:0.8; }
     .progress-bar { height:8px; background:#e2e8f0; border-radius:10px; overflow:hidden; margin-top:6px; }
-    .progress-fill { height:100%; border-radius:10px; background:var(--indigo); }
+    .progress-fill { height:100%; border-radius:10px; background:var(--indigo); transition:width 0.4s ease; }
     .diff-plus  { color:var(--green); font-weight:700; }
     .diff-minus { color:var(--red);   font-weight:700; }
     .diff-zero  { color:var(--gray); }
     #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
     #toast.show { transform:translateX(-50%) translateY(0); }
+
+    /* ── Round banner ───────────────────────────────────── */
+    .round-banner { background:linear-gradient(135deg,#021D49,#0b3a8f); color:white; border-radius:14px; padding:1.1rem 1.4rem; margin-bottom:0.85rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; }
+    .round-banner .rlabel { font-size:1.05rem; font-weight:800; }
+    .round-banner .rsub   { font-size:0.78rem; opacity:0.8; margin-top:2px; }
+    .round-select { padding:0.5rem 0.75rem; border-radius:9px; border:none; font-family:Sarabun,sans-serif; font-size:0.85rem; font-weight:700; }
+
+    /* ── KPI cards (enterprise style) ───────────────────── */
+    .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.7rem; margin-bottom:0.85rem; }
+    .kpi-card { background:white; border-radius:12px; padding:0.9rem 1.1rem; border-left:5px solid var(--border); box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+    .kpi-card .kicon { font-size:1.3rem; margin-bottom:0.2rem; }
+    .kpi-card .kval  { font-size:1.7rem; font-weight:900; line-height:1.1; }
+    .kpi-card .klabel{ font-size:0.75rem; color:var(--gray); font-weight:600; margin-top:2px; }
+    .kpi-blue   { border-left-color:var(--blue); }
+    .kpi-gray   { border-left-color:var(--gray); }
+    .kpi-indigo { border-left-color:var(--indigo); }
+    .kpi-green  { border-left-color:var(--green); }
+    .kpi-amber  { border-left-color:var(--amber); }
+    .kpi-red    { border-left-color:var(--red); }
+
+    /* ── Section header ─────────────────────────────────── */
+    .sec-head { display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;padding:0.9rem 1.25rem;border-bottom:1px solid var(--border); }
+    .sec-title { font-weight:800; color:var(--blue); font-size:0.98rem; display:flex; align-items:center; gap:0.4rem; }
+
+    /* ── Mini horizontal bar (staff / zone visual compare) ─ */
+    .mini-bar-wrap { display:flex; align-items:center; gap:0.6rem; }
+    .mini-bar-track { flex:1; height:8px; background:#e2e8f0; border-radius:6px; overflow:hidden; }
+    .mini-bar-fill  { height:100%; border-radius:6px; background:var(--indigo); }
   </style>
 </head>
 <body>
@@ -38,66 +66,103 @@
 
     <!-- SUB: ภาพรวม/มอนิเตอร์ -->
     <div id="tagcount-overview">
-      <div class="stats-row" style="flex-wrap:wrap;">
-        <div class="stat-card"><div class="stat-value" id="tag-total">—</div><div class="stat-label">Location ทั้งหมด</div></div>
-        <div class="stat-card"><div class="stat-value" style="color:var(--gray)" id="tag-notstart">—</div><div class="stat-label">ยังไม่เริ่ม</div></div>
-        <div class="stat-card"><div class="stat-value" style="color:var(--indigo)" id="tag-inprog">—</div><div class="stat-label">กำลังนับ</div></div>
-        <div class="stat-card"><div class="stat-value" style="color:var(--green)" id="tag-done">—</div><div class="stat-label">เสร็จแล้ว (ตรง)</div></div>
-        <div class="stat-card"><div class="stat-value" style="color:var(--amber)" id="tag-short">—</div><div class="stat-label">Location มีขาด</div></div>
-        <div class="stat-card"><div class="stat-value" style="color:var(--red)" id="tag-over">—</div><div class="stat-label">Location มีเกิน</div></div>
+
+      <!-- ═══ ROUND BANNER ═══ -->
+      <div class="round-banner">
+        <div>
+          <div class="rlabel" id="round-label">🔄 กำลังโหลดรอบปัจจุบัน...</div>
+          <div class="rsub" id="round-sub">—</div>
+        </div>
+        <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+          <select id="round-select" class="round-select"><option>รอบปัจจุบัน</option></select>
+          <button class="btn btn-sm" id="btn-new-round" style="background:white;color:var(--blue);border:none;font-weight:700;">🆕 เริ่มรอบใหม่</button>
+        </div>
       </div>
-      <div class="stats-row" style="flex-wrap:wrap;">
-        <div class="stat-card"><div class="stat-value" style="color:var(--amber)" id="tag-short-qty">—</div><div class="stat-label">ยอดขาดรวม (ชิ้น/tag)</div></div>
-        <div class="stat-card"><div class="stat-value" style="color:var(--red)" id="tag-over-qty">—</div><div class="stat-label">ยอดเกินรวม (ชิ้น/tag)</div></div>
+
+      <!-- ═══ KPI GRID ═══ -->
+      <div class="kpi-grid">
+        <div class="kpi-card kpi-blue"><div class="kicon">📍</div><div class="kval" id="tag-total">—</div><div class="klabel">Location ทั้งหมด</div></div>
+        <div class="kpi-card kpi-gray"><div class="kicon">⬜</div><div class="kval" id="tag-notstart">—</div><div class="klabel">ยังไม่เริ่ม</div></div>
+        <div class="kpi-card kpi-indigo"><div class="kicon">🔵</div><div class="kval" id="tag-inprog">—</div><div class="klabel">กำลังนับ</div></div>
+        <div class="kpi-card kpi-green"><div class="kicon">✅</div><div class="kval" id="tag-done">—</div><div class="klabel">เสร็จแล้ว (ตรง)</div></div>
+        <div class="kpi-card kpi-amber"><div class="kicon">📉</div><div class="kval" id="tag-short">—</div><div class="klabel">Location มีขาด</div></div>
+        <div class="kpi-card kpi-red"><div class="kicon">📈</div><div class="kval" id="tag-over">—</div><div class="klabel">Location มีเกิน</div></div>
+        <div class="kpi-card kpi-amber"><div class="kicon">🔻</div><div class="kval" id="tag-short-qty">—</div><div class="klabel">ยอดขาดรวม (ชิ้น/tag)</div></div>
+        <div class="kpi-card kpi-red"><div class="kicon">🔺</div><div class="kval" id="tag-over-qty">—</div><div class="klabel">ยอดเกินรวม (ชิ้น/tag)</div></div>
       </div>
+
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-          <div style="font-weight:700;color:var(--blue);">ความคืบหน้ารวม</div>
+          <div style="font-weight:700;color:var(--blue);">ความคืบหน้ารวม (รอบปัจจุบัน)</div>
           <div id="tag-pct" style="font-weight:700;color:var(--indigo);font-size:1.2rem;">0%</div>
         </div>
         <div class="progress-bar"><div class="progress-fill" id="tag-bar" style="width:0%"></div></div>
       </div>
 
-      <!-- สรุปตามโซน/Area -->
+      <!-- ═══ สรุปตามโซน/Area ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
-        <div style="padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);font-weight:700;color:var(--blue);">📦 สรุปตามโซน</div>
+        <div class="sec-head"><span class="sec-title">📦 สรุปตามโซน</span></div>
         <div class="table-wrap" style="border:none;border-radius:0;">
           <table>
-            <thead><tr><th>โซน</th><th>ทั้งหมด</th><th>ยังไม่เริ่ม</th><th>กำลังนับ</th><th>เสร็จ (ตรง)</th><th>เสร็จ (มี diff)</th><th>ขาดรวม</th><th>เกินรวม</th></tr></thead>
-            <tbody id="tag-zone-tbody"><tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+            <thead><tr><th>โซน</th><th>ทั้งหมด</th><th>ยังไม่เริ่ม</th><th>กำลังนับ</th><th>เสร็จ (ตรง)</th><th>เสร็จ (มี diff)</th><th>ขาดรวม</th><th>เกินรวม</th><th style="min-width:110px;">ความคืบหน้า</th></tr></thead>
+            <tbody id="tag-zone-tbody"><tr><td colspan="9" style="text-align:center;padding:1.5rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══ สรุปตามพนักงาน ═══ -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="sec-head">
+          <span class="sec-title">👤 สรุปผลงานพนักงาน (รอบที่เลือก)</span>
+          <span style="font-size:0.75rem;color:var(--gray);">เวลาที่ใช้ = ผลรวม (จบนับ − เริ่มนับ) ของงานที่เสร็จแล้ว</span>
+        </div>
+        <div class="table-wrap" style="border:none;border-radius:0;">
+          <table>
+            <thead><tr><th>พนักงาน</th><th>Location ที่นับเสร็จ</th><th>จำนวนชิ้น/tag รวม</th><th>เวลารวมที่ใช้</th><th>เฉลี่ย/โล</th><th>ขาด</th><th>เกิน</th></tr></thead>
+            <tbody id="tag-staff-tbody"><tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
           </table>
         </div>
       </div>
 
       <div class="card" style="padding:0;overflow:hidden;">
-        <div style="padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);font-weight:700;color:var(--indigo);">🟢 กำลังนับอยู่ตอนนี้</div>
+        <div class="sec-head"><span class="sec-title">🟢 กำลังนับอยู่ตอนนี้</span></div>
         <div id="tag-active-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีใครกำลังนับอยู่</div></div>
       </div>
+
       <div class="card" style="padding:0;overflow:hidden;">
-        <div style="padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-          <span style="font-weight:700;color:var(--blue);">ตารางความคืบหน้าตาม Location</span>
+        <div class="sec-head">
+          <span class="sec-title">📍 ตารางความคืบหน้าตาม Location (รอบปัจจุบัน)</span>
           <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
             <input type="text" id="tag-search" placeholder="ค้นหา Location..." style="padding:0.4rem 0.7rem;border:1.5px solid var(--border);border-radius:8px;font-size:0.8rem;">
             <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;"><input type="checkbox" id="tag-diff-only"> เฉพาะที่มี diff</label>
-            <button class="btn btn-outline btn-sm" id="btn-export-tag-xlsx">⬇️ Export Excel (ทุกอย่าง)</button>
           </div>
         </div>
         <div id="tag-table" style="max-height:480px;overflow-y:auto;"></div>
       </div>
 
-      <!-- ประวัติการนับทั้งหมด: ใครนับอะไรไปโลไหน เวลาเริ่ม-จบ -->
+      <!-- ═══ ประวัติ/Transactions ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
-        <div style="padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-          <span style="font-weight:700;color:var(--blue);">📜 ประวัติการนับทั้งหมด (ทุก Job)</span>
+        <div class="sec-head">
+          <span class="sec-title">📜 ประวัติการนับ / Transactions (รอบที่เลือก)</span>
           <input type="text" id="tag-log-search" placeholder="ค้นหา Location / ชื่อคน..." style="padding:0.4rem 0.7rem;border:1.5px solid var(--border);border-radius:8px;font-size:0.8rem;">
         </div>
         <div class="table-wrap" style="border:none;border-radius:0;">
           <table>
-            <thead><tr><th>Location</th><th>โซน</th><th>ผู้นับ</th><th>เริ่ม</th><th>จบ</th><th>สถานะ</th><th>ตรง/ทั้งหมด</th><th>ขาด</th><th>เกิน</th></tr></thead>
-            <tbody id="tag-log-tbody"><tr><td colspan="9" style="text-align:center;padding:1.5rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+            <thead><tr><th>Location</th><th>โซน</th><th>ผู้นับ</th><th>เริ่ม</th><th>จบ</th><th>ใช้เวลา</th><th>สถานะ</th><th>ตรง/ทั้งหมด</th><th>ขาด</th><th>เกิน</th></tr></thead>
+            <tbody id="tag-log-tbody"><tr><td colspan="10" style="text-align:center;padding:1.5rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
           </table>
         </div>
       </div>
+
+      <!-- ═══ Export ═══ -->
+      <div class="card" style="text-align:center;">
+        <div style="font-weight:700;color:var(--blue);margin-bottom:0.6rem;">⬇️ Export Excel — ครบทุกอย่างในไฟล์เดียว</div>
+        <div style="font-size:0.78rem;color:var(--gray);margin-bottom:0.85rem;">
+          Coverage · สรุปตามโซน · สรุปพนักงาน · ประวัติ/Transactions (รอบที่เลือก) · Master + Status
+        </div>
+        <button class="btn btn-primary" id="btn-export-tag-xlsx" style="padding:0.75rem 2rem;">📥 Export Excel ทั้งหมด</button>
+      </div>
+    </div>
     </div>
 
     <!-- SUB: จัดการ Master Stock + พนักงาน (ย้ายมาจาก stocktake.html) -->
@@ -185,6 +250,85 @@
   let tagMasterStock = [], tagJobs = [], tagLoaded = false;
   let tagSearch = "", tagDiffOnly = false;
   const TAG_Z = {"Normal":"badge-blue","Zone B":"badge-purple","Overflow":"badge-orange"};
+
+  // ══ ROUND SYSTEM ══════════════════════════════════════════
+  // แก้ปัญหา "ล้าง Master แล้ว job เก่ายังค้าง" แบบไม่ทำลายประวัติ:
+  // แท็ก round_id ให้ทุก Job/Master row ตอนสร้าง แล้ว Dashboard กรองโชว์
+  // แค่รอบปัจจุบันเป็นค่าเริ่มต้น ส่วนรอบเก่าเลือกดูย้อนหลังได้เสมอผ่าน dropdown
+  let currentRound = null;      // {round_id, round_label, started_at, started_by}
+  let allRounds = [];           // ประวัติทุกรอบที่เคยเริ่ม
+  let selectedRoundId = null;   // รอบที่กำลังดูอยู่ใน Staff Summary / Transactions
+
+  onSnapshot(doc(db,"app_settings","stocktake_round"), snap => {
+    currentRound = snap.exists() ? snap.data() : null;
+    renderRoundBanner();
+    renderTagMonitor();
+  });
+  onSnapshot(query(collection(db,"stocktake_rounds"), orderBy("started_at","desc")), snap => {
+    allRounds = snap.docs.map(d=>d.data());
+    renderRoundSelect();
+  });
+
+  function renderRoundBanner() {
+    const lbl = document.getElementById("round-label");
+    const sub = document.getElementById("round-sub");
+    if (!lbl) return;
+    if (!currentRound) {
+      lbl.textContent = "⚠️ ยังไม่เคยเริ่มรอบ (ข้อมูลเก่าทั้งหมดถือเป็น Legacy)";
+      sub.textContent = 'กด "เริ่มรอบใหม่" ด้านขวาเพื่อเริ่มระบบนับตามรอบ';
+    } else {
+      lbl.textContent = `🔄 รอบปัจจุบัน: ${currentRound.round_label || currentRound.round_id}`;
+      sub.textContent = `เริ่มเมื่อ ${fmtDT(currentRound.started_at)} โดย ${currentRound.started_by||"—"}`;
+    }
+  }
+
+  function renderRoundSelect() {
+    const sel = document.getElementById("round-select");
+    if (!sel) return;
+    const keep = sel.value;
+    sel.innerHTML = allRounds.map(r =>
+      `<option value="${r.round_id}">${currentRound?.round_id===r.round_id?"🔵 ":""}${r.round_label||r.round_id}</option>`
+    ).join("") + `<option value="__legacy__">— ก่อนเริ่มระบบรอบ (Legacy) —</option>`;
+    if ([...sel.options].some(o=>o.value===keep)) sel.value = keep;
+    else if (currentRound) sel.value = currentRound.round_id;
+    selectedRoundId = sel.value;
+    renderTagMonitor();
+  }
+  document.getElementById("round-select")?.addEventListener("change", e => {
+    selectedRoundId = e.target.value;
+    renderTagMonitor();
+  });
+
+  async function startNewRound(customLabel) {
+    const roundId = "R" + Date.now();
+    const label = customLabel || `รอบ ${new Date().toLocaleDateString("th-TH",{day:"numeric",month:"short",year:"2-digit"})}`;
+    const payload = { round_id: roundId, round_label: label, started_at: serverTimestamp(), started_by: currentProfile.name };
+    await setDoc(doc(db,"app_settings","stocktake_round"), payload);
+    await setDoc(doc(db,"stocktake_rounds",roundId), payload);
+    return roundId;
+  }
+  document.getElementById("btn-new-round")?.addEventListener("click", async () => {
+    if (!confirm('เริ่มรอบใหม่?\n\nประวัติของรอบเก่าจะยังอยู่ครบ ดูย้อนหลังได้ผ่าน dropdown เลือกรอบด้านบน\nแค่ Dashboard หลัก (Coverage/สรุปตามโซน) จะเริ่มนับใหม่จาก 0')) return;
+    const label = prompt("ตั้งชื่อรอบนี้ (เว้นว่างได้ ระบบจะตั้งเป็นวันที่ให้):", "") || undefined;
+    await startNewRound(label);
+    toast("🆕 เริ่มรอบใหม่แล้ว");
+  });
+
+  // จำกัด jobs ให้อยู่ในรอบที่ต้องการ
+  function jobsInRound(roundId) {
+    if (roundId === "__legacy__") return tagJobs.filter(j=>!j.round_id);
+    if (!roundId) return currentRound ? tagJobs.filter(j=>j.round_id===currentRound.round_id) : tagJobs.filter(j=>!j.round_id);
+    return tagJobs.filter(j=>j.round_id===roundId);
+  }
+  function jobsForCurrentRound() { return jobsInRound(currentRound?.round_id || null); }
+  function jobsForSelectedRound() { return jobsInRound(selectedRoundId); }
+
+  function fmtDuration(ms) {
+    if (!ms || ms<=0) return "—";
+    const mins = Math.round(ms/60000);
+    const h = Math.floor(mins/60), m = mins%60;
+    return h>0 ? `${h} ชม. ${m} นาที` : `${m} นาที`;
+  }
 
   loadTagMonitor(); // เรียกทันที ไม่ต้องรอคลิกแท็บแล้ว เพราะเป็นเนื้อหาเดียวของหน้านี้
 
@@ -321,6 +465,8 @@
     const orig = btn.textContent;
     btn.disabled = true;
     try {
+      // ล้าง Master = เริ่ม Stock Take รอบใหม่เสมอ (กันปัญหา job/history รอบเก่าปนกับรอบใหม่)
+      const roundId = clear ? await startNewRound() : (currentRound?.round_id || await startNewRound());
       const text  = (await file.text()).replace(/^\uFEFF/, ""); // ตัด BOM ของไฟล์ CSV จริง
       const lines = text.split(/\r?\n/).filter(l=>l.trim());
       const hdrs  = parseCSVLine(lines[0]).map(h=>h.trim().toLowerCase());
@@ -338,6 +484,7 @@
           location: loc, zone,
           tag_barcode: tag, sku: obj.sku||"", item_name: obj.name||obj.item_name||"",
           qty_system: (qtySys!==null && !isNaN(qtySys)) ? qtySys : null,
+          round_id: roundId,
           imported_at: serverTimestamp()
         });
       }
@@ -393,8 +540,12 @@
   }
 
   function renderTagMonitor() {
+    // KPI / Zone Summary / Coverage / Active-now ต้องอิงกับ "รอบปัจจุบัน" เท่านั้น
+    // เพราะ tagMasterStock คือ Master ที่ยังอยู่ตอนนี้ — ถ้าเอา job รอบเก่ามาปนจะเพี้ยน
+    // (นี่คือจุดที่แก้บั๊ก "ล้าง Master แล้ว job เก่ายังค้าง")
+    const curJobs = jobsForCurrentRound();
     const latestByLoc = {};
-    tagJobs.forEach(j => { if (!latestByLoc[j.location_scan]) latestByLoc[j.location_scan] = j; });
+    curJobs.forEach(j => { if (!latestByLoc[j.location_scan]) latestByLoc[j.location_scan] = j; });
 
     const distinctLocs = [...new Set(tagMasterStock.map(m=>m.location))];
     let done=0, hasShort=0, hasOver=0, inProg=0, notStarted=0, shortQty=0, overQty=0;
@@ -443,8 +594,9 @@
     const zoneRows = Object.values(zoneMap).sort((a,b)=>a.area.localeCompare(b.area));
     const zoneTbody = document.getElementById("tag-zone-tbody");
     if (zoneTbody) {
-      zoneTbody.innerHTML = zoneRows.length ? zoneRows.map(z => `
-        <tr>
+      zoneTbody.innerHTML = zoneRows.length ? zoneRows.map(z => {
+        const zpct = z.total ? Math.round(((z.done+z.diff)/z.total)*100) : 0;
+        return `<tr>
           <td style="font-weight:700;">${z.area}</td>
           <td>${z.total}</td>
           <td style="color:var(--gray);">${z.notStarted}</td>
@@ -453,12 +605,13 @@
           <td style="color:var(--red);font-weight:700;">${z.diff}</td>
           <td style="color:var(--amber);">${z.shortSum||"—"}</td>
           <td style="color:var(--red);">${z.overSum||"—"}</td>
-        </tr>
-      `).join("") : `<tr><td colspan="8" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่พบข้อมูล</td></tr>`;
+          <td><div class="mini-bar-wrap"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${zpct}%;background:${zpct>=100?'var(--green)':zpct>=50?'var(--indigo)':'var(--amber)'};"></div></div><span style="font-size:0.75rem;font-weight:700;min-width:32px;">${zpct}%</span></div></td>
+        </tr>`;
+      }).join("") : `<tr><td colspan="9" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่พบข้อมูล</td></tr>`;
     }
 
-    // ── กำลังนับอยู่ตอนนี้ ────────────────────────────────────
-    const active = tagJobs.filter(j=>j.count_status==="In Progress");
+    // ── กำลังนับอยู่ตอนนี้ (รอบปัจจุบัน) ───────────────────
+    const active = curJobs.filter(j=>j.count_status==="In Progress");
     const activeEl = document.getElementById("tag-active-list");
     if (activeEl) {
       activeEl.innerHTML = active.length ? active.map(j => {
@@ -474,7 +627,7 @@
       }).join("") : `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีใครกำลังนับอยู่</div>`;
     }
 
-    // ── ตารางความคืบหน้าตาม Location (ล่าสุดต่อโล) ──────────
+    // ── ตารางความคืบหน้าตาม Location (รอบปัจจุบัน) ──────────
     let filtered = rowsData;
     if (tagSearch) filtered = filtered.filter(r=>r.loc.toLowerCase().includes(tagSearch.toLowerCase()));
     if (tagDiffOnly) filtered = filtered.filter(r=>r.status==="diff");
@@ -492,9 +645,40 @@
       `).join("") || `<div style="padding:1.5rem;text-align:center;color:var(--gray);">ไม่พบข้อมูล</div>`;
     }
 
-    // ── ประวัติการนับทั้งหมด: ทุก Job ไม่ dedupe (ใครนับอะไรไปโลไหน เวลาเริ่ม-จบ) ──
+    // ── สรุปผลงานพนักงาน (รอบที่เลือก) ──────────────────────
+    const selJobs = jobsForSelectedRound();
+    const staffMap = {};
+    selJobs.forEach(j => {
+      const name = j.created_name || "(ไม่ระบุชื่อ)";
+      if (!staffMap[name]) staffMap[name] = { name, locCount:0, itemCount:0, totalMs:0, shortSum:0, overSum:0 };
+      if (j.count_status === "Completed") {
+        const s = staffMap[name];
+        s.locCount++;
+        s.itemCount += (j.matched_count||0);
+        s.shortSum  += (j.short_count||0);
+        s.overSum   += (j.over_count||0);
+        if (j.start_time?.toDate && j.end_time?.toDate) s.totalMs += (j.end_time.toDate() - j.start_time.toDate());
+      }
+    });
+    const staffRows = Object.values(staffMap).sort((a,b)=>b.locCount-a.locCount);
+    const staffTbody = document.getElementById("tag-staff-tbody");
+    if (staffTbody) {
+      staffTbody.innerHTML = staffRows.length ? staffRows.map(s => `
+        <tr>
+          <td style="font-weight:700;">${s.name}</td>
+          <td>${s.locCount}</td>
+          <td>${s.itemCount}</td>
+          <td>${fmtDuration(s.totalMs)}</td>
+          <td>${s.locCount ? fmtDuration(s.totalMs/s.locCount) : "—"}</td>
+          <td style="${s.shortSum>0?'color:var(--amber);font-weight:700;':''}">${s.shortSum||"—"}</td>
+          <td style="${s.overSum>0?'color:var(--red);font-weight:700;':''}">${s.overSum||"—"}</td>
+        </tr>
+      `).join("") : `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่พบข้อมูลในรอบนี้</td></tr>`;
+    }
+
+    // ── ประวัติ/Transactions (รอบที่เลือก) ──────────────────
     const logSearch = (document.getElementById("tag-log-search")?.value || "").toLowerCase();
-    let logRows = tagJobs;
+    let logRows = selJobs;
     if (logSearch) logRows = logRows.filter(j =>
       (j.location_scan||"").toLowerCase().includes(logSearch) || (j.created_name||"").toLowerCase().includes(logSearch)
     );
@@ -506,23 +690,26 @@
         const statusTxt = !isDone ? `<span style="color:var(--indigo);font-weight:700;">🔵 กำลังนับ</span>`
           : (sc===0 && oc===0) ? `<span style="color:var(--green);font-weight:700;">✅ ตรง</span>`
           : `<span style="color:var(--red);font-weight:700;">⚠️ มี diff</span>`;
+        const dur = (isDone && j.start_time?.toDate && j.end_time?.toDate) ? fmtDuration(j.end_time.toDate()-j.start_time.toDate()) : "—";
         return `<tr>
           <td style="font-weight:700;font-family:monospace;">${j.location_scan}</td>
           <td><span class="badge ${TAG_Z[j.zone_type]||"badge-gray"}">${j.zone_type}</span></td>
           <td>${j.created_name||"—"}</td>
           <td style="font-size:0.8rem;">${fmtDT(j.start_time)}</td>
           <td style="font-size:0.8rem;">${isDone ? fmtDT(j.end_time) : "—"}</td>
+          <td style="font-size:0.8rem;">${dur}</td>
           <td>${statusTxt}</td>
           <td>${j.matched_count??0}/${j.expected_target??"?"}</td>
           <td style="${sc>0?'color:var(--amber);font-weight:700;':''}">${sc||"—"}</td>
           <td style="${oc>0?'color:var(--red);font-weight:700;':''}">${oc||"—"}</td>
         </tr>`;
-      }).join("") : `<tr><td colspan="9" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่พบข้อมูล</td></tr>`;
+      }).join("") : `<tr><td colspan="10" style="text-align:center;padding:1.5rem;color:var(--gray);">ไม่พบข้อมูลในรอบนี้</td></tr>`;
     }
 
-    window._tagRowsData = rowsData;
-    window._tagZoneRows = zoneRows;
-    window._tagLogRows  = tagJobs;
+    window._tagRowsData  = rowsData;
+    window._tagZoneRows  = zoneRows;
+    window._tagStaffRows = staffRows;
+    window._tagLogRows   = logRows;
   }
   document.getElementById("tag-log-search")?.addEventListener("input", () => renderTagMonitor());
 
@@ -531,7 +718,7 @@
     if (!rows.length) { toast("ไม่มีข้อมูล"); return; }
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1: Coverage ต่อ Location (ล่าสุด)
+    // Sheet 1: Coverage ต่อ Location (รอบปัจจุบัน)
     const coverage = [["Location","Zone","สถานะ","ผู้นับ","เริ่มนับ","จบนับ","ตรง","ขาด(Short)","เกิน(Over)"]];
     rows.forEach(r => {
       const j = r.job;
@@ -539,13 +726,19 @@
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(coverage), "Coverage");
 
-    // Sheet 2: สรุปตามโซน
+    // Sheet 2: สรุปตามโซน (รอบปัจจุบัน)
     const zoneRows = window._tagZoneRows || [];
     const zoneSheet = [["โซน","ทั้งหมด","ยังไม่เริ่ม","กำลังนับ","เสร็จ(ตรง)","เสร็จ(diff)","ขาดรวม","เกินรวม"]];
     zoneRows.forEach(z => zoneSheet.push([z.area, z.total, z.notStarted, z.inProg, z.done, z.diff, z.shortSum, z.overSum]));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(zoneSheet), "สรุปตามโซน");
 
-    // Sheet 3: ประวัติการนับทั้งหมด (ทุก Job — ใครนับอะไร โลไหน เวลาเริ่ม-จบ)
+    // Sheet 3: สรุปผลงานพนักงาน (รอบที่เลือกใน dropdown)
+    const staffRows = window._tagStaffRows || [];
+    const staffSheet = [["พนักงาน","Location เสร็จ","จำนวนชิ้น/tag รวม","เวลารวม(นาที)","เฉลี่ยนาที/โล","ขาดรวม","เกินรวม"]];
+    staffRows.forEach(s => staffSheet.push([s.name, s.locCount, s.itemCount, Math.round(s.totalMs/60000), s.locCount?Math.round(s.totalMs/60000/s.locCount):"", s.shortSum, s.overSum]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(staffSheet), "สรุปพนักงาน");
+
+    // Sheet 4: ประวัติ/Transactions (รอบที่เลือกใน dropdown)
     const logRows = window._tagLogRows || [];
     const logSheet = [["Location","Zone","ผู้นับ","เริ่มนับ","จบนับ","สถานะ","ตรง","ทั้งหมด","ขาด(Short)","เกิน(Over)"]];
     logRows.forEach(j => {
@@ -554,10 +747,22 @@
       const st = !isDone ? "กำลังนับ" : (sc===0&&oc===0) ? "ตรง" : "มี diff";
       logSheet.push([j.location_scan, j.zone_type, j.created_name||"", fmtDT(j.start_time), isDone?fmtDT(j.end_time):"", st, j.matched_count??"", j.expected_target??"", sc, oc]);
     });
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(logSheet), "ประวัติการนับทั้งหมด");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(logSheet), "ประวัติ_Transactions");
 
-    XLSX.writeFile(wb, `stocktake_monitor_${new Date().toISOString().slice(0,10)}.xlsx`);
-    toast("✅ Export Excel แล้ว");
+    // Sheet 5: Master + Status (เหมือน Master แต่เพิ่ม Status/ผู้นับ/เวลาเริ่ม/เวลาจบ — รอบปัจจุบัน)
+    const curJobs = jobsForCurrentRound();
+    const latestByLoc = {};
+    curJobs.forEach(j => { if (!latestByLoc[j.location_scan]) latestByLoc[j.location_scan] = j; });
+    const msSheet = [["Location","Zone","Tag","SKU","ชื่อสินค้า","Qty System","Status","ผู้นับ","เวลาเริ่ม","เวลาจบ"]];
+    tagMasterStock.forEach(m => {
+      const j = latestByLoc[m.location];
+      const status = !j ? "Not Started" : j.count_status==="In Progress" ? "In Progress" : "Completed";
+      msSheet.push([m.location, m.zone, m.tag_barcode, m.sku||"", m.item_name||"", m.qty_system??"", status, j?.created_name||"", j?fmtDT(j.start_time):"", (j&&j.count_status==="Completed")?fmtDT(j.end_time):""]);
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(msSheet), "Master+Status");
+
+    XLSX.writeFile(wb, `stocktake_dashboard_${new Date().toISOString().slice(0,10)}.xlsx`);
+    toast("✅ Export Excel แล้ว (5 ชีท)");
   });
 </script>
 </body>
