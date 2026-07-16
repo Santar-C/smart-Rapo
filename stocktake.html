@@ -228,7 +228,7 @@
   import { db } from "./firebase-config.js";
   import { requireAuth } from "./auth.js";
   import {
-    collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
+    collection, doc, addDoc, updateDoc, deleteDoc, getDocs, getDoc,
     query, orderBy, where, onSnapshot, serverTimestamp, writeBatch, limit
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -381,16 +381,26 @@
     return masterStock.find(m=>m.location===loc.toUpperCase())?.zone || "Normal";
   }
 
+  // อ่านรอบปัจจุบันมาแท็กให้ทุก Job ที่สร้างใหม่ (ให้ Dashboard ใน monitor.html กรองถูก)
+  async function getCurrentRoundId() {
+    try {
+      const snap = await getDoc(doc(db,"app_settings","stocktake_round"));
+      return snap.exists() ? snap.data().round_id : null;
+    } catch (e) { return null; }
+  }
+
   document.getElementById("btn-start-job").addEventListener("click", async () => {
     const loc  = locInput.value.trim().toUpperCase();
     if (!loc) { toast("⚠️ ระบุ Location ก่อน"); return; }
     const rows = masterRowsAt(loc);
     const zone = rows[0]?.zone || "Normal";
     const nowClient = new Date();
+    const roundId = await getCurrentRoundId();
     const ref  = await addDoc(collection(db,"count_jobs"), {
       location_scan: loc, zone_type: zone,
       start_time: serverTimestamp(), count_status: "In Progress",
       expected_target: rows.length, matched_count: 0, short_count: 0, over_count: 0,
+      round_id: roundId,
       created_by: currentUser.uid, created_name: profile.name
     });
     scanEvents=[];
