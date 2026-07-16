@@ -205,10 +205,11 @@
       <div class="card">
         <div class="card-title">🗄️ Import Master Stock (Tag/Zone)</div>
         <div class="alert alert-warning" style="font-size:0.82rem;margin-bottom:0.75rem;">
-          <b>Format CSV หัวคอลัมน์:</b> <code>location, zone, tag_barcode, item_name, qty_system</code><br>
-          <small>zone = Normal | Zone B | Overflow<br>
-          Zone B / Overflow: 1 tag = 1 ชิ้น (ไม่ต้องใส่ qty_system ก็ได้)<br>
-          Normal: ยิงบาร์โค้ดซ้ำเพื่อนับจำนวน เทียบกับ qty_system ที่ต้องใส่</small>
+          <b>Format CSV หัวคอลัมน์จริง:</b> <code>Location,Tag,SKU,Name,Qty_System</code><br>
+          <small>ไม่ต้องมีคอลัมน์ zone — ระบบคำนวณ zone ให้อัตโนมัติจาก prefix ของ Location:<br>
+          Location ขึ้นต้นด้วย <b>B</b> (เช่น B01, B02...) → Zone B (bulk, 1 tag = 1 ชิ้น)<br>
+          Location ขึ้นต้นด้วย <b>OVERFL</b> → Overflow (bulk, 1 tag = 1 ชิ้น)<br>
+          Location อื่นๆ ทั้งหมด (A01-A20, C01-C04, SA12, RECEIVE ฯลฯ) → Normal (ยิงบาร์โค้ดซ้ำนับจำนวนจริง เทียบ Qty_System)</small>
         </div>
         <div class="alert alert-error" style="font-size:0.8rem;margin-bottom:0.75rem;">
           ⚠️ ก่อนเริ่ม Stock Take รอบใหม่ ต้อง <b>ล้าง Master เก่าออกก่อนแล้วค่อย Import ใหม่</b>
@@ -230,8 +231,8 @@
         </div>
         <div class="table-wrap" style="border:none;border-radius:0;">
           <table>
-            <thead><tr><th>Location</th><th>Zone</th><th>Barcode</th><th>ชื่อสินค้า</th><th>Qty System</th><th>ลบ</th></tr></thead>
-            <tbody id="tag-master-tbody"><tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
+            <thead><tr><th>Location</th><th>Zone</th><th>Tag</th><th>SKU</th><th>ชื่อสินค้า</th><th>Qty System</th><th>ลบ</th></tr></thead>
+            <tbody id="tag-master-tbody"><tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -584,16 +585,18 @@
     const data = tagMasterStock.filter(m =>
       (m.location||"").toLowerCase().includes(q) ||
       (m.tag_barcode||"").toLowerCase().includes(q) ||
+      (m.sku||"").toLowerCase().includes(q) ||
       (m.item_name||"").toLowerCase().includes(q)
     );
     tbody.innerHTML = data.length ? data.map(m => `<tr>
         <td style="font-weight:700;">${m.location}</td>
         <td><span class="badge ${TAG_Z[m.zone]||"badge-gray"}">${m.zone||"Normal"}</span></td>
         <td style="font-family:monospace;font-size:0.85rem;">${m.tag_barcode}</td>
+        <td style="font-family:monospace;font-size:0.8rem;">${m.sku||"—"}</td>
         <td>${m.item_name||"—"}</td>
         <td>${m.qty_system ?? "—"}</td>
         <td><button onclick="delTagMaster('${m.id}')" class="btn btn-red btn-sm">🗑️</button></td>
-      </tr>`).join("") : `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--gray);">ยังไม่มี Master</td></tr>`;
+      </tr>`).join("") : `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray);">ยังไม่มี Master</td></tr>`;
   }
   document.getElementById("tag-master-search")?.addEventListener("input", e => { tagMasterSearch=e.target.value; renderTagMasterTable(); });
   window.delTagMaster = async id => {
@@ -609,32 +612,42 @@
     await batch.commit();
     toast("🗑️ ล้าง Master ทั้งหมดแล้ว");
   });
+
+  // Location prefix → zone: B* = Zone B (bulk), OVERFL* = Overflow (bulk), อื่นๆ = Normal (quantity)
+  function deriveZone(loc) {
+    const area = (loc.split("-")[0] || "").toUpperCase();
+    if (area.startsWith("B")) return "Zone B";
+    if (area.startsWith("OVERFL")) return "Overflow";
+    return "Normal";
+  }
+
   document.getElementById("btn-tag-import-master")?.addEventListener("click", async () => {
     const file = document.getElementById("tag-master-csv").files[0];
     const clear = document.getElementById("tag-master-clear").checked;
     if (!file) { toast("⚠️ เลือกไฟล์ก่อน"); return; }
-    const text  = await file.text();
-    const lines = text.split("\n").filter(l=>l.trim());
+    const text  = (await file.text()).replace(/^\uFEFF/, ""); // ตัด BOM ของไฟล์ CSV จริง
+    const lines = text.split(/\r?\n/).filter(l=>l.trim());
     const hdrs  = lines[0].split(",").map(h=>h.trim().replace(/^"|"$/g,"").toLowerCase());
     const batch = writeBatch(db);
-    let count = 0;
+    let count = 0, skipped = 0;
     if (clear) tagMasterStock.forEach(m => batch.delete(doc(db,"master_stock",m.id)));
     for (let i=1;i<lines.length;i++) {
       const vals = lines[i].split(",").map(v=>v.trim().replace(/^"|"$/g,""));
       const obj  = {}; hdrs.forEach((h,idx)=>{ obj[h]=vals[idx]||""; });
       const loc  = (obj.location||"").toUpperCase().trim();
-      const tag  = (obj.tag_barcode||obj.barcode||"").trim();
-      if (!loc||!tag) continue;
+      const tag  = (obj.tag||obj.tag_barcode||obj.barcode||"").trim();
+      if (!loc||!tag) { skipped++; continue; } // ข้าม location ว่าง/ผิดปกติ เช่นแถว "(blank)"
+      const zone   = obj.zone || deriveZone(loc); // ใช้คอลัมน์ zone ถ้ามี ไม่งั้น derive จาก prefix
       const qtySys = obj.qty_system!=="" ? Number(obj.qty_system) : null;
       batch.set(doc(collection(db,"master_stock")), {
-        location: loc, zone: obj.zone||"Normal",
-        tag_barcode: tag, item_name: obj.item_name||obj.name||"",
+        location: loc, zone,
+        tag_barcode: tag, sku: obj.sku||"", item_name: obj.name||obj.item_name||"",
         qty_system: (qtySys!==null && !isNaN(qtySys)) ? qtySys : null,
         imported_at: serverTimestamp()
       }); count++;
     }
     await batch.commit();
-    toast(`✅ Import ${count} รายการ`);
+    toast(`✅ Import ${count} รายการ${skipped?` (ข้าม ${skipped} แถวที่ไม่มี Location/Tag)`:""}`);
   });
 
   // ── Staff List management — ย้ายมาจาก stocktake.html ────────
