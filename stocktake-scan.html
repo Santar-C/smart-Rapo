@@ -140,7 +140,7 @@
   import { auth, db } from "./firebase-config.js";
   import { signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
-    collection, doc, addDoc, updateDoc, deleteDoc, getDocs,
+    collection, doc, addDoc, updateDoc, deleteDoc, getDocs, getDoc,
     query, where, orderBy, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -286,10 +286,19 @@
     await beginCounting(name, selLoc);
   });
 
+  async function getCurrentRoundId() {
+    try {
+      const snap = await getDoc(doc(db,"app_settings","stocktake_round"));
+      return snap.exists() ? snap.data().round_id : null;
+    } catch (e) { return null; }
+  }
+
   async function beginCounting(name, locCode) {
     const locRows = masterStock.filter(m=>m.location===locCode);
+    const roundId = await getCurrentRoundId();
     const existing = await getDocs(query(
-      collection(db,"count_jobs"), where("location_scan","==",locCode), where("count_status","==","In Progress")
+      collection(db,"count_jobs"), where("location_scan","==",locCode), where("count_status","==","In Progress"),
+      where("round_id","==",roundId)
     ));
     if (!existing.empty) {
       const j = existing.docs[0];
@@ -303,6 +312,7 @@
         location_scan: locCode, zone_type: zone,
         start_time: serverTimestamp(), count_status: "In Progress",
         expected_target: locRows.length, matched_count: 0, short_count: 0, over_count: 0,
+        round_id: roundId,
         created_by: currentUser.uid, created_name: name
       });
       scanEvents = [];
@@ -375,7 +385,7 @@
         ? `<div class="tick" onclick="toggleTick('${r.tag_barcode}')" style="background:${cls==='matched'?'#16a34a':cls==='over'?'#dc2626':'#e2e8f0'};color:${cls==='pending'?'#94a3b8':'white'};">${tickIcon}</div>`
         : `<div class="stepper"><button onclick="stepQty('${r.tag_barcode}',-1)">−</button><div class="cnt">${c}${t!=null?` / ${t}`:""}</div><button onclick="stepQty('${r.tag_barcode}',1)">+</button></div>`;
       return `<div class="chk-row ${cls}">
-        <div style="flex:1;min-width:0;"><div class="tag">${r.tag_barcode}</div>${r.item_name?`<div class="name">${r.item_name}</div>`:""}</div>
+        <div style="flex:1;min-width:0;"><div class="tag">${r.tag_barcode}</div>${(r.sku||r.item_name)?`<div class="name">${r.sku?`<b>${r.sku}</b>`:""}${r.sku&&r.item_name?" — ":""}${r.item_name||""}</div>`:""}</div>
         ${stepper}
       </div>`;
     }).join("") : `<div style="text-align:center;color:var(--gray);font-size:0.9rem;padding:1rem 0;">ไม่มีรายการที่ต้องนับที่นี่</div>`;
