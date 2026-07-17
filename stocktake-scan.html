@@ -771,19 +771,27 @@
     const modal = document.getElementById("cam-modal");
     modal.style.display = "flex";
     html5Cam = new Html5Qrcode("cam-reader");
+    const onFrame = text => { onDecode(text); if (autoClose) closeCam(); };
     // เรียกกล้องทันทีจากการกดของ user โดยตรง ไม่หน่วงเวลาก่อน — iOS Safari ต้องการให้ขอสิทธิ์กล้อง
     // ต่อเนื่องจากการกดของ user จริงๆ (user gesture) ถ้าหน่วงหลายจังหวะก่อนอาจถูกปฏิเสธเงียบๆ
     // ปัญหาจอดำแก้ด้วย min-height ที่ตั้งไว้ใน CSS ของ #cam-reader แทน ไม่ต้องหน่วงเวลารอ layout
-    await html5Cam.start({ facingMode: { ideal: "environment" } }, BARCODE_CAM_CONFIG,
-      text => { onDecode(text); if (autoClose) closeCam(); }, ()=>{}
-    ).then(()=>{ camStarted=true; })
-     .catch((err)=>{
-        modal.style.display="none";
+    try {
+      await html5Cam.start({ facingMode: "environment" }, BARCODE_CAM_CONFIG, onFrame, ()=>{});
+      camStarted = true;
+    } catch (err1) {
+      // บางยี่ห้อ/บางเครื่องไม่รู้จัก facingMode "environment" — ลองเปิดกล้องแบบไม่ระบุ (เอาตัวไหนก็ได้ที่มี)
+      try {
+        await html5Cam.start({}, BARCODE_CAM_CONFIG, onFrame, ()=>{});
+        camStarted = true;
+      } catch (err2) {
+        modal.style.display = "none";
+        const err = err2;
         const msg = (err?.name === "NotAllowedError") ? "ไม่ได้รับสิทธิ์กล้อง — เข้า Settings เบราว์เซอร์แล้วอนุญาตกล้องให้เว็บนี้"
           : (err?.name === "NotFoundError") ? "ไม่พบกล้องในเครื่องนี้"
           : "เปิดกล้องไม่ได้ (" + (err?.message||err) + ") — ใช้ช่องพิมพ์บาร์โค้ดแทนได้เลย";
         toast("📷 "+msg, "err", 5000);
-     });
+      }
+    }
   }
   async function closeCam() {
     await stopCam();
