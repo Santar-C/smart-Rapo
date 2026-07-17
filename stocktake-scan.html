@@ -63,6 +63,7 @@
       <label style="font-size:1.25rem;font-weight:700;">2️⃣ สแกนบาร์โค้ด Location ที่ติดอยู่หน้าช่อง</label>
       <input type="text" id="loc-barcode-input" placeholder="ยิงบาร์โค้ด Location ตรงนี้ (ปืนยิง)"
         autocomplete="off" autocorrect="off" spellcheck="false" class="scan-input-big" style="margin-top:0.5rem;">
+      <button class="btn btn-outline btn-full big-btn" id="btn-use-qr" style="margin-top:0.6rem;">📷 หรือเปิดกล้องสแกนแทน (ถ้ามี)</button>
       <div style="font-size:1.05rem;color:var(--gray);margin-top:0.5rem;text-align:center;">หรือเลือกเองด้านล่าง ↓</div>
     </div>
 
@@ -81,8 +82,7 @@
       <div style="font-size:1.1rem;color:var(--gray);margin-top:0.5rem;" id="loc-sub"></div>
     </div>
 
-    <button class="btn btn-primary btn-full big-btn" id="btn-begin" style="margin-bottom:0.6rem;">▶ เริ่มนับ</button>
-    <button class="btn btn-outline btn-full" id="btn-use-qr" style="margin-bottom:1rem;">📷 หรือสแกน QR แทน (ถ้ามี)</button>
+    <button class="btn btn-primary btn-full big-btn" id="btn-begin" style="margin-bottom:1rem;">▶ เริ่มนับ</button>
   </div>
 
   <!-- ═══ SCREEN: CHECKLIST (นับ) ═══ -->
@@ -128,7 +128,7 @@
     <!-- กล้องสแกน Tag — fullscreen overlay กันหน้าจอขยับ/เลื่อนหาปุ่มไม่เจอ -->
     <div id="cam-modal" style="display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:1rem;">
       <div style="position:relative;width:100%;max-width:460px;">
-        <div id="cam-reader" style="width:100%;border-radius:12px;overflow:hidden;background:#000;"></div>
+        <div id="cam-reader" style="width:100%;min-height:280px;border-radius:12px;overflow:hidden;background:#000;"></div>
         <div class="cam-aim-line"></div>
       </div>
       <div style="color:white;font-size:1.15rem;font-weight:700;margin-top:1rem;text-align:center;">เล็งให้เส้นแดงทับกลางบาร์โค้ด</div>
@@ -760,19 +760,30 @@
 
   // ── กล้องสแกนแบบ fullscreen overlay ใช้ร่วมกันทั้ง 3 จุด (Tag / เลือก Location / Location ถัดไป) ──
   // แก้ปัญหาหน้าจอขยับ/เลื่อนหาปุ่มไม่เจอตอนเปิดกล้อง เพราะเป็น overlay ไม่ใช่ inline ที่ดันของข้างล่างลง
-  function waitForLayout() {
-    return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  }
 
   async function openCam(onDecode, autoClose) {
+    // เช็คก่อนว่าเบราว์เซอร์/แอปนี้รองรับกล้องไหม (webview ในแอป LINE/Facebook/Instagram
+    // มักบล็อกกล้องไว้ ไม่ว่าโค้ดจะเขียนดีแค่ไหนก็เปิดไม่ได้ — ต้องเปิดด้วย Safari/Chrome จริงๆ)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      toast("📷 เบราว์เซอร์นี้ไม่รองรับกล้อง (ถ้าเปิดจากแอป LINE/Facebook ให้เปิดด้วย Safari/Chrome แทน) — ใช้ช่องพิมพ์บาร์โค้ดด้านบนได้เลย", "err", 5000);
+      return;
+    }
     const modal = document.getElementById("cam-modal");
     modal.style.display = "flex";
-    await waitForLayout(); // สำคัญ: ต้องรอ browser layout เสร็จก่อน ไม่งั้นกล้องวัดขนาด container ผิดเป็น 0 แล้วจอดำ
     html5Cam = new Html5Qrcode("cam-reader");
-    await html5Cam.start({facingMode:"environment"}, BARCODE_CAM_CONFIG,
+    // เรียกกล้องทันทีจากการกดของ user โดยตรง ไม่หน่วงเวลาก่อน — iOS Safari ต้องการให้ขอสิทธิ์กล้อง
+    // ต่อเนื่องจากการกดของ user จริงๆ (user gesture) ถ้าหน่วงหลายจังหวะก่อนอาจถูกปฏิเสธเงียบๆ
+    // ปัญหาจอดำแก้ด้วย min-height ที่ตั้งไว้ใน CSS ของ #cam-reader แทน ไม่ต้องหน่วงเวลารอ layout
+    await html5Cam.start({ facingMode: { ideal: "environment" } }, BARCODE_CAM_CONFIG,
       text => { onDecode(text); if (autoClose) closeCam(); }, ()=>{}
     ).then(()=>{ camStarted=true; })
-     .catch((err)=>{ toast("❌ เปิดกล้องไม่ได้: "+(err?.message||err), "err", 4000); modal.style.display="none"; });
+     .catch((err)=>{
+        modal.style.display="none";
+        const msg = (err?.name === "NotAllowedError") ? "ไม่ได้รับสิทธิ์กล้อง — เข้า Settings เบราว์เซอร์แล้วอนุญาตกล้องให้เว็บนี้"
+          : (err?.name === "NotFoundError") ? "ไม่พบกล้องในเครื่องนี้"
+          : "เปิดกล้องไม่ได้ (" + (err?.message||err) + ") — ใช้ช่องพิมพ์บาร์โค้ดแทนได้เลย";
+        toast("📷 "+msg, "err", 5000);
+     });
   }
   async function closeCam() {
     await stopCam();
