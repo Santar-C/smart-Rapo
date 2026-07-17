@@ -53,14 +53,21 @@
     </div>
 
     <div class="card">
-      <label style="font-size:1rem;font-weight:700;">2️⃣ เลือกโซน</label>
+      <label style="font-size:1rem;font-weight:700;">2️⃣ สแกนบาร์โค้ด Location ที่ติดอยู่หน้าช่อง</label>
+      <input type="text" id="loc-barcode-input" placeholder="ยิงบาร์โค้ด Location ตรงนี้ (ปืนยิง)"
+        autocomplete="off" autocorrect="off" spellcheck="false" class="scan-input-big" style="margin-top:0.5rem;">
+      <div style="font-size:0.8rem;color:var(--gray);margin-top:0.5rem;text-align:center;">หรือเลือกเองด้านล่าง ↓</div>
+    </div>
+
+    <div class="card">
+      <label style="font-size:1rem;font-weight:700;">เลือกโซนเอง</label>
       <select id="area-select" style="width:100%;padding:0.85rem;border:2px solid var(--border);border-radius:10px;font-family:Sarabun,sans-serif;font-size:1.15rem;font-weight:700;margin-top:0.5rem;">
         <option value="">-- กำลังโหลด... --</option>
       </select>
     </div>
 
     <div class="card" id="loc-select-card" style="display:none;">
-      <label style="font-size:1rem;font-weight:700;">3️⃣ เลือก Location</label>
+      <label style="font-size:1rem;font-weight:700;">เลือก Location เอง</label>
       <select id="loc-select" style="width:100%;padding:0.85rem;border:2px solid var(--border);border-radius:10px;font-family:Sarabun,sans-serif;font-size:1.15rem;font-weight:700;margin-top:0.5rem;">
         <option value="">-- เลือกโซนก่อน --</option>
       </select>
@@ -119,6 +126,7 @@
     </div>
 
     <button class="btn btn-outline btn-full big-btn" id="btn-report-over" style="margin-bottom:0.6rem;">🔺 เจอของเกิน (ไม่มีในรายการ)</button>
+    <button class="btn btn-outline btn-full big-btn" id="btn-wrong-location" style="margin-bottom:0.6rem;color:var(--red);border-color:var(--red);">❌ กดผิด Location — แจ้ง Admin</button>
     <button class="btn btn-green btn-full big-btn" id="btn-finish-job" style="margin-bottom:1rem;">🏁 นับเสร็จ — โลนี้จบ</button>
   </div>
 
@@ -293,7 +301,7 @@
   });
 
   let selLoc  = "";
-  let masterStock = [], scanEvents = [], curJob = null, staffList = [];
+  let scanEvents = [], curJob = null, staffList = [];
   let allLocations = []; // [{location, zone, count}]
   let camStarted = false, html5Cam = null, lastScan = 0, qrPickerCam = null;
 
@@ -316,18 +324,45 @@
     return "⚪ อื่นๆ";
   }
 
-  async function init() {
-    // โหลด Master ทั้งหมดครั้งเดียว เพื่อสร้าง dropdown โซน/location
-    const s = await getDocs(collection(db,"master_stock"));
-    masterStock = s.docs.map(d=>({id:d.id,...d.data()}));
+  const INDEX_CACHE_KEY = "rapo_location_index_cache_v1";
+  const BARCODE_MAP_CACHE_KEY = "rapo_barcode_map_cache_v1";
+  let barcodeMap = {}; // { "asdfth": "A01-01-1-10", ... } — จาก WMS
 
-    const byLoc = {};
-    masterStock.forEach(m => {
-      if (!m.location) return;
-      if (!byLoc[m.location]) byLoc[m.location] = { location:m.location, zone:m.zone||"Normal", count:0 };
-      byLoc[m.location].count++;
-    });
-    allLocations = Object.values(byLoc).sort((a,b)=>a.location.localeCompare(b.location));
+  async function init() {
+    const roundId = await getCurrentRoundId();
+
+    // ── โหลด "location_index" เอกสารเดียว (location+zone+count) แทน master_stock
+    // เต็ม 5,862+ แถว — ลด read จากหลักพันเหลือแค่ 1 ต่อเครื่อง ─────────────
+    // sessionStorage cache ไว้ช่วยกรณีเปิดหน้าซ้ำในเซสชันเดียวกัน (cache หมดอายุอัตโนมัติเมื่อเริ่มรอบใหม่)
+    let cached = null;
+    try {
+      const raw = sessionStorage.getItem(INDEX_CACHE_KEY);
+      if (raw) { const parsed = JSON.parse(raw); if (parsed.roundId === roundId) cached = parsed; }
+    } catch (e) {}
+
+    if (cached) {
+      allLocations = cached.locations;
+    } else {
+      const snap = await getDoc(doc(db,"location_index","current"));
+      allLocations = (snap.exists() ? (snap.data().locations||[]) : []).slice().sort((a,b)=>a.location.localeCompare(b.location));
+      try { sessionStorage.setItem(INDEX_CACHE_KEY, JSON.stringify({roundId, locations: allLocations})); } catch(e) {}
+    }
+
+    // ── โหลดตารางเทียบ "บาร์โค้ด WMS" ↔ "รหัส Location ที่คนอ่าน" (1 read, cache เหมือนกัน) ──
+    let bmCached = null;
+    try {
+      const raw = sessionStorage.getItem(BARCODE_MAP_CACHE_KEY);
+      if (raw) { const parsed = JSON.parse(raw); if (parsed.roundId === roundId) bmCached = parsed; }
+    } catch (e) {}
+    if (bmCached) {
+      barcodeMap = bmCached.map;
+    } else {
+      try {
+        const bmSnap = await getDoc(doc(db,"location_barcode_map","current"));
+        barcodeMap = bmSnap.exists() ? (bmSnap.data().map || {}) : {};
+      } catch (e) { barcodeMap = {}; }
+      try { sessionStorage.setItem(BARCODE_MAP_CACHE_KEY, JSON.stringify({roundId, map: barcodeMap})); } catch(e) {}
+    }
 
     // สร้างกลุ่มโซน (Area) เรียงตามหมวดแล้วเรียงชื่อในหมวด
     const areaMap = {};
@@ -363,6 +398,7 @@
     if (preLoc) selectLocation(preLoc);
   }
   init();
+  setTimeout(()=>document.getElementById("loc-barcode-input")?.focus(), 300);
 
   document.getElementById("area-select").addEventListener("change", () => {
     const area = document.getElementById("area-select").value;
@@ -382,14 +418,30 @@
   // เลือก location ให้ตรงกับ dropdown อัตโนมัติ (ใช้ตอนมี ?loc= หรือสแกน QR)
   function selectLocation(code) {
     const loc = allLocations.find(l=>l.location===code);
-    if (!loc) { toast(`⚠️ ไม่พบ location ${code} ใน Master`, "err"); return; }
+    if (!loc) { toast(`⚠️ ไม่พบ location "${code}" — เช็คว่ามีในตารางเทียบบาร์โค้ด/Master หรือยัง`, "err", 3500); return; }
     document.getElementById("area-select").value = deriveArea(code);
     document.getElementById("area-select").dispatchEvent(new Event("change"));
     setTimeout(() => {
       document.getElementById("loc-select").value = code;
       selLoc = code;
     }, 30);
+    toast(`📍 เลือก ${code} แล้ว — กด "เริ่มนับ" ได้เลย`, "ok");
   }
+
+  // ── ยิงบาร์โค้ด Location ที่ติดหน้าช่อง (บาร์โค้ดทั่วไป ปืนยิงพิมพ์เป็นข้อความ ไม่ใช่ QR) ──
+  document.getElementById("loc-barcode-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const v = e.target.value.trim().toUpperCase();
+      e.target.value = "";
+      if (!v) return;
+      const raw = extractLocFromScan(v);
+      // แปลงบาร์โค้ด WMS → รหัส location ที่คนอ่าน ถ้ามีในตารางเทียบ
+      // ถ้าไม่เจอในตาราง ลองใช้ค่าที่พิมพ์/สแกนมาตรงๆ (เผื่อพิมพ์รหัส location เองหรือ QR เก่า)
+      const mapped = barcodeMap[raw] || raw;
+      selectLocation(mapped);
+    }
+  });
 
   document.getElementById("btn-use-qr").addEventListener("click", async () => {
     const wrap = document.getElementById("qr-picker-reader");
@@ -430,7 +482,11 @@
   }
 
   async function beginCounting(name, locCode) {
-    const locRows = masterStock.filter(m=>m.location===locCode);
+    // ดึงเฉพาะ tag ของ location นี้จริงๆ (ปกติมีแค่ 1-5 รายการ) แทนการโหลด master_stock ทั้งหมด
+    const locSnap = await getDocs(query(collection(db,"master_stock"), where("location","==",locCode)));
+    const allRows = locSnap.docs.map(d=>({id:d.id,...d.data()}));
+    // ตัดแถว placeholder (location ว่าง ไม่มีของ) ออก ไม่ให้ขึ้นเป็นรายการต้องสแกน
+    const locRows = allRows.filter(r => !r.is_placeholder);
     const roundId = await getCurrentRoundId();
     const existing = await getDocs(query(
       collection(db,"count_jobs"), where("location_scan","==",locCode), where("count_status","==","In Progress"),
@@ -443,7 +499,7 @@
       scanEvents = dd.docs.map(d=>({docId:d.id,...d.data()}));
       curJob = { id:j.id, location:locCode, zone:jd.zone_type, createdName: jd.created_name, rows: locRows };
     } else {
-      const zone = locRows[0]?.zone || "Normal";
+      const zone = allRows[0]?.zone || "Normal";
       const ref = await addDoc(collection(db,"count_jobs"), {
         location_scan: locCode, zone_type: zone,
         start_time: serverTimestamp(), count_status: "In Progress",
@@ -463,6 +519,7 @@
     document.getElementById("loc-select-card").style.display = "none";
     document.getElementById("area-select").value = "";
     selLoc = ""; curJob = null; scanEvents = [];
+    setTimeout(()=>document.getElementById("loc-barcode-input")?.focus(), 100);
   });
   document.getElementById("btn-next-qr").addEventListener("click", async () => {
     const wrap = document.getElementById("next-reader");
@@ -684,6 +741,27 @@
     document.getElementById("over-modal").style.display = "none";
     toast(photoWarning ? `🔺 บันทึกของเกินแล้ว (รูปแนบไม่ได้ตอนนี้ — ลองแนบใหม่ทีหลัง)` : `🔺 บันทึกของเกินแล้ว`, "ok", 3500);
     btn.disabled = false; btn.textContent = orig;
+  });
+
+  // ── กดผิด Location: แจ้ง Admin แทนการลบเอง (กันพนักงานลบ/ปิดบังของจริงได้) ──
+  document.getElementById("btn-wrong-location").addEventListener("click", async () => {
+    if (!curJob) return;
+    if (!confirm(`ยืนยันว่ากดผิด Location "${curJob.location}"?\n\nจะแจ้ง Admin ให้ตรวจสอบและรีเซ็ตให้ แล้วพาคุณกลับไปเลือก Location ใหม่`)) return;
+    try {
+      await updateDoc(doc(db,"count_jobs",curJob.id), {
+        wrong_location_flag: true, flagged_at: serverTimestamp(), flagged_by: curJob.createdName
+      });
+    } catch (err) {
+      // ถ้าออฟไลน์ ก็ยังปล่อยให้กลับไปเลือกใหม่ได้ปกติ ไม่บล็อกงาน — แค่ admin จะเห็น flag ช้าหน่อย
+    }
+    await stopCam();
+    document.getElementById("screen-scan").style.display = "none";
+    document.getElementById("screen-start").style.display = "block";
+    document.getElementById("loc-select-card").style.display = "none";
+    document.getElementById("area-select").value = "";
+    selLoc = ""; curJob = null; scanEvents = [];
+    toast("✅ แจ้ง Admin แล้ว — เลือก Location ใหม่ได้เลย", "ok");
+    setTimeout(()=>document.getElementById("loc-barcode-input")?.focus(), 100);
   });
 
   document.getElementById("btn-finish-job").addEventListener("click", async () => {
