@@ -157,6 +157,12 @@
         <div id="tag-table" style="max-height:480px;overflow-y:auto;"></div>
       </div>
 
+      <!-- ═══ กดผิด Location — พนักงานแจ้งมา ═══ -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="sec-head"><span class="sec-title">❌ พนักงานแจ้งว่ากดผิด Location</span></div>
+        <div id="tag-wrongloc-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการ</div></div>
+      </div>
+
       <!-- ═══ Reconciliation: ตรวจ Short/Over + ระบุสาเหตุ ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="sec-head">
@@ -187,6 +193,13 @@
           Coverage · สรุปตามโซน · สรุปพนักงาน · ประวัติ/Transactions (รอบที่เลือก) · Master + Status · Reconciliation
         </div>
         <button class="btn btn-primary" id="btn-export-tag-xlsx" style="padding:0.75rem 2rem;">📥 Export Excel ทั้งหมด</button>
+        <div style="border-top:1px dashed var(--border);margin:1rem 0;"></div>
+        <div style="font-weight:700;color:var(--red);margin-bottom:0.4rem;">🗑️ นับจบรอบทั้งหมดแล้ว? ล้างข้อมูลได้เลย</div>
+        <div style="font-size:0.78rem;color:var(--gray);margin-bottom:0.85rem;">
+          ปุ่มนี้แยกจาก Export ด้านบน — <b>ไม่ export ให้อัตโนมัติ</b> ใช้ตอนแน่ใจว่านับครบ + export
+          เก็บไฟล์ไว้แล้วเท่านั้น ลบ Job/รายการนับของ<b>รอบปัจจุบัน</b>ทิ้งจาก Firestore ทั้งหมด กู้คืนไม่ได้
+        </div>
+        <button class="btn" id="btn-clear-round" style="padding:0.75rem 2rem;background:var(--red);color:white;border:none;">🗑️ ล้างข้อมูลรอบนี้ (กลับไป 0 พร้อมรอบใหม่)</button>
       </div>
     </div>
     </div>
@@ -200,7 +213,9 @@
           <small>ไม่ต้องมีคอลัมน์ zone — ระบบคำนวณ zone ให้อัตโนมัติจาก prefix ของ Location:<br>
           Location ขึ้นต้นด้วย <b>B</b> (เช่น B01, B02...) → Zone B (bulk, 1 tag = 1 ชิ้น)<br>
           Location ขึ้นต้นด้วย <b>OVERFL</b> → Overflow (bulk, 1 tag = 1 ชิ้น)<br>
-          Location อื่นๆ ทั้งหมด (A01-A20, C01-C04, SA12, RECEIVE ฯลฯ) → Normal (ยิงบาร์โค้ดซ้ำนับจำนวนจริง เทียบ Qty_System)</small>
+          Location อื่นๆ ทั้งหมด (A01-A20, C01-C04, SA12, RECEIVE ฯลฯ) → Normal (ยิงบาร์โค้ดซ้ำนับจำนวนจริง เทียบ Qty_System)<br><br>
+          <b>🆕 Location ที่ไม่มีของ:</b> ใส่แค่ Location ไว้ เว้น Tag ว่าง (เช่น <code>A05-10-1-10,,,,</code>)
+          → จะขึ้นให้เลือกใน dropdown ปกติ พนักงานไปเช็คแล้วกด "นับเสร็จ" ได้เลย = ยืนยันว่า location นี้ว่างจริง</small>
         </div>
         <div class="alert alert-error" style="font-size:0.8rem;margin-bottom:0.75rem;">
           ⚠️ ก่อนเริ่ม Stock Take รอบใหม่ ต้อง <b>ล้าง Master เก่าออกก่อนแล้วค่อย Import ใหม่</b>
@@ -226,6 +241,20 @@
             <tbody id="tag-master-tbody"><tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray);">กำลังโหลด...</td></tr></tbody>
           </table>
         </div>
+      </div>
+      <div class="card">
+        <div class="card-title">🏷️ Import ตาราง Barcode ↔ Location (จาก WMS)</div>
+        <div class="alert alert-info" style="font-size:0.8rem;margin-bottom:0.75rem;">
+          บาร์โค้ดจริงที่ติดหน้าช่องเป็นรหัสที่ระบบ WMS generate ไว้ <b>คนละค่ากับรหัส Location ที่คนอ่านเห็น</b>
+          (เช่น A01-01-1-10) ต้อง export ตารางเทียบจาก WMS มา import ที่นี่ก่อน ไม่งั้นพนักงานยิงบาร์โค้ดแล้วระบบจะหาไม่เจอ<br><br>
+          <b>Format CSV หัวคอลัมน์:</b> <code>Barcode,Location</code>
+        </div>
+        <div class="form-group"><label>เลือกไฟล์ CSV</label><input type="file" id="barcode-map-csv" accept=".csv"></div>
+        <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;cursor:pointer;font-size:0.9rem;">
+          <input type="checkbox" id="barcode-map-clear" checked> ล้างตารางเทียบเก่าก่อน Import
+        </label>
+        <button class="btn btn-primary btn-full" id="btn-import-barcode-map">📥 Import ตารางเทียบ</button>
+        <div style="font-size:0.8rem;color:var(--gray);margin-top:0.6rem;" id="barcode-map-status">ยังไม่ได้เช็คสถานะ</div>
       </div>
       <div class="card">
         <div class="card-title">👤 รายชื่อพนักงาน (สำหรับ Dropdown ตอนเริ่มนับ)</div>
@@ -402,7 +431,13 @@
       (m.sku||"").toLowerCase().includes(q) ||
       (m.item_name||"").toLowerCase().includes(q)
     );
-    tbody.innerHTML = data.length ? data.map(m => `<tr>
+    tbody.innerHTML = data.length ? data.map(m => m.is_placeholder ? `<tr style="background:#f8fafc;">
+        <td style="font-weight:700;">${m.location}</td>
+        <td><span class="badge ${TAG_Z[m.zone]||"badge-gray"}">${m.zone||"Normal"}</span></td>
+        <td colspan="3" style="color:var(--gray);font-style:italic;">📭 ไม่มีของ (location ว่าง)</td>
+        <td>—</td>
+        <td><button onclick="delTagMaster('${m.id}')" class="btn btn-red btn-sm">🗑️</button></td>
+      </tr>` : `<tr>
         <td style="font-weight:700;">${m.location}</td>
         <td><span class="badge ${TAG_Z[m.zone]||"badge-gray"}">${m.zone||"Normal"}</span></td>
         <td style="font-family:monospace;font-size:0.85rem;">${m.tag_barcode}</td>
@@ -426,9 +461,74 @@
     btn.disabled = true;
     try {
       await deleteInChunks(tagMasterStock.map(m=>m.id), msg => { btn.textContent = msg; });
+      await setDoc(doc(db,"location_index","current"), { locations: [], updated_at: serverTimestamp() });
       toast("🗑️ ล้าง Master ทั้งหมดแล้ว");
     } catch (err) {
       toast("❌ ล้างไม่สำเร็จ: "+err.message, 6000);
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
+  });
+
+  // ── location_index: สรุปเบาๆ (location+zone+count) 1 เอกสารเดียว ──
+  // ให้ stocktake-scan.html โหลดแทน master_stock เต็ม (ลด read จาก 5,862 เหลือ 1 ต่อเครื่อง)
+  async function rebuildLocationIndex(rows) {
+    const byLoc = {};
+    rows.forEach(r => {
+      if (!byLoc[r.location]) byLoc[r.location] = { location: r.location, zone: r.zone, count: 0 };
+      if (!r.is_placeholder) byLoc[r.location].count++; // placeholder = location ว่าง ไม่นับเป็น item
+    });
+    const locations = Object.values(byLoc).sort((a,b)=>a.location.localeCompare(b.location));
+    await setDoc(doc(db,"location_index","current"), { locations, updated_at: serverTimestamp() });
+  }
+
+  // ── Import ตาราง Barcode ↔ Location ของ WMS ──────────────
+  async function checkBarcodeMapStatus() {
+    const el = document.getElementById("barcode-map-status");
+    if (!el) return;
+    try {
+      const snap = await getDocs(collection(db,"location_barcode_map"));
+      let total = 0;
+      snap.forEach(d => { const m = d.data().map || {}; total += Object.keys(m).length; });
+      el.textContent = total ? `✅ มีตารางเทียบอยู่แล้ว ${total} รายการ` : "⚠️ ยังไม่มีตารางเทียบ";
+    } catch (e) { el.textContent = "เช็คสถานะไม่ได้"; }
+  }
+  checkBarcodeMapStatus();
+
+  document.getElementById("btn-import-barcode-map")?.addEventListener("click", async () => {
+    const file = document.getElementById("barcode-map-csv").files[0];
+    const clear = document.getElementById("barcode-map-clear").checked;
+    if (!file) { toast("⚠️ เลือกไฟล์ก่อน"); return; }
+    const btn = document.getElementById("btn-import-barcode-map");
+    const orig = btn.textContent;
+    btn.disabled = true;
+    try {
+      const text  = (await file.text()).replace(/^\uFEFF/, "");
+      const lines = text.split(/\r?\n/).filter(l=>l.trim());
+      const hdrs  = parseCSVLine(lines[0]).map(h=>h.trim().toLowerCase());
+      const map = {};
+      let count = 0, skipped = 0;
+      for (let i=1;i<lines.length;i++) {
+        const vals = parseCSVLine(lines[i]);
+        const obj = {}; hdrs.forEach((h,idx)=>{ obj[h]=(vals[idx]||"").trim(); });
+        const barcode = (obj.barcode||"").toUpperCase().trim();
+        const location = (obj.location||"").toUpperCase().trim();
+        if (!barcode || !location) { skipped++; continue; }
+        map[barcode] = location;
+        count++;
+      }
+      if (clear) {
+        const old = await getDocs(collection(db,"location_barcode_map"));
+        const batch = writeBatch(db);
+        old.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+      }
+      // เก็บเป็นเอกสารเดียว (โหลดครั้งเดียวฝั่งพนักงาน — เหมือน location_index)
+      await setDoc(doc(db,"location_barcode_map","current"), { map, updated_at: serverTimestamp() });
+      toast(`✅ Import ตารางเทียบ ${count} รายการ${skipped?` (ข้าม ${skipped} แถวไม่ครบ)`:""}`);
+      checkBarcodeMapStatus();
+    } catch (err) {
+      toast("❌ Import ไม่สำเร็จ: "+err.message, 6000);
     } finally {
       btn.disabled = false; btn.textContent = orig;
     }
@@ -497,14 +597,20 @@
       const lines = text.split(/\r?\n/).filter(l=>l.trim());
       const hdrs  = parseCSVLine(lines[0]).map(h=>h.trim().toLowerCase());
       const rows = [];
-      let skipped = 0;
+      let skipped = 0, placeholders = 0;
       for (let i=1;i<lines.length;i++) {
         const vals = parseCSVLine(lines[i]);
         const obj  = {}; hdrs.forEach((h,idx)=>{ obj[h]=(vals[idx]||"").trim(); });
         const loc  = (obj.location||"").toUpperCase().trim();
         const tag  = (obj.tag||obj.tag_barcode||obj.barcode||"").trim();
-        if (!loc||!tag) { skipped++; continue; } // ข้าม location ว่าง/ผิดปกติ เช่นแถว "(blank)"
+        if (!loc) { skipped++; continue; } // ข้าม location ว่าง/ผิดปกติ เช่นแถว "(blank)"
         const zone   = obj.zone || deriveZone(loc); // ใช้คอลัมน์ zone ถ้ามี ไม่งั้น derive จาก prefix
+        if (!tag) {
+          // Location มีแต่ Tag ว่าง = "location นี้ไม่มีของ" (placeholder) — ไม่นับเป็น item ที่ต้องนับ
+          // แค่ทำให้ location นี้ปรากฏใน dropdown ให้พนักงานเลือกไปเช็คว่าง่ายจริงได้
+          rows.push({ location: loc, zone, tag_barcode: "", sku:"", item_name:"", qty_system: null, is_placeholder: true, round_id: roundId, imported_at: serverTimestamp() });
+          placeholders++; continue;
+        }
         const qtySys = obj.qty_system!=="" ? Number(obj.qty_system) : null;
         rows.push({
           location: loc, zone,
@@ -518,7 +624,9 @@
         await deleteInChunks(tagMasterStock.map(m=>m.id), msg => { btn.textContent = msg; });
       }
       await setInChunks(rows, msg => { btn.textContent = msg; });
-      toast(`✅ Import ${rows.length} รายการ${skipped?` (ข้าม ${skipped} แถวที่ไม่มี Location/Tag)`:""}`);
+      btn.textContent = "⏳ อัปเดต location index...";
+      await rebuildLocationIndex(rows);
+      toast(`✅ Import ${rows.length} รายการ${placeholders?` (มี ${placeholders} location ว่าง)`:""}${skipped?` (ข้าม ${skipped} แถวไม่มี Location)`:""}`);
     } catch (err) {
       toast("❌ Import ไม่สำเร็จ: "+err.message, 6000);
     } finally {
@@ -742,6 +850,10 @@
     const reconJobs = curJobs.filter(j => j.count_status==="Completed" && ((j.short_count||0)>0 || (j.over_count||0)>0));
     renderReconciliation(reconJobs);
 
+    // ── กดผิด Location: jobs ที่ถูก flag ไว้ (รอบปัจจุบัน) ──
+    const wrongLocJobs = curJobs.filter(j => j.wrong_location_flag);
+    renderWrongLocation(wrongLocJobs);
+
     renderTrend();
 
     window._tagRowsData  = rowsData;
@@ -831,9 +943,44 @@
   };
   document.getElementById("tag-recon-hide-reviewed")?.addEventListener("change", () => renderReconciliation(window._tagReconJobs||[]));
 
-  document.getElementById("btn-export-tag-xlsx")?.addEventListener("click", () => {
+  // ── กดผิด Location: แสดงรายการ + ปุ่มลบ&รีเซ็ต หรือไม่ต้องรีเซ็ต ──
+  function renderWrongLocation(jobs) {
+    const el = document.getElementById("tag-wrongloc-list");
+    if (!el) return;
+    window._tagWrongLocJobs = jobs;
+    if (!jobs.length) { el.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการ</div>`; return; }
+    el.innerHTML = jobs.map(j => `
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.85rem;border-bottom:1px solid var(--border);font-size:0.85rem;flex-wrap:wrap;">
+        <span style="font-weight:700;font-family:monospace;min-width:90px;">${j.location_scan}</span>
+        <span>${j.created_name||"—"}</span>
+        <span style="color:var(--gray);font-size:0.78rem;">แจ้งเมื่อ ${fmtDT(j.flagged_at)}</span>
+        <span style="margin-left:auto;font-weight:700;">${j.matched_count??0}/${j.expected_target??"?"}</span>
+        <button class="btn btn-sm" style="background:var(--red);color:white;border:none;" onclick="resetWrongLocation('${j.id}')">🗑️ ลบ & รีเซ็ต Location</button>
+        <button class="btn btn-outline btn-sm" onclick="dismissWrongLocation('${j.id}')">✔️ ไม่ต้องรีเซ็ต</button>
+      </div>
+    `).join("");
+  }
+  window.resetWrongLocation = async (jobId) => {
+    if (!confirm("ยืนยันลบ Job นี้ทิ้ง? Location จะกลับไปเป็น \"ยังไม่เริ่ม\" ให้เริ่มนับใหม่ได้ทันที (ลบข้อมูลที่นับไปแล้วในนี้ด้วย)")) return;
+    try {
+      const dd = await getDocs(query(collection(db,"count_details"), where("job_id","==",jobId)));
+      const batch = writeBatch(db);
+      dd.docs.forEach(d => batch.delete(d.ref));
+      batch.delete(doc(db,"count_jobs",jobId));
+      await batch.commit();
+      toast("✅ ลบและรีเซ็ต Location แล้ว");
+    } catch (err) {
+      toast("❌ ลบไม่สำเร็จ: "+err.message, 5000);
+    }
+  };
+  window.dismissWrongLocation = async (jobId) => {
+    await updateDoc(doc(db,"count_jobs",jobId), { wrong_location_flag: false });
+    toast("✅ ปิดการแจ้งเตือนแล้ว (ข้อมูลยังอยู่เหมือนเดิม)");
+  };
+
+  function runExportExcel() {
     const rows = window._tagRowsData || [];
-    if (!rows.length) { toast("ไม่มีข้อมูล"); return; }
+    if (!rows.length) { toast("ไม่มีข้อมูล"); return false; }
     const wb = XLSX.utils.book_new();
 
     // Sheet 1: Coverage ต่อ Location (รอบปัจจุบัน)
@@ -868,12 +1015,12 @@
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(logSheet), "ประวัติ_Transactions");
 
     // Sheet 5: Master + Status (เหมือน Master แต่เพิ่ม Status/ผู้นับ/เวลาเริ่ม/เวลาจบ — รอบปัจจุบัน)
-    const curJobs = jobsForCurrentRound();
-    const latestByLoc = {};
-    curJobs.forEach(j => { if (!latestByLoc[j.location_scan]) latestByLoc[j.location_scan] = j; });
+    const curJobsForExport = jobsForCurrentRound();
+    const latestByLocForExport = {};
+    curJobsForExport.forEach(j => { if (!latestByLocForExport[j.location_scan]) latestByLocForExport[j.location_scan] = j; });
     const msSheet = [["Location","Zone","Tag","SKU","ชื่อสินค้า","Qty System","Status","ผู้นับ","เวลาเริ่ม","เวลาจบ"]];
     tagMasterStock.forEach(m => {
-      const j = latestByLoc[m.location];
+      const j = latestByLocForExport[m.location];
       const status = !j ? "Not Started" : j.count_status==="In Progress" ? "In Progress" : "Completed";
       msSheet.push([m.location, m.zone, m.tag_barcode, m.sku||"", m.item_name||"", m.qty_system??"", status, j?.created_name||"", j?fmtDT(j.start_time):"", (j&&j.count_status==="Completed")?fmtDT(j.end_time):""]);
     });
@@ -885,8 +1032,60 @@
     reconJobs.forEach(j => reconSheet.push([j.location_scan, j.created_name||"", j.short_count||0, j.over_count||0, j.reviewed?"ตรวจแล้ว":"ยังไม่ตรวจ", j.reason||"", j.reviewed_by||""]));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(reconSheet), "Reconciliation");
 
+    // Sheet 7: กดผิด Location
+    const wrongLocJobs = window._tagWrongLocJobs || [];
+    const wrongLocSheet = [["Location","ผู้นับ","แจ้งเมื่อ","ตรง/ทั้งหมด"]];
+    wrongLocJobs.forEach(j => wrongLocSheet.push([j.location_scan, j.created_name||"", fmtDT(j.flagged_at), `${j.matched_count??0}/${j.expected_target??"?"}`]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wrongLocSheet), "กดผิด_Location");
+
     XLSX.writeFile(wb, `stocktake_dashboard_${new Date().toISOString().slice(0,10)}.xlsx`);
-    toast("✅ Export Excel แล้ว (5 ชีท)");
+    return true;
+  }
+
+  document.getElementById("btn-export-tag-xlsx")?.addEventListener("click", () => {
+    if (runExportExcel()) toast("✅ Export Excel แล้ว (6 ชีท)");
+  });
+
+  // ── ล้างข้อมูลรอบนี้ (แยกจาก Export โดยตั้งใจ — ใช้ตอนนับจบรอบทั้งหมดแล้วเท่านั้น) ──
+  document.getElementById("btn-clear-round")?.addEventListener("click", async () => {
+    const curJobs = jobsForCurrentRound();
+    if (!curJobs.length) { toast("ไม่มีข้อมูลของรอบปัจจุบันให้ล้าง"); return; }
+    if (!confirm(`⚠️ ยืนยันล้างข้อมูลรอบปัจจุบันทั้งหมด (${curJobs.length} job)?\n\nอย่าลืม Export เก็บไฟล์ไว้ก่อนถ้ายังไม่ได้ทำ — ลบแล้วกู้คืนไม่ได้`)) return;
+    if (!confirm("ยืนยันอีกครั้ง — ล้างข้อมูลจริงตอนนี้เลยหรือไม่?")) return;
+
+    const btn = document.getElementById("btn-clear-round");
+    const orig = btn.textContent;
+    btn.disabled = true;
+    try {
+      // ลบ count_details ของทุก job ในรอบนี้ก่อน แล้วค่อยลบ count_jobs (แบ่งชุดละ 400 กัน error เกิน 500 ops/batch)
+      const jobIds = curJobs.map(j=>j.id);
+      let allDetailIds = [];
+      for (const jobId of jobIds) {
+        const dd = await getDocs(query(collection(db,"count_details"), where("job_id","==",jobId)));
+        allDetailIds.push(...dd.docs.map(d=>d.id));
+      }
+      btn.textContent = `⏳ ลบ Detail 0/${allDetailIds.length}...`;
+      for (let i=0;i<allDetailIds.length;i+=400) {
+        const chunk = allDetailIds.slice(i,i+400);
+        const batch = writeBatch(db);
+        chunk.forEach(id => batch.delete(doc(db,"count_details",id)));
+        await batch.commit();
+        btn.textContent = `⏳ ลบ Detail ${Math.min(i+400,allDetailIds.length)}/${allDetailIds.length}...`;
+      }
+      btn.textContent = `⏳ ลบ Job 0/${jobIds.length}...`;
+      for (let i=0;i<jobIds.length;i+=400) {
+        const chunk = jobIds.slice(i,i+400);
+        const batch = writeBatch(db);
+        chunk.forEach(id => batch.delete(doc(db,"count_jobs",id)));
+        await batch.commit();
+        btn.textContent = `⏳ ลบ Job ${Math.min(i+400,jobIds.length)}/${jobIds.length}...`;
+      }
+      toast(`✅ ล้างข้อมูลรอบนี้เรียบร้อย (ลบ ${jobIds.length} job, ${allDetailIds.length} รายการนับ)`);
+    } catch (err) {
+      toast("❌ ล้างข้อมูลไม่สำเร็จ: "+err.message, 6000);
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
   });
 </script>
 </body>
