@@ -10,10 +10,11 @@
   <link rel="stylesheet" href="shared.css">
   <script src="https://unpkg.com/html5-qrcode"></script>
   <style>
-    body { font-family:'Sarabun',sans-serif; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { font-family:'Sarabun',sans-serif; overflow-x:hidden; }
     .big-title { font-size:2.05rem; font-weight:900; }
     .big-btn { font-size:1.4rem !important; padding:1.1rem !important; }
-    .scan-input-big { font-size:1.75rem !important; font-weight:700 !important; text-align:center; letter-spacing:0.06em; background:#f0fdf4 !important; border-color:var(--green) !important; padding:1.1rem !important; }
+    .scan-input-big { box-sizing:border-box !important; width:100% !important; max-width:100% !important; font-size:1.75rem !important; font-weight:700 !important; text-align:center; letter-spacing:0.06em; background:#f0fdf4 !important; border-color:var(--green) !important; padding:1.1rem !important; }
     .chk-list { display:flex; flex-direction:column; gap:0.5rem; max-height:440px; overflow-y:auto; }
     .chk-row { display:flex; align-items:center; gap:0.7rem; padding:0.7rem 0.9rem; border-radius:12px; border:2px solid var(--border); background:white; }
     .chk-row.pending { background:#f8fafc; }
@@ -759,14 +760,19 @@
 
   // ── กล้องสแกนแบบ fullscreen overlay ใช้ร่วมกันทั้ง 3 จุด (Tag / เลือก Location / Location ถัดไป) ──
   // แก้ปัญหาหน้าจอขยับ/เลื่อนหาปุ่มไม่เจอตอนเปิดกล้อง เพราะเป็น overlay ไม่ใช่ inline ที่ดันของข้างล่างลง
+  function waitForLayout() {
+    return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }
+
   async function openCam(onDecode, autoClose) {
     const modal = document.getElementById("cam-modal");
     modal.style.display = "flex";
+    await waitForLayout(); // สำคัญ: ต้องรอ browser layout เสร็จก่อน ไม่งั้นกล้องวัดขนาด container ผิดเป็น 0 แล้วจอดำ
     html5Cam = new Html5Qrcode("cam-reader");
     await html5Cam.start({facingMode:"environment"}, BARCODE_CAM_CONFIG,
       text => { onDecode(text); if (autoClose) closeCam(); }, ()=>{}
     ).then(()=>{ camStarted=true; })
-     .catch(()=>{ toast("❌ เปิดกล้องไม่ได้","err"); modal.style.display="none"; });
+     .catch((err)=>{ toast("❌ เปิดกล้องไม่ได้: "+(err?.message||err), "err", 4000); modal.style.display="none"; });
   }
   async function closeCam() {
     await stopCam();
