@@ -125,16 +125,6 @@
       <button class="btn btn-outline btn-full big-btn" id="btn-toggle-cam" style="margin-top:0.6rem;">📷 เปิดกล้องสแกน</button>
     </div>
 
-    <!-- กล้องสแกน Tag — fullscreen overlay กันหน้าจอขยับ/เลื่อนหาปุ่มไม่เจอ -->
-    <div id="cam-modal" style="display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:1rem;">
-      <div style="position:relative;width:100%;max-width:460px;">
-        <div id="cam-reader" style="width:100%;min-height:280px;border-radius:12px;overflow:hidden;background:#000;"></div>
-        <div class="cam-aim-line"></div>
-      </div>
-      <div style="color:white;font-size:1.15rem;font-weight:700;margin-top:1rem;text-align:center;">เล็งให้เส้นแดงทับกลางบาร์โค้ด</div>
-      <button class="btn btn-full big-btn" id="btn-stop-cam" style="margin-top:1rem;max-width:460px;background:white;color:#1e293b;border:none;">✕ ปิดกล้อง</button>
-    </div>
-
     <div class="card" style="margin-bottom:0.75rem;">
       <div class="card-title" style="font-size:1.25rem;margin-bottom:0.75rem;">✅ รายการที่ต้องนับ</div>
       <div class="chk-list" id="chk-list"></div>
@@ -186,6 +176,17 @@
     </div>
     <button class="btn btn-primary btn-full big-btn" id="btn-next-location" style="margin-bottom:0.6rem;">➕ นับ Location ถัดไป</button>
     <button class="btn btn-outline btn-full" id="btn-next-qr" style="margin-bottom:1rem;">📷 หรือสแกน QR แทน (ถ้ามี)</button>
+  </div>
+
+  <!-- กล้องสแกน (ใช้ร่วมกัน 3 จุด) — วางไว้นอกทุก screen div โดยตั้งใจ
+       ไม่งั้นถ้า screen ที่ครอบมัน display:none กล้องจะโดนซ่อนไปด้วยทั้งที่สั่งเปิดแล้ว -->
+  <div id="cam-modal" style="display:none;position:fixed;inset:0;background:#000;z-index:9999;flex-direction:column;align-items:center;justify-content:center;padding:1rem;">
+    <div style="position:relative;width:100%;max-width:460px;">
+      <div id="cam-reader" style="width:100%;min-height:280px;border-radius:12px;overflow:hidden;background:#000;"></div>
+      <div class="cam-aim-line"></div>
+    </div>
+    <div style="color:white;font-size:1.15rem;font-weight:700;margin-top:1rem;text-align:center;">เล็งให้เส้นแดงทับกลางบาร์โค้ด</div>
+    <button class="btn btn-full big-btn" id="btn-stop-cam" style="margin-top:1rem;max-width:460px;background:white;color:#1e293b;border:none;">✕ ปิดกล้อง</button>
   </div>
 
 </div>
