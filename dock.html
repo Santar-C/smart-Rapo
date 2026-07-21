@@ -539,7 +539,8 @@ const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle})=>(
     </div>
     <div className="p-3 text-xs text-slate-600 space-y-1">
       <div className="font-bold text-slate-800">{booking.license} <span className="text-slate-400 font-normal">({booking.vehicle})</span></div>
-      <div className="text-indigo-600 font-bold text-[11px]">{booking.shipmentNo}</div>
+      <div className="text-indigo-800 font-black text-[13px] leading-tight">{booking.doNumber||booking.shipmentNo}</div>
+      {booking.doNumber && <div className="text-[10px] text-slate-400">Doc: {booking.shipmentNo}</div>}
       <div className="text-slate-500">{booking.vendor}</div>
       <div className="font-semibold text-indigo-600 bg-indigo-50 inline-block px-2 py-0.5 rounded">{booking.startTime} - {booking.endTime}</div>
     </div>
@@ -569,7 +570,12 @@ const DockCardOccupied = ({dock, booking, delay, isPower, onEdit, onManifest, on
         {booking.timeArrived && <span className="text-[10px] text-slate-400">มาถึง {booking.timeArrived}</span>}
       </div>
       <div className="space-y-1">
-        <div className="flex"><span className="w-12 text-slate-400">Doc:</span><span className="font-bold text-indigo-700 truncate">{booking.shipmentNo}</span></div>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[1.05rem] font-black text-indigo-800 truncate leading-tight">
+            {booking.doNumber||booking.shipmentNo}
+          </span>
+          {booking.doNumber && <span className="text-[10px] text-slate-400 truncate">Doc: {booking.shipmentNo}</span>}
+        </div>
         <div className="flex"><span className="w-12 text-slate-400">Truck:</span><span className="font-bold">{booking.license} <span className="text-slate-400 font-normal">({booking.vehicle})</span></span></div>
         <div className="flex"><span className="w-12 text-slate-400">Vendor:</span><span className="truncate">{booking.vendor}</span></div>
       </div>
