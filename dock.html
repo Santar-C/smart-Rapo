@@ -500,6 +500,18 @@ const FormPanel = React.memo(({form, setForm, bays, settings, onSubmit, editId, 
           {bays.map(d=><option key={d.name} value={d.name}>📍 ลง {d.name}</option>)}
         </select>
       </div>
+      {form.allocation==='Waitlist' && (
+        <div>
+          <label className="block text-[10px] font-bold text-amber-600 mb-1 uppercase">🎯 รอ Dock ไหน (แสดงบน TV)</label>
+          <select value={form.target_dock||''}
+            onChange={e=>setForm(p=>({...p,target_dock:e.target.value}))}
+            className="w-full border border-amber-200 rounded-xl p-2.5 bg-amber-50/50 font-bold outline-none focus:border-amber-500 text-sm">
+            <option value="">— ยังไม่ระบุ —</option>
+            {bays.map(d=><option key={d.name} value={d.name}>{d.name}</option>)}
+          </select>
+          <p className="text-[10px] text-slate-400 mt-1">หน้าจอ TV จะแสดงว่า Shipment นี้รอ dock ไหน</p>
+        </div>
+      )}
       {/* Submit */}
       <button onClick={onSubmit}
         className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md">
@@ -861,6 +873,12 @@ function App() {
     if(next==='WaitingDoc'&&!upd.timeWaitingDoc) upd.timeWaitingDoc=t;
     if(next==='Completed'&&!upd.timeCompleted)   upd.timeCompleted=t;
     syncBookings(bookings.map(x=>x.id===b.id?upd:x));
+    rtdb.ref('smartdock/changelog').push({
+      bookingId:b.id,shipmentNo:b.shipmentNo||'',date:b.date,
+      changedBy:currentUser?.email||currentUser?.displayName||'scan',
+      changedAt:Date.now(),changedTime:t,
+      changes:['Status: '+b.status+' → '+next],note:'',type:'STATUS',
+    });
   };
   const handleToggleBay=(name,cur)=>{
     if(!canDock)return;
@@ -871,6 +889,20 @@ function App() {
   };
   const handleSubmit=()=>{
     if(!isPower)return;
+    let changeNote='', changeFields=[];
+    if(editId){
+      const orig=bookings.find(b=>b.id===editId)||{};
+      if(orig.allocation !==form.allocation)   changeFields.push('Dock: '+(orig.allocation||'-')+' → '+form.allocation);
+      if(orig.startTime  !==form.startTime)    changeFields.push('เวลาเข้า: '+(orig.startTime||'-')+' → '+form.startTime);
+      if(orig.endTime    !==form.endTime)      changeFields.push('เวลาออก: '+(orig.endTime||'-')+' → '+form.endTime);
+      if(orig.license    !==form.license)      changeFields.push('ทะเบียน: '+(orig.license||'-')+' → '+form.license);
+      if((orig.target_dock||'')!==(form.target_dock||'')) changeFields.push('Dock เป้าหมาย: '+(orig.target_dock||'-')+' → '+(form.target_dock||'-'));
+      if(changeFields.length>0){
+        changeNote=window.prompt('📝 เหตุผลการแก้ไข\n\n• '+changeFields.join('\n• '),'');
+        if(changeNote===null)return;
+        if(!changeNote.trim()&&!window.confirm('ไม่มีหมายเหตุ ยืนยันบันทึก?'))return;
+      }
+    }
     if(!form.startTime||!form.endTime||!form.vendor||!form.license){
       alert('กรุณากรอกข้อมูลให้ครบ (เวลา, บริษัท, ทะเบียน)');return;
     }
@@ -879,7 +911,10 @@ function App() {
       ...form,
       status: editId ? (bookings.find(b=>b.id===editId)?.status||'Pending') : 'Pending',
       id: editId || Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      lastEditBy: currentUser?.email||currentUser?.displayName||'Admin',
+      lastEditNote: changeNote||'',
+      lastEditTime: TIMENOW(),
     };
     let nb;
     if(editId){
@@ -888,6 +923,18 @@ function App() {
       nb=[...bookings, newEntry];
     }
     rtdb.ref('smartdock/bookings').set(nb).then(()=>{
+      const t=Date.now();
+      rtdb.ref('smartdock/changelog').push({
+        bookingId:   newEntry.id,
+        shipmentNo:  newEntry.shipmentNo||'',
+        date:        newEntry.date,
+        changedBy:   newEntry.lastEditBy,
+        changedAt:   t,
+        changedTime: TIMENOW(),
+        changes:     changeFields.length>0?changeFields:[editId?'บันทึกข้อมูล':'สร้างคิวใหม่'],
+        note:        changeNote||'',
+        type:        editId?(changeFields.length>0?'EDIT':'UPDATE'):'CREATE',
+      });
       setEditId(null);
       setForm(getBlank());
     }).catch(err=>alert('บันทึกไม่สำเร็จ: '+err.message));
@@ -912,6 +959,7 @@ function App() {
     {id:'scan',lbl:'📷 สแกน'},
     {id:'reports',lbl:'📊 รายงาน',h:!isPower},
     {id:'qr',lbl:'🖨️ QR',h:!isAdmin},
+    {id:'changelog',lbl:'📋 ประวัติแก้ไข',h:!isPower},
     {id:'settings',lbl:'⚙️ ตั้งค่า',h:!isAdmin},
   ];
 
@@ -1019,12 +1067,63 @@ function App() {
           {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
           {tab==='scan'     && <ScanView scanOn={scanOn} setScanOn={setScanOn} scanMsg={scanMsg}/>}
           {tab==='qr'       && <QRView bays={bays}/>}
+          {tab==='changelog' && <ChangelogView/>}
           {tab==='settings' && <SettingsView settings={settings}/>}
         </div>
       </div>
     </div>
   );
 }
+
+
+const ChangelogView = ()=>{
+  const [logs,setLogs]=React.useState([]);
+  const [loading,setLoading]=React.useState(true);
+  React.useEffect(()=>{
+    const ref=rtdb.ref('smartdock/changelog').orderByChild('changedAt').limitToLast(300);
+    ref.on('value',snap=>{
+      const d=snap.val();
+      if(!d){setLogs([]);setLoading(false);return;}
+      setLogs(Object.entries(d).map(([k,v])=>({_key:k,...v})).sort((a,b)=>b.changedAt-a.changedAt));
+      setLoading(false);
+    });
+    return()=>ref.off();
+  },[]);
+  const TC={CREATE:'bg-green-100 text-green-700',EDIT:'bg-amber-100 text-amber-700',STATUS:'bg-sky-100 text-sky-700',UPDATE:'bg-slate-100 text-slate-600'};
+  const TL={CREATE:'➕ สร้าง',EDIT:'✏️ แก้ไข',STATUS:'🔄 สถานะ',UPDATE:'💾 บันทึก'};
+  if(loading)return<div className="flex-1 flex items-center justify-center text-slate-400 p-8">กำลังโหลด...</div>;
+  return(
+    <div className="flex-1 overflow-y-auto p-4">
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-black text-lg text-slate-800">📋 ประวัติการแก้ไข Booking</h2>
+          <span className="text-sm text-slate-400">{logs.length} รายการล่าสุด</span>
+        </div>
+        {!logs.length&&<div className="text-center py-12 text-slate-400">ยังไม่มีประวัติ</div>}
+        <div className="space-y-2">
+          {logs.map(l=>(
+            <div key={l._key} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${TC[l.type]||'bg-slate-100 text-slate-600'}`}>{TL[l.type]||l.type}</span>
+                  <span className="font-bold text-slate-800">{l.shipmentNo||'—'}</span>
+                </div>
+                <div className="text-xs text-slate-400 text-right shrink-0">
+                  <div>{l.date} {l.changedTime}</div>
+                  <div className="font-medium text-slate-600">{l.changedBy}</div>
+                </div>
+              </div>
+              <div className="mt-2 space-y-1">
+                {(l.changes||[]).map((c,i)=><div key={i} className="text-sm text-slate-600 bg-slate-50 rounded px-3 py-1">• {c}</div>)}
+              </div>
+              {l.note&&<div className="mt-2 text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5 border border-amber-200">💬 {l.note}</div>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
