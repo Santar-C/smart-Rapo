@@ -888,7 +888,8 @@ function App() {
     syncBays(bays.map(d=>d.name===name?{...d,status:next}:d));
   };
   const handleSubmit=()=>{
-    if(!isPower)return;
+    console.log('handleSubmit called, isPower=',isPower,'role=',role);
+    if(!isPower){console.log('blocked: not isPower');return;}
     let changeNote='', changeFields=[];
     if(editId){
       const orig=bookings.find(b=>b.id===editId)||{};
@@ -903,6 +904,7 @@ function App() {
         if(!changeNote.trim()&&!window.confirm('ไม่มีหมายเหตุ ยืนยันบันทึก?'))return;
       }
     }
+    console.log('form=',JSON.stringify({startTime:form.startTime,endTime:form.endTime,vendor:form.vendor,license:form.license}));
     if(!form.startTime||!form.endTime||!form.vendor||!form.license){
       alert('กรุณากรอกข้อมูลให้ครบ (เวลา, บริษัท, ทะเบียน)');return;
     }
