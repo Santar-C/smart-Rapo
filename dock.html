@@ -875,7 +875,7 @@ function App() {
     syncBookings(bookings.map(x=>x.id===b.id?upd:x));
     rtdb.ref('smartdock/changelog').push({
       bookingId:b.id,shipmentNo:b.shipmentNo||'',date:b.date,
-      changedBy:currentUser?.email||currentUser?.displayName||'scan',
+      changedBy:role,
       changedAt:Date.now(),changedTime:t,
       changes:['Status: '+b.status+' → '+next],note:'',type:'STATUS',
     });
@@ -912,7 +912,7 @@ function App() {
       status: editId ? (bookings.find(b=>b.id===editId)?.status||'Pending') : 'Pending',
       id: editId || Date.now(),
       updatedAt: Date.now(),
-      lastEditBy: currentUser?.email||currentUser?.displayName||'Admin',
+      lastEditBy: role,
       lastEditNote: changeNote||'',
       lastEditTime: TIMENOW(),
     };
