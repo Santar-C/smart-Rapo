@@ -1078,6 +1078,24 @@ function App() {
 }
 
 
+function exportChangelog(logs){
+  var DQ=String.fromCharCode(34);
+  var LF=String.fromCharCode(10);
+  var BOM=String.fromCharCode(0xFEFF);
+  var q=function(s){return DQ+String(s||'').split(DQ).join(DQ+DQ)+DQ;};
+  var rows=[[q('ประเภท'),q('Shipment'),q('วันที่'),q('เวลา'),q('แก้ไขโดย'),q('รายการที่เปลี่ยน'),q('หมายเหตุ')].join(',')];
+  logs.forEach(function(l){
+    rows.push([q(l.type),q(l.shipmentNo),q(l.date),q(l.changedTime),q(l.changedBy),q((l.changes||[]).join(' | ')),q(l.note)].join(','));
+  });
+  var blob=new Blob([BOM+rows.join(LF)],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;
+  a.download='dock_changelog_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 const ChangelogView = ()=>{
   const [logs,setLogs]=React.useState([]);
   const [loading,setLoading]=React.useState(true);
@@ -1097,9 +1115,14 @@ const ChangelogView = ()=>{
   return(
     <div className="flex-1 overflow-y-auto p-4">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h2 className="font-black text-lg text-slate-800">📋 ประวัติการแก้ไข Booking</h2>
-          <span className="text-sm text-slate-400">{logs.length} รายการล่าสุด</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-400">{logs.length} รายการ</span>
+            <button onClick={()=>exportChangelog(logs)} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors">
+              📄 Export CSV
+            </button>
+          </div>
         </div>
         {!logs.length&&<div className="text-center py-12 text-slate-400">ยังไม่มีประวัติ</div>}
         <div className="space-y-2">
