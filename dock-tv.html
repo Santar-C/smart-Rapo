@@ -35,8 +35,10 @@
     .s-arr{background:#0e4429;color:#4ade80} .s-ld{background:#1e1b4b;color:#a5b4fc}
     .s-wd{background:#431407;color:#fb923c} .s-pnd{background:#1e2d48;color:#94a3b8}
     .dc-body{padding:.5rem .75rem;flex:1;display:flex;flex-direction:column;gap:2px;overflow:hidden}
-    .t-lic{font-size:1.5rem;font-weight:900;color:#fff;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .t-do{font-size:.72rem;color:#818cf8;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .t-lic{font-size:.85rem;font-weight:700;color:#93c5fd;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .t-do{font-size:.8rem;color:#a5b4fc;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+    .t-do-num{font-size:1.4rem;color:#fff;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.1}
+    .t-do-label{font-size:.58rem;color:#818cf8;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
     .t-ven{font-size:.7rem;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .tags{display:flex;gap:.35rem;margin-top:auto;padding-top:3px;flex-wrap:wrap}
     .tag{font-size:.62rem;padding:2px 6px;border-radius:5px;font-weight:700}
@@ -176,6 +178,7 @@ function gTime(b){return b.end_time||b.endTime||'';}
 function gStart(b){return b.start_time||b.startTime||'';}
 function gLic(b){return b.license_plate||b.license||'';}
 function gShip(b){return b.shipment_no||b.shipmentNo||'';}
+function gDO(b){return b.do_number||b.doNumber||'';}
 function gVendor(b){return b.vendor||'';}
 function gVeh(b){return b.vehicle||'';}
 function gJob(b){return b.job_type||b.jobType||'IN';}
@@ -203,8 +206,10 @@ function renderDocks(){
       var io=gJob(b)==='OUT'?'<span class="tag to">OUT</span>':'<span class="tag ti">IN</span>';
       h+='<div class="dc-head"><span class="dn">'+bay.name+'</span><span class="'+sc+'">'+sl+'</span></div>';
       h+='<div class="dc-body">';
-      h+='<div class="t-do">'+gShip(b)+'</div>';
-      h+='<div class="t-lic">'+gLic(b)+'</div>';
+      h+='<div class="t-do-label">DO Number</div>';
+      h+='<div class="t-do-num">'+(gDO(b)||gShip(b))+'</div>';
+      h+='<div class="t-do">Shipment: '+gShip(b)+'</div>';
+      h+='<div class="t-lic">🚛 '+gLic(b)+'</div>';
       h+='<div class="t-ven">'+gVendor(b)+'</div>';
       h+='<div class="tags"><span class="tag tv">'+gVeh(b)+'</span>'+io+'</div>';
       h+='</div>';
@@ -235,7 +240,7 @@ function renderWaitlist(){
     h+='<div class="wl-num">'+(i+1)+'</div>';
     h+='<div class="wl-info">';
     h+='<div class="wl-lic">'+gLic(b)+'</div>';
-    h+='<div class="wl-do">'+gShip(b)+'</div>';
+    h+='<div class="wl-do">'+(gDO(b)||gShip(b))+'</div>';
     if(tgt)h+='<div class="wl-tgt">รอ '+tgt+'</div>';
     h+='</div>';
     h+='<span class="'+ic+'">'+it+'</span>';
