@@ -534,6 +534,9 @@ const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle})=>(
       <span className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
         คิว{idx+1}
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${booking.jobType==='OUT'?'bg-orange-100 text-orange-600':'bg-sky-100 text-sky-600'}`}>{booking.jobType}</span>
+        {otd && <span style={{background:otd.bg,color:otd.color,borderRadius:'999px',padding:'2px 8px',fontSize:'10px',fontWeight:900,marginLeft:'4px'}}>
+          {otd.label}{otd.diff>0&&<span style={{opacity:.75,marginLeft:'3px'}}>{otd.diff}m</span>}
+        </span>}
       </span>
       <StatusBadge booking={booking} onCycle={onCycle}/>
     </div>
@@ -554,13 +557,16 @@ const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle})=>(
 );
 
 // ── Dock Card (occupied) ───────────────────────────────────
-const DockCardOccupied = ({dock, booking, delay, isPower, onEdit, onManifest, onDelete, onCycle})=>(
+const DockCardOccupied = ({dock, booking, delay, otd, isPower, onEdit, onManifest, onDelete, onCycle})=>(
   <div className={`bg-white rounded-2xl shadow-sm border flex flex-col transition-all hover:shadow-md ${delay?'border-red-400 ring-2 ring-red-100':'border-slate-200 hover:border-indigo-300'}`} style={{minHeight:'270px'}}>
     {delay && <div className="bg-red-500 text-white text-[10px] font-bold py-1 text-center pr rounded-t-2xl">⚠️ DELAY — เกินเวลา Plan ออก</div>}
     <div className={`px-4 py-2.5 flex justify-between items-center font-bold text-sm ${delay?'bg-red-50 text-red-800 border-b border-red-100':'bg-indigo-50/50 text-indigo-900 border-b border-indigo-50'} ${!delay?'rounded-t-2xl':''}`}>
       <span className="flex items-center gap-2">
         {dock.name}
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${booking.jobType==='OUT'?'bg-orange-100 text-orange-600':'bg-sky-100 text-sky-600'}`}>{booking.jobType}</span>
+        {otd && <span style={{background:otd.bg,color:otd.color,borderRadius:'999px',padding:'2px 8px',fontSize:'10px',fontWeight:900,marginLeft:'4px'}}>
+          {otd.label}{otd.diff>0&&<span style={{opacity:.75,marginLeft:'3px'}}>{otd.diff}m</span>}
+        </span>}
       </span>
       {isPower && <button onClick={()=>onEdit(booking)} className="p-1.5 bg-white/80 text-indigo-600 rounded-lg hover:bg-white text-xs">✏️</button>}
     </div>
@@ -581,6 +587,9 @@ const DockCardOccupied = ({dock, booking, delay, isPower, onEdit, onManifest, on
       </div>
       <div className="bg-slate-50 rounded-xl p-2.5 mt-auto flex justify-between border border-slate-100 text-center">
         <div className="flex-1 border-r border-slate-200"><div className="text-[9px] text-slate-400 font-bold">PLAN OUT</div><div className="font-bold text-indigo-600">{booking.endTime}</div></div>
+        {otd && <div className="col-span-2 rounded-lg py-1.5 px-2 text-center font-black text-sm mb-1" style={{background:otd.bg,color:otd.color}}>
+          {otd.label}{otd.diff>0&&<span className="ml-2 font-normal text-xs opacity-75">ช้า/เร็ว {otd.diff} นาที</span>}
+        </div>}
         <div className="flex-1"><div className="text-[9px] text-slate-400 font-bold">มาถึง</div><div className="font-bold text-slate-700">{booking.timeArrived||'—'}</div></div>
       </div>
       {isPower && (
@@ -865,6 +874,24 @@ function App() {
     return TIMENOW()>b.endTime;
   };
 
+  getOTD = b=>{
+    if(!b||b.status==='Pending') return null;
+    const toMin=t=>{const[h,m]=(t||'').split(':').map(Number);return isNaN(h)||isNaN(m)?null:h*60+m;};
+    const planIn=toMin(b.startTime), planOut=toMin(b.endTime);
+    const arrived=toMin(b.timeArrived);
+    const nowMin=toMin(TIMENOW());
+    if(!arrived){
+      if(!planOut||!nowMin) return null;
+      if(nowMin>planOut) return {status:'delay',label:'⏰ DELAY',color:'#ef4444',bg:'#fef2f2',diff:nowMin-planOut};
+      return null;
+    }
+    if(!planIn) return {status:'ontime',label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:0};
+    const d=arrived-planIn;
+    if(d<=0)  return {status:'early', label:'🚀 EARLY',  color:'#0284c7',bg:'#eff6ff',diff:Math.abs(d)};
+    if(d<=15) return {status:'ontime',label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:d};
+    return          {status:'delay', label:'⏰ DELAY',  color:'#ef4444',bg:'#fef2f2',diff:d};
+  };
+
   const handleEdit = b=>{ if(!isPower)return; setForm({...BLANK,...b}); setEditId(b.id); window.scrollTo({top:0,behavior:'smooth'}); };
   const handleDelete = id=>{ if(!isPower||!confirm('ลบรายการนี้?'))return; syncBookings(bookings.filter(b=>b.id!==id)); };
   const cancelEdit = ()=>{ setEditId(null); setForm(getBlank()); };
@@ -1059,7 +1086,7 @@ function App() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {bays.map(dock=>{
                     const ab=dockBooks.find(b=>b.allocation===dock.name);
-                    if(ab) return <DockCardOccupied key={dock.name} dock={dock} booking={ab} delay={isDelay(ab)}
+                    if(ab) return <DockCardOccupied key={dock.name} dock={dock} booking={ab} delay={isDelay(ab)} otd={getOTD(ab)}
                       isPower={isPower} onEdit={handleEdit} onManifest={printManifest}
                       onDelete={handleDelete} onCycle={handleCycle}/>;
                     return <DockCardEmpty key={dock.name} dock={dock} canDock={canDock} isAdmin={isAdmin}
