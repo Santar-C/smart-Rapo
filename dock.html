@@ -788,6 +788,26 @@ const getBlank = ()=>({
 });
 const BLANK = getBlank();
 
+// ══ OTD Calculator (outside App — pure function) ══
+function toMinOTD(t){var p=(t||'').split(':').map(Number);return p.length===2&&!isNaN(p[0])?p[0]*60+p[1]:null;}
+function getOTD(b){
+  if(!b||b.status==='Pending') return null;
+  var planIn=toMinOTD(b.startTime), planOut=toMinOTD(b.endTime);
+  var arrived=toMinOTD(b.timeArrived);
+  var nowStr=new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
+  var nowMin=toMinOTD(nowStr);
+  if(!arrived){
+    if(!planOut||!nowMin) return null;
+    if(nowMin>planOut) return {status:'delay',label:'⏰ DELAY',color:'#ef4444',bg:'#fef2f2',diff:nowMin-planOut};
+    return null;
+  }
+  if(!planIn) return {status:'ontime',label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:0};
+  var d=arrived-planIn;
+  if(d<=0)  return {status:'early', label:'🚀 EARLY',  color:'#0284c7',bg:'#eff6ff',diff:Math.abs(d)};
+  if(d<=15) return {status:'ontime',label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:d};
+  return          {status:'delay', label:'⏰ DELAY',  color:'#ef4444',bg:'#fef2f2',diff:d};
+}
+
 function App() {
   const [bays,     setBays]     = React.useState(INIT_BAYS);
   const [bookings, setBookings] = React.useState([]);
@@ -874,23 +894,6 @@ function App() {
     return TIMENOW()>b.endTime;
   };
 
-  const getOTD = b=>{
-    if(!b||b.status==='Pending') return null;
-    const toMin=t=>{const[h,m]=(t||'').split(':').map(Number);return isNaN(h)||isNaN(m)?null:h*60+m;};
-    const planIn=toMin(b.startTime), planOut=toMin(b.endTime);
-    const arrived=toMin(b.timeArrived);
-    const nowMin=toMin(TIMENOW());
-    if(!arrived){
-      if(!planOut||!nowMin) return null;
-      if(nowMin>planOut) return {status:'delay',label:'⏰ DELAY',color:'#ef4444',bg:'#fef2f2',diff:nowMin-planOut};
-      return null;
-    }
-    if(!planIn) return {status:'ontime',label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:0};
-    const d=arrived-planIn;
-    if(d<=0)  return {status:'early', label:'🚀 EARLY',  color:'#0284c7',bg:'#eff6ff',diff:Math.abs(d)};
-    if(d<=15) return {status:'ontime',label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:d};
-    return          {status:'delay', label:'⏰ DELAY',  color:'#ef4444',bg:'#fef2f2',diff:d};
-  };
 
   const handleEdit = b=>{ if(!isPower)return; setForm({...BLANK,...b}); setEditId(b.id); window.scrollTo({top:0,behavior:'smooth'}); };
   const handleDelete = id=>{ if(!isPower||!confirm('ลบรายการนี้?'))return; syncBookings(bookings.filter(b=>b.id!==id)); };
