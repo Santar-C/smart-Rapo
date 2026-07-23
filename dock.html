@@ -1065,7 +1065,7 @@ function App() {
               <div className="p-4 flex overflow-x-auto sh gap-3">
                 {waitlist.map((b,i)=>(
                   <WaitlistCard key={b.id} booking={b} idx={i} isPower={isPower}
-                    onEdit={handleEdit} onManifest={printManifest} onCycle={handleCycle}/>
+                    onEdit={handleEdit} onManifest={printManifest} onCycle={handleCycle} otd={getOTD(b)}/>
                 ))}
                 {!waitlist.length && <div className="w-full text-center py-6 text-slate-400 text-sm">Waitlist ว่าง</div>}
               </div>
