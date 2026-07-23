@@ -179,6 +179,21 @@ function gStart(b){return b.start_time||b.startTime||'';}
 function gLic(b){return b.license_plate||b.license||'';}
 function gShip(b){return b.shipment_no||b.shipmentNo||'';}
 function gDO(b){return b.do_number||b.doNumber||'';}
+function toMin(t){var p=(t||'').split(':').map(Number);return p.length===2&&!isNaN(p[0])?p[0]*60+p[1]:null;}
+function getOTD(b){
+  if(!b||b.status==='Pending'||b.status==='Completed') return null;
+  var planIn=toMin(b.startTime),planOut=toMin(b.endTime),arrived=toMin(b.timeArrived);
+  var now=toMin(new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'}));
+  if(!arrived){
+    if(now&&planOut&&now>planOut) return {label:'DELAY',color:'#f87171',bg:'rgba(239,68,68,.18)',diff:now-planOut};
+    return null;
+  }
+  if(!planIn) return {label:'ON TIME',color:'#4ade80',bg:'rgba(22,163,74,.18)',diff:0};
+  var d=arrived-planIn;
+  if(d<=0)  return {label:'EARLY',  color:'#38bdf8',bg:'rgba(56,189,248,.18)',diff:Math.abs(d)};
+  if(d<=15) return {label:'ON TIME',color:'#4ade80',bg:'rgba(74,222,128,.18)',diff:d};
+  return         {label:'DELAY',  color:'#f87171',bg:'rgba(239,68,68,.18)',diff:d};
+}
 function gVendor(b){return b.vendor||'';}
 function gVeh(b){return b.vehicle||'';}
 function gJob(b){return b.job_type||b.jobType||'IN';}
@@ -206,6 +221,8 @@ function renderDocks(){
       var io=gJob(b)==='OUT'?'<span class="tag to">OUT</span>':'<span class="tag ti">IN</span>';
       h+='<div class="dc-head"><span class="dn">'+bay.name+'</span><span class="'+sc+'">'+sl+'</span></div>';
       h+='<div class="dc-body">';
+      var _otd=getOTD(b);
+      if(_otd) h+='<div style="background:'+_otd.bg+';color:'+_otd.color+';border-radius:999px;padding:1px 10px;font-size:.75rem;font-weight:900;margin-bottom:3px;display:inline-block">'+_otd.label+(_otd.diff>0?' '+_otd.diff+'m':'')+'</div>';
       h+='<div class="t-do-label">DO Number</div>';
       h+='<div class="t-do-num">'+(gDO(b)||gShip(b))+'</div>';
       h+='<div class="t-do">Shipment: '+gShip(b)+'</div>';
