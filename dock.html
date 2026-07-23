@@ -500,18 +500,6 @@ const FormPanel = React.memo(({form, setForm, bays, settings, onSubmit, editId, 
           {bays.map(d=><option key={d.name} value={d.name}>📍 ลง {d.name}</option>)}
         </select>
       </div>
-      {form.allocation==='Waitlist' && (
-        <div>
-          <label className="block text-[10px] font-bold text-amber-600 mb-1 uppercase">🎯 รอ Dock ไหน (แสดงบน TV)</label>
-          <select value={form.target_dock||''}
-            onChange={e=>setForm(p=>({...p,target_dock:e.target.value}))}
-            className="w-full border border-amber-200 rounded-xl p-2.5 bg-amber-50/50 font-bold outline-none focus:border-amber-500 text-sm">
-            <option value="">— ยังไม่ระบุ —</option>
-            {bays.map(d=><option key={d.name} value={d.name}>{d.name}</option>)}
-          </select>
-          <p className="text-[10px] text-slate-400 mt-1">หน้าจอ TV จะแสดงว่า Shipment นี้รอ dock ไหน</p>
-        </div>
-      )}
       {/* Submit */}
       <button onClick={onSubmit}
         className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md">
@@ -534,16 +522,12 @@ const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle})=>(
       <span className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
         คิว{idx+1}
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${booking.jobType==='OUT'?'bg-orange-100 text-orange-600':'bg-sky-100 text-sky-600'}`}>{booking.jobType}</span>
-        {otd && <span style={{background:otd.bg,color:otd.color,borderRadius:'999px',padding:'2px 8px',fontSize:'10px',fontWeight:900,marginLeft:'4px'}}>
-          {otd.label}{otd.diff>0&&<span style={{opacity:.75,marginLeft:'3px'}}>{otd.diff}m</span>}
-        </span>}
       </span>
       <StatusBadge booking={booking} onCycle={onCycle}/>
     </div>
     <div className="p-3 text-xs text-slate-600 space-y-1">
       <div className="font-bold text-slate-800">{booking.license} <span className="text-slate-400 font-normal">({booking.vehicle})</span></div>
-      <div className="text-indigo-800 font-black text-[13px] leading-tight">{booking.doNumber||booking.shipmentNo}</div>
-      {booking.doNumber && <div className="text-[10px] text-slate-400">Doc: {booking.shipmentNo}</div>}
+      <div className="text-indigo-600 font-bold text-[11px]">{booking.shipmentNo}</div>
       <div className="text-slate-500">{booking.vendor}</div>
       <div className="font-semibold text-indigo-600 bg-indigo-50 inline-block px-2 py-0.5 rounded">{booking.startTime} - {booking.endTime}</div>
     </div>
@@ -564,9 +548,7 @@ const DockCardOccupied = ({dock, booking, delay, otd, isPower, onEdit, onManifes
       <span className="flex items-center gap-2">
         {dock.name}
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${booking.jobType==='OUT'?'bg-orange-100 text-orange-600':'bg-sky-100 text-sky-600'}`}>{booking.jobType}</span>
-        {otd && <span style={{background:otd.bg,color:otd.color,borderRadius:'999px',padding:'2px 8px',fontSize:'10px',fontWeight:900,marginLeft:'4px'}}>
-          {otd.label}{otd.diff>0&&<span style={{opacity:.75,marginLeft:'3px'}}>{otd.diff}m</span>}
-        </span>}
+        {otd && <span style={{background:otd.bg,color:otd.color,borderRadius:'999px',padding:'2px 8px',fontSize:'10px',fontWeight:900}}>{otd.label}{otd.diff>0&&<span style={{opacity:.75}}> {otd.diff}m</span>}</span>}
       </span>
       {isPower && <button onClick={()=>onEdit(booking)} className="p-1.5 bg-white/80 text-indigo-600 rounded-lg hover:bg-white text-xs">✏️</button>}
     </div>
@@ -576,20 +558,13 @@ const DockCardOccupied = ({dock, booking, delay, otd, isPower, onEdit, onManifes
         {booking.timeArrived && <span className="text-[10px] text-slate-400">มาถึง {booking.timeArrived}</span>}
       </div>
       <div className="space-y-1">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[1.05rem] font-black text-indigo-800 truncate leading-tight">
-            {booking.doNumber||booking.shipmentNo}
-          </span>
-          {booking.doNumber && <span className="text-[10px] text-slate-400 truncate">Doc: {booking.shipmentNo}</span>}
-        </div>
+        <div className="flex"><span className="w-12 text-slate-400">Doc:</span><span className="font-bold text-indigo-700 truncate">{booking.shipmentNo}</span></div>
         <div className="flex"><span className="w-12 text-slate-400">Truck:</span><span className="font-bold">{booking.license} <span className="text-slate-400 font-normal">({booking.vehicle})</span></span></div>
         <div className="flex"><span className="w-12 text-slate-400">Vendor:</span><span className="truncate">{booking.vendor}</span></div>
       </div>
       <div className="bg-slate-50 rounded-xl p-2.5 mt-auto flex justify-between border border-slate-100 text-center">
         <div className="flex-1 border-r border-slate-200"><div className="text-[9px] text-slate-400 font-bold">PLAN OUT</div><div className="font-bold text-indigo-600">{booking.endTime}</div></div>
-        {otd && <div className="col-span-2 rounded-lg py-1.5 px-2 text-center font-black text-sm mb-1" style={{background:otd.bg,color:otd.color}}>
-          {otd.label}{otd.diff>0&&<span className="ml-2 font-normal text-xs opacity-75">ช้า/เร็ว {otd.diff} นาที</span>}
-        </div>}
+        {otd && <div style={{background:otd.bg,color:otd.color,borderRadius:'8px',padding:'4px 8px',fontWeight:900,fontSize:'12px',textAlign:'center',gridColumn:'span 2',marginBottom:'4px'}}>{otd.label}{otd.diff>0&&<span style={{opacity:.75,marginLeft:'6px',fontWeight:400,fontSize:'11px'}}>ช้า/เร็ว {otd.diff} นาที</span>}</div>}
         <div className="flex-1"><div className="text-[9px] text-slate-400 font-bold">มาถึง</div><div className="font-bold text-slate-700">{booking.timeArrived||'—'}</div></div>
       </div>
       {isPower && (
@@ -788,24 +763,20 @@ const getBlank = ()=>({
 });
 const BLANK = getBlank();
 
-// ══ OTD Calculator (outside App — pure function) ══
 function toMinOTD(t){var p=(t||'').split(':').map(Number);return p.length===2&&!isNaN(p[0])?p[0]*60+p[1]:null;}
 function getOTD(b){
-  if(!b||b.status==='Pending') return null;
-  var planIn=toMinOTD(b.startTime), planOut=toMinOTD(b.endTime);
-  var arrived=toMinOTD(b.timeArrived);
-  var nowStr=new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
-  var nowMin=toMinOTD(nowStr);
+  if(!b||b.status==='Pending'||b.status==='Completed') return null;
+  var planIn=toMinOTD(b.startTime),planOut=toMinOTD(b.endTime),arrived=toMinOTD(b.timeArrived);
+  var now=new Date(),nowMin=now.getHours()*60+now.getMinutes();
   if(!arrived){
-    if(!planOut||!nowMin) return null;
-    if(nowMin>planOut) return {status:'delay',label:'⏰ DELAY',color:'#ef4444',bg:'#fef2f2',diff:nowMin-planOut};
+    if(planOut&&nowMin>planOut) return {label:'⏰ DELAY',color:'#ef4444',bg:'#fef2f2',diff:nowMin-planOut};
     return null;
   }
-  if(!planIn) return {status:'ontime',label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:0};
+  if(!planIn) return {label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:0};
   var d=arrived-planIn;
-  if(d<=0)  return {status:'early', label:'🚀 EARLY',  color:'#0284c7',bg:'#eff6ff',diff:Math.abs(d)};
-  if(d<=15) return {status:'ontime',label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:d};
-  return          {status:'delay', label:'⏰ DELAY',  color:'#ef4444',bg:'#fef2f2',diff:d};
+  if(d<=0)  return {label:'🚀 EARLY',  color:'#0284c7',bg:'#eff6ff',diff:Math.abs(d)};
+  if(d<=15) return {label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:d};
+  return          {label:'⏰ DELAY',  color:'#ef4444',bg:'#fef2f2',diff:d};
 }
 
 function App() {
@@ -894,7 +865,6 @@ function App() {
     return TIMENOW()>b.endTime;
   };
 
-
   const handleEdit = b=>{ if(!isPower)return; setForm({...BLANK,...b}); setEditId(b.id); window.scrollTo({top:0,behavior:'smooth'}); };
   const handleDelete = id=>{ if(!isPower||!confirm('ลบรายการนี้?'))return; syncBookings(bookings.filter(b=>b.id!==id)); };
   const cancelEdit = ()=>{ setEditId(null); setForm(getBlank()); };
@@ -909,12 +879,6 @@ function App() {
     if(next==='WaitingDoc'&&!upd.timeWaitingDoc) upd.timeWaitingDoc=t;
     if(next==='Completed'&&!upd.timeCompleted)   upd.timeCompleted=t;
     syncBookings(bookings.map(x=>x.id===b.id?upd:x));
-    rtdb.ref('smartdock/changelog').push({
-      bookingId:b.id,shipmentNo:b.shipmentNo||'',date:b.date,
-      changedBy:role,
-      changedAt:Date.now(),changedTime:t,
-      changes:['Status: '+b.status+' → '+next],note:'',type:'STATUS',
-    });
   };
   const handleToggleBay=(name,cur)=>{
     if(!canDock)return;
@@ -924,23 +888,7 @@ function App() {
     syncBays(bays.map(d=>d.name===name?{...d,status:next}:d));
   };
   const handleSubmit=()=>{
-    console.log('handleSubmit called, isPower=',isPower,'role=',role);
-    if(!isPower){console.log('blocked: not isPower');return;}
-    let changeNote='', changeFields=[];
-    if(editId){
-      const orig=bookings.find(b=>b.id===editId)||{};
-      if(orig.allocation !==form.allocation)   changeFields.push('Dock: '+(orig.allocation||'-')+' → '+form.allocation);
-      if(orig.startTime  !==form.startTime)    changeFields.push('เวลาเข้า: '+(orig.startTime||'-')+' → '+form.startTime);
-      if(orig.endTime    !==form.endTime)      changeFields.push('เวลาออก: '+(orig.endTime||'-')+' → '+form.endTime);
-      if(orig.license    !==form.license)      changeFields.push('ทะเบียน: '+(orig.license||'-')+' → '+form.license);
-      if((orig.target_dock||'')!==(form.target_dock||'')) changeFields.push('Dock เป้าหมาย: '+(orig.target_dock||'-')+' → '+(form.target_dock||'-'));
-      if(changeFields.length>0){
-        changeNote=window.prompt('📝 เหตุผลการแก้ไข\n\n• '+changeFields.join('\n• '),'');
-        if(changeNote===null)return;
-        if(!changeNote.trim()&&!window.confirm('ไม่มีหมายเหตุ ยืนยันบันทึก?'))return;
-      }
-    }
-    console.log('form=',JSON.stringify({startTime:form.startTime,endTime:form.endTime,vendor:form.vendor,license:form.license}));
+    if(!isPower)return;
     if(!form.startTime||!form.endTime||!form.vendor||!form.license){
       alert('กรุณากรอกข้อมูลให้ครบ (เวลา, บริษัท, ทะเบียน)');return;
     }
@@ -949,10 +897,7 @@ function App() {
       ...form,
       status: editId ? (bookings.find(b=>b.id===editId)?.status||'Pending') : 'Pending',
       id: editId || Date.now(),
-      updatedAt: Date.now(),
-      lastEditBy: role,
-      lastEditNote: changeNote||'',
-      lastEditTime: TIMENOW(),
+      updatedAt: Date.now()
     };
     let nb;
     if(editId){
@@ -961,18 +906,6 @@ function App() {
       nb=[...bookings, newEntry];
     }
     rtdb.ref('smartdock/bookings').set(nb).then(()=>{
-      const t=Date.now();
-      rtdb.ref('smartdock/changelog').push({
-        bookingId:   newEntry.id,
-        shipmentNo:  newEntry.shipmentNo||'',
-        date:        newEntry.date,
-        changedBy:   newEntry.lastEditBy,
-        changedAt:   t,
-        changedTime: TIMENOW(),
-        changes:     changeFields.length>0?changeFields:[editId?'บันทึกข้อมูล':'สร้างคิวใหม่'],
-        note:        changeNote||'',
-        type:        editId?(changeFields.length>0?'EDIT':'UPDATE'):'CREATE',
-      });
       setEditId(null);
       setForm(getBlank());
     }).catch(err=>alert('บันทึกไม่สำเร็จ: '+err.message));
@@ -997,7 +930,6 @@ function App() {
     {id:'scan',lbl:'📷 สแกน'},
     {id:'reports',lbl:'📊 รายงาน',h:!isPower},
     {id:'qr',lbl:'🖨️ QR',h:!isAdmin},
-    {id:'changelog',lbl:'📋 ประวัติแก้ไข',h:!isPower},
     {id:'settings',lbl:'⚙️ ตั้งค่า',h:!isAdmin},
   ];
 
@@ -1065,7 +997,7 @@ function App() {
               <div className="p-4 flex overflow-x-auto sh gap-3">
                 {waitlist.map((b,i)=>(
                   <WaitlistCard key={b.id} booking={b} idx={i} isPower={isPower}
-                    onEdit={handleEdit} onManifest={printManifest} onCycle={handleCycle} otd={getOTD(b)}/>
+                    onEdit={handleEdit} onManifest={printManifest} onCycle={handleCycle}/>
                 ))}
                 {!waitlist.length && <div className="w-full text-center py-6 text-slate-400 text-sm">Waitlist ว่าง</div>}
               </div>
@@ -1105,86 +1037,12 @@ function App() {
           {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
           {tab==='scan'     && <ScanView scanOn={scanOn} setScanOn={setScanOn} scanMsg={scanMsg}/>}
           {tab==='qr'       && <QRView bays={bays}/>}
-          {tab==='changelog' && <ChangelogView/>}
           {tab==='settings' && <SettingsView settings={settings}/>}
         </div>
       </div>
     </div>
   );
 }
-
-
-function exportChangelog(logs){
-  var DQ=String.fromCharCode(34);
-  var LF=String.fromCharCode(10);
-  var BOM=String.fromCharCode(0xFEFF);
-  var q=function(s){return DQ+String(s||'').split(DQ).join(DQ+DQ)+DQ;};
-  var rows=[[q('ประเภท'),q('Shipment'),q('วันที่'),q('เวลา'),q('แก้ไขโดย'),q('รายการที่เปลี่ยน'),q('หมายเหตุ')].join(',')];
-  logs.forEach(function(l){
-    rows.push([q(l.type),q(l.shipmentNo),q(l.date),q(l.changedTime),q(l.changedBy),q((l.changes||[]).join(' | ')),q(l.note)].join(','));
-  });
-  var blob=new Blob([BOM+rows.join(LF)],{type:'text/csv;charset=utf-8;'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  a.href=url;
-  a.download='dock_changelog_'+new Date().toISOString().slice(0,10)+'.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-const ChangelogView = ()=>{
-  const [logs,setLogs]=React.useState([]);
-  const [loading,setLoading]=React.useState(true);
-  React.useEffect(()=>{
-    const ref=rtdb.ref('smartdock/changelog').orderByChild('changedAt').limitToLast(300);
-    ref.on('value',snap=>{
-      const d=snap.val();
-      if(!d){setLogs([]);setLoading(false);return;}
-      setLogs(Object.entries(d).map(([k,v])=>({_key:k,...v})).sort((a,b)=>b.changedAt-a.changedAt));
-      setLoading(false);
-    });
-    return()=>ref.off();
-  },[]);
-  const TC={CREATE:'bg-green-100 text-green-700',EDIT:'bg-amber-100 text-amber-700',STATUS:'bg-sky-100 text-sky-700',UPDATE:'bg-slate-100 text-slate-600'};
-  const TL={CREATE:'➕ สร้าง',EDIT:'✏️ แก้ไข',STATUS:'🔄 สถานะ',UPDATE:'💾 บันทึก'};
-  if(loading)return<div className="flex-1 flex items-center justify-center text-slate-400 p-8">กำลังโหลด...</div>;
-  return(
-    <div className="flex-1 overflow-y-auto p-4">
-      <div className="max-w-3xl mx-auto">
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h2 className="font-black text-lg text-slate-800">📋 ประวัติการแก้ไข Booking</h2>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400">{logs.length} รายการ</span>
-            <button onClick={()=>exportChangelog(logs)} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 transition-colors">
-              📄 Export CSV
-            </button>
-          </div>
-        </div>
-        {!logs.length&&<div className="text-center py-12 text-slate-400">ยังไม่มีประวัติ</div>}
-        <div className="space-y-2">
-          {logs.map(l=>(
-            <div key={l._key} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${TC[l.type]||'bg-slate-100 text-slate-600'}`}>{TL[l.type]||l.type}</span>
-                  <span className="font-bold text-slate-800">{l.shipmentNo||'—'}</span>
-                </div>
-                <div className="text-xs text-slate-400 text-right shrink-0">
-                  <div>{l.date} {l.changedTime}</div>
-                  <div className="font-medium text-slate-600">{l.changedBy}</div>
-                </div>
-              </div>
-              <div className="mt-2 space-y-1">
-                {(l.changes||[]).map((c,i)=><div key={i} className="text-sm text-slate-600 bg-slate-50 rounded px-3 py-1">• {c}</div>)}
-              </div>
-              {l.note&&<div className="mt-2 text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5 border border-amber-200">💬 {l.note}</div>}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
