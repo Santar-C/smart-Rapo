@@ -874,7 +874,7 @@ function App() {
     return TIMENOW()>b.endTime;
   };
 
-  getOTD = b=>{
+  const getOTD = b=>{
     if(!b||b.status==='Pending') return null;
     const toMin=t=>{const[h,m]=(t||'').split(':').map(Number);return isNaN(h)||isNaN(m)?null:h*60+m;};
     const planIn=toMin(b.startTime), planOut=toMin(b.endTime);
