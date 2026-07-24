@@ -63,6 +63,9 @@
     .empty-wl{padding:2rem 1rem;text-align:center;color:#1e3a5f;font-size:.85rem;font-weight:700}
     #sdot{width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block;margin-right:5px}
     #sdot.on{background:#34d399;animation:none} #sdot.off{animation:pd 1s ease-in-out infinite}
+    .job-in{background:#0ea5e9;color:#fff;font-weight:900;font-size:.72rem;padding:2px 10px;border-radius:999px;display:inline-block}
+    .job-out{background:#f97316;color:#fff;font-weight:900;font-size:.72rem;padding:2px 10px;border-radius:999px;display:inline-block}
+    .st-badge{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;display:inline-block}
   </style>
 </head>
 <body>
@@ -209,6 +212,18 @@ function gVendor(b){return b.vendor||'';}
 function gVeh(b){return b.vehicle||'';}
 function gJob(b){return b.job_type||b.jobType||'IN';}
 function gArr(b){return b.time_arrived||b.timeArrived||'—';}
+function gStatus(b){
+  var s=b.status||'Pending';
+  var map={
+    'Pending':   {label:'รอเข้าท่า', color:'#94a3b8',bg:'rgba(148,163,184,.2)'},
+    'Arrived':   {label:'มาถึงแล้ว',color:'#38bdf8',bg:'rgba(56,189,248,.2)'},
+    'Loading':   {label:'Loading',   color:'#a78bfa',bg:'rgba(167,139,250,.2)'},
+    'WaitingDoc':{label:'รอเอกสาร', color:'#fb923c',bg:'rgba(251,146,60,.2)'},
+    'Departing': {label:'รถออกแล้ว',color:'#f43f5e',bg:'rgba(244,63,94,.2)'},
+    'Completed': {label:'เสร็จสิ้น',color:'#4ade80',bg:'rgba(74,222,128,.2)'},
+  };
+  return map[s]||{label:s,color:'#94a3b8',bg:'rgba(148,163,184,.2)'};
+}
 
 // ── Render ────────────────────────────────────────────
 function render(){renderDocks();renderWaitlist();}
@@ -232,14 +247,17 @@ function renderDocks(){
       var io=gJob(b)==='OUT'?'<span class="tag to">OUT</span>':'<span class="tag ti">IN</span>';
       h+='<div class="dc-head"><span class="dn">'+bay.name+'</span><span class="'+sc+'">'+sl+'</span></div>';
       h+='<div class="dc-body">';
+      var _job=gJob(b)==='OUT'?'<span class="job-out">📤 OUT</span>':'<span class="job-in">📥 IN</span>';
+      var _st=gStatus(b);
+      var _stb='<span class="st-badge" style="background:'+_st.bg+';color:'+_st.color+'">'+_st.label+'</span>';
       var _otd=getOTD(b);
-      if(_otd) h+='<div style="background:'+_otd.bg+';color:'+_otd.color+';border-radius:999px;padding:1px 10px;font-size:.75rem;font-weight:900;margin-bottom:3px;display:inline-block">'+_otd.label+(_otd.diff>0?' '+_otd.diff+'m':'')+'</div>';
+      var _otdb=_otd?'<span class="st-badge" style="background:'+_otd.bg+';color:'+_otd.color+';font-weight:900">'+_otd.label+(_otd.diff>0?' '+_otd.diff+'m':'')+'</span>':'';
+      h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">'+_job+_stb+_otdb+'</div>';
       h+='<div class="t-do-label">DO Number</div>';
       h+='<div class="t-do-num">'+(gDO(b)||gShip(b))+'</div>';
-      h+='<div class="t-do">Shipment: '+gShip(b)+'</div>';
+      if(gShip(b)) h+='<div class="t-do">Shipment: '+gShip(b)+'</div>';
       h+='<div class="t-lic">🚛 '+gLic(b)+'</div>';
       h+='<div class="t-ven">'+gVendor(b)+'</div>';
-      h+='<div class="tags"><span class="tag tv">'+gVeh(b)+'</span>'+io+'</div>';
       h+='</div>';
       h+='<div class="dc-foot"><span>Plan ออก: <b>'+gTime(b)+'</b></span><span>มาถึง: <b>'+gArr(b)+'</b></span></div>';
     } else {
