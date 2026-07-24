@@ -81,7 +81,7 @@ const TODAY   = ()=>new Date().toISOString().split('T')[0];
 const TIMENOW = ()=>new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
 const safe = v=>{ if(!v)return[]; if(Array.isArray(v))return v.filter(Boolean); return Object.values(v).filter(Boolean); };
 
-const STATUSES  = ['Pending','Arrived','Loading','WaitingDoc','Completed'];
+const STATUSES  = ['Pending','Arrived','Loading','WaitingDoc','Departing','Completed'];
 const STAT_LBL  = {Pending:'รอเข้าท่า',Arrived:'1.รถมาถึง',Loading:'2.โหลดงาน',WaitingDoc:'3.รอเอกสาร',Completed:'4.เสร็จสิ้น'};
 const STAT_CLS  = {
   Pending:'bg-slate-100 text-slate-600 border-slate-300',
@@ -500,6 +500,17 @@ const FormPanel = React.memo(({form, setForm, bays, settings, onSubmit, editId, 
           {bays.map(d=><option key={d.name} value={d.name}>📍 ลง {d.name}</option>)}
         </select>
       </div>
+      {form.allocation==='Waitlist' && (
+        <div>
+          <label className="block text-[10px] font-bold text-amber-600 mb-1 uppercase">🎯 รอ Dock ไหน (แสดงบน TV)</label>
+          <select value={form.target_dock||''}
+            onChange={e=>setForm(p=>({...p,target_dock:e.target.value}))}
+            className="w-full border border-amber-200 rounded-xl p-2.5 bg-amber-50 font-bold outline-none text-sm">
+            <option value="">— ยังไม่ระบุ —</option>
+            {bays.map(d=><option key={d.name} value={d.name}>{d.name}</option>)}
+          </select>
+        </div>
+      )}
       {/* Submit */}
       <button onClick={onSubmit}
         className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-md">
@@ -529,6 +540,11 @@ const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle})=>(
       <div className="font-bold text-slate-800">{booking.license} <span className="text-slate-400 font-normal">({booking.vehicle})</span></div>
       <div className="text-indigo-600 font-bold text-[11px]">{booking.shipmentNo}</div>
       <div className="text-slate-500">{booking.vendor}</div>
+      {booking.target_dock && (
+        <div className="font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 text-[11px]">
+          🎯 รอ Dock: {booking.target_dock}
+        </div>
+      )}
       <div className="font-semibold text-indigo-600 bg-indigo-50 inline-block px-2 py-0.5 rounded">{booking.startTime} - {booking.endTime}</div>
     </div>
     {isPower && (
@@ -637,7 +653,8 @@ const QRView = ({bays})=>(
 const ScheduleView = ({bays,bookings,viewDate,isPower,onEdit})=>{
   const hours=Array.from({length:13},(_,i)=>i+7);
   const data=bookings.filter(b=>b.date===viewDate&&b.allocation!=='Waitlist'&&b.status!=='Completed');
-  const COLORS={Pending:'#94a3b8',Arrived:'#38bdf8',Loading:'#a78bfa',WaitingDoc:'#fb923c',Completed:'#4ade80'};
+  const COLORS={Pending:'#94a3b8',Arrived:'#38bdf8',Loading:'#a78bfa',WaitingDoc:'#fb923c',Departing:'#f43f5e',Completed:'#4ade80'};
+  const STATUS_LABEL={'Pending':'รอเข้าท่า','Arrived':'มาถึงแล้ว','Loading':'กำลัง Loading','WaitingDoc':'รอเอกสาร','Departing':'รถออกแล้ว','Completed':'เสร็จสิ้น'};
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fi">
       <div className="p-4 border-b border-slate-100"><h3 className="font-bold text-lg">📅 ตารางเวลาหน้าท่า ({viewDate})</h3></div>
@@ -760,6 +777,7 @@ const getBlank = ()=>({
   allocation:'Waitlist', driverName:'',
   bookingNo:'', containerNo:'', sealNo:'',
   origin:'CEVA WAREHOUSE', destination:'PAT WAREHOUSE',
+  target_dock:'',
 });
 const BLANK = getBlank();
 
@@ -890,6 +908,7 @@ function App() {
     if(next==='Arrived'&&!upd.timeArrived)       upd.timeArrived=t;
     if(next==='Loading'&&!upd.timeLoading)       upd.timeLoading=t;
     if(next==='WaitingDoc'&&!upd.timeWaitingDoc) upd.timeWaitingDoc=t;
+    if(next==='Departing'&&!upd.timeDeparting)   upd.timeDeparting=t;
     if(next==='Completed'&&!upd.timeCompleted)   upd.timeCompleted=t;
     syncBookings(bookings.map(x=>x.id===b.id?upd:x));
   };
