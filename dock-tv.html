@@ -181,18 +181,29 @@ function gShip(b){return b.shipment_no||b.shipmentNo||'';}
 function gDO(b){return b.do_number||b.doNumber||'';}
 function toMin(t){var p=(t||'').split(':').map(Number);return p.length===2&&!isNaN(p[0])?p[0]*60+p[1]:null;}
 function getOTD(b){
-  if(!b||b.status==='Pending'||b.status==='Completed') return null;
-  var planIn=toMin(b.startTime),planOut=toMin(b.endTime),arrived=toMin(b.timeArrived);
-  var now=toMin(new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'}));
-  if(!arrived){
-    if(now&&planOut&&now>planOut) return {label:'DELAY',color:'#f87171',bg:'rgba(239,68,68,.18)',diff:now-planOut};
-    return null;
+  if(!b || b.status==='Completed') return null;
+  var planIn  = toMin(b.startTime);
+  var planOut = toMin(b.endTime);
+  var arrived = toMin(b.timeArrived);
+  var now     = new Date();
+  var nowMin  = now.getHours()*60 + now.getMinutes();
+
+  if(!planIn && !planOut) return null;
+
+  if(arrived){
+    if(!planIn) return {label:'ON TIME', color:'#4ade80', bg:'rgba(22,163,74,.2)', diff:0};
+    var d = arrived - planIn;
+    if(d <= 0)  return {label:'EARLY',   color:'#38bdf8', bg:'rgba(56,189,248,.2)', diff:Math.abs(d)};
+    if(d <= 15) return {label:'ON TIME', color:'#4ade80', bg:'rgba(74,222,128,.2)', diff:d};
+    return             {label:'DELAY',   color:'#f87171', bg:'rgba(239,68,68,.25)', diff:d};
   }
-  if(!planIn) return {label:'ON TIME',color:'#4ade80',bg:'rgba(22,163,74,.18)',diff:0};
-  var d=arrived-planIn;
-  if(d<=0)  return {label:'EARLY',  color:'#38bdf8',bg:'rgba(56,189,248,.18)',diff:Math.abs(d)};
-  if(d<=15) return {label:'ON TIME',color:'#4ade80',bg:'rgba(74,222,128,.18)',diff:d};
-  return         {label:'DELAY',  color:'#f87171',bg:'rgba(239,68,68,.18)',diff:d};
+
+  if(!planIn) return null;
+  var gap = nowMin - planIn;
+  if(gap < -15) return {label:'INCOMING', color:'#818cf8', bg:'rgba(99,102,241,.2)', diff:Math.abs(gap)};
+  if(gap <=  0) return {label:'DUE NOW',  color:'#fbbf24', bg:'rgba(251,191,36,.2)', diff:Math.abs(gap)};
+  if(gap <= 15) return {label:'LATE',     color:'#fb923c', bg:'rgba(251,146,60,.2)', diff:gap};
+  return               {label:'DELAY',    color:'#f87171', bg:'rgba(239,68,68,.25)', diff:gap};
 }
 function gVendor(b){return b.vendor||'';}
 function gVeh(b){return b.vehicle||'';}
