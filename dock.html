@@ -765,18 +765,31 @@ const BLANK = getBlank();
 
 function toMinOTD(t){var p=(t||'').split(':').map(Number);return p.length===2&&!isNaN(p[0])?p[0]*60+p[1]:null;}
 function getOTD(b){
-  if(!b||b.status==='Pending'||b.status==='Completed') return null;
-  var planIn=toMinOTD(b.startTime),planOut=toMinOTD(b.endTime),arrived=toMinOTD(b.timeArrived);
-  var now=new Date(),nowMin=now.getHours()*60+now.getMinutes();
-  if(!arrived){
-    if(planOut&&nowMin>planOut) return {label:'⏰ DELAY',color:'#ef4444',bg:'#fef2f2',diff:nowMin-planOut};
-    return null;
+  if(!b || b.status==='Completed') return null;
+  var planIn  = toMinOTD(b.startTime);
+  var planOut = toMinOTD(b.endTime);
+  var arrived = toMinOTD(b.timeArrived);
+  var now     = new Date();
+  var nowMin  = now.getHours()*60 + now.getMinutes();
+
+  if(!planIn && !planOut) return null; // ไม่มีเวลาเลย ไม่แสดง
+
+  if(arrived){
+    // รถมาถึงแล้ว — เทียบกับ Plan IN
+    if(!planIn) return {label:'✅ ON TIME', color:'#16a34a', bg:'#f0fdf4', diff:0};
+    var d = arrived - planIn;
+    if(d <= 0)  return {label:'🚀 EARLY',   color:'#0284c7', bg:'#eff6ff', diff:Math.abs(d)};
+    if(d <= 15) return {label:'✅ ON TIME',  color:'#16a34a', bg:'#f0fdf4', diff:d};
+    return             {label:'⏰ DELAY',    color:'#ef4444', bg:'#fef2f2', diff:d};
   }
-  if(!planIn) return {label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:0};
-  var d=arrived-planIn;
-  if(d<=0)  return {label:'🚀 EARLY',  color:'#0284c7',bg:'#eff6ff',diff:Math.abs(d)};
-  if(d<=15) return {label:'✅ ON TIME',color:'#16a34a',bg:'#f0fdf4',diff:d};
-  return          {label:'⏰ DELAY',  color:'#ef4444',bg:'#fef2f2',diff:d};
+
+  // รถยังไม่มา — เทียบเวลาปัจจุบันกับ Plan IN
+  if(!planIn) return null;
+  var gap = nowMin - planIn;
+  if(gap < -15) return {label:'⏳ รอเข้า',  color:'#0284c7', bg:'#f0f9ff', diff:Math.abs(gap)};
+  if(gap <=  0) return {label:'🟡 ใกล้ถึง', color:'#d97706', bg:'#fffbeb', diff:Math.abs(gap)};
+  if(gap <= 15) return {label:'⚠️ ช้านิดหน่อย', color:'#ea580c', bg:'#fff7ed', diff:gap};
+  return               {label:'⏰ DELAY',    color:'#ef4444', bg:'#fef2f2', diff:gap};
 }
 
 function App() {
