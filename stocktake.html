@@ -89,6 +89,7 @@
           <div style="font-weight:700;font-size:1rem;" id="loc-info-name">—</div>
           <div style="font-size:0.85rem;margin-top:4px;">Zone: <b id="loc-info-zone">—</b> &nbsp;|&nbsp; รายการใน Master: <b id="loc-info-count">—</b></div>
         </div>
+        <div id="loc-unavailable-warn" class="alert alert-error" style="display:none;margin-top:0.5rem;font-size:0.85rem;font-weight:700;"></div>
         <button class="btn btn-primary btn-full" id="btn-start-job" style="margin-top:0.75rem;">▶ เริ่มนับ Location นี้</button>
       </div>
     </div>
@@ -243,6 +244,35 @@
   let masterStock = [], allJobs = [], masterSearch = "";
   let curJob = null, scanEvents = []; // scanEvents: {docId, scanned_tag, timestamp/scan_time}
   let camStarted = false, html5Cam = null, locCam = null, lastScan = 0;
+  let currentRoundId = null, roundJobsByLoc = {};
+
+  // ── สถานะ job ล่าสุดของแต่ละ location ในรอบปัจจุบัน — กันเลือก location ที่ (1) มีคนกำลังนับอยู่
+  // (2) นับเสร็จแล้วตรง (3) มี short/over แล้วแอดมินยังไม่สั่งนับซ้ำ (needs_recount) ──
+  function isLocationAvailable(loc) {
+    const j = roundJobsByLoc[loc];
+    if (!j) return true;
+    if (j.count_status === "In Progress") return false;
+    const hasDiff = (j.short_count||0) > 0 || (j.over_count||0) > 0;
+    if (!hasDiff) return false;
+    return !!j.needs_recount;
+  }
+  function unavailableReason(loc) {
+    const j = roundJobsByLoc[loc];
+    if (!j) return null;
+    if (j.count_status === "In Progress") return `⛔ Location "${loc}" กำลังถูกนับโดย ${j.created_name||"พนักงานคนอื่น"} อยู่ตอนนี้ — รอให้นับเสร็จก่อน (ถ้าค้างนานให้แจ้งแอดมิน)`;
+    const hasDiff = (j.short_count||0) > 0 || (j.over_count||0) > 0;
+    if (!hasDiff) return `✅ Location "${loc}" นับเสร็จแล้ว (ตรง) ไม่ต้องนับซ้ำ`;
+    if (!j.needs_recount) return `⏳ Location "${loc}" มีของขาด/เกิน — รอแอดมินสั่งนับซ้ำก่อนถึงจะนับได้อีกครั้ง`;
+    return null;
+  }
+  function updateLocAvailabilityUI(loc) {
+    const btn = document.getElementById("btn-start-job");
+    const warnEl = document.getElementById("loc-unavailable-warn");
+    const reason = unavailableReason(loc);
+    if (!btn || !warnEl) return;
+    if (reason) { warnEl.textContent = reason; warnEl.style.display = "block"; btn.disabled = true; }
+    else { warnEl.style.display = "none"; btn.disabled = false; }
+  }
 
   const { user, prof } = await (async () => {
     const r = await requireAuth();
@@ -289,6 +319,22 @@
   }
   loadMaster();
 
+  // ══ รอบปัจจุบัน — ต้องรู้ก่อนเพื่อกรอง roundJobsByLoc ให้ตรงรอบ ═══
+  onSnapshot(doc(db,"app_settings","stocktake_round"), snap => {
+    currentRoundId = snap.exists() ? snap.data().round_id : null;
+    rebuildRoundJobsByLoc();
+  });
+
+  function rebuildRoundJobsByLoc() {
+    roundJobsByLoc = {};
+    allJobs.filter(j => (j.round_id||null) === currentRoundId).forEach(j => {
+      const cur = roundJobsByLoc[j.location_scan];
+      if (!cur || (j.start_time?.toMillis?.()||0) > (cur.start_time?.toMillis?.()||0)) roundJobsByLoc[j.location_scan] = j;
+    });
+    const loc = locInput?.value.trim().toUpperCase();
+    if (loc) updateLocAvailabilityUI(loc);
+  }
+
   // ══ JOBS (list + realtime) ═══════════════════════════════
   onSnapshot(query(collection(db,"count_jobs"), orderBy("start_time","desc"), limit(300)), snap => {
     allJobs = snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -297,6 +343,7 @@
     document.getElementById("sj-total").textContent = myJobs.length;
     document.getElementById("sj-prog").textContent  = myJobs.filter(j=>j.count_status==="In Progress").length;
     document.getElementById("sj-done").textContent  = myJobs.filter(j=>j.count_status==="Completed").length;
+    rebuildRoundJobsByLoc();
   });
 
   function renderJobList(jobs) {
@@ -366,12 +413,13 @@
 
   locInput.addEventListener("input", () => {
     const loc = locInput.value.trim().toUpperCase();
-    if (!loc) { document.getElementById("loc-info").style.display="none"; return; }
+    if (!loc) { document.getElementById("loc-info").style.display="none"; document.getElementById("loc-unavailable-warn").style.display="none"; document.getElementById("btn-start-job").disabled=false; return; }
     const rows = masterRowsAt(loc);
     document.getElementById("loc-info").style.display="flex";
     document.getElementById("loc-info-name").textContent  = `📍 ${loc}`;
     document.getElementById("loc-info-zone").textContent  = rows[0]?.zone || "Normal (ยังไม่มีใน Master)";
     document.getElementById("loc-info-count").textContent = rows.length ? `${rows.length} รายการ` : "ยังไม่มีใน Master";
+    updateLocAvailabilityUI(loc);
   });
 
   function masterRowsAt(loc) {
@@ -392,6 +440,8 @@
   document.getElementById("btn-start-job").addEventListener("click", async () => {
     const loc  = locInput.value.trim().toUpperCase();
     if (!loc) { toast("⚠️ ระบุ Location ก่อน"); return; }
+    const preReason = unavailableReason(loc);
+    if (preReason) { toast(preReason, "err", 4500); return; }
     const btn = document.getElementById("btn-start-job");
     const origLabel = btn.textContent;
     btn.disabled = true; btn.textContent = "⏳ กำลังตรวจสอบ...";
@@ -400,7 +450,9 @@
       const zone = rows[0]?.zone || "Normal";
       const roundId = await getCurrentRoundId();
 
-      // ดึง job ทั้งหมดของ location นี้ในรอบปัจจุบัน (ทุกสถานะ) — เช็ค resume + คำนวณรอบนับที่กี่ (attempt) ในคราวเดียว
+      // เช็คซ้ำอีกครั้งด้วยข้อมูลสดจาก Firestore ตรงๆ (กันกรณี race condition ในเสี้ยววินาทีที่ผ่านมา)
+      // ถ้ามีคนกำลังนับ location นี้อยู่ (ไม่ว่าจะเป็นใคร) จะ "บล็อก" ไม่ให้เข้า ไม่ resume ให้อัตโนมัติอีกต่อไป
+      // — job ที่ค้างจริงๆ (คนเดิมรีเฟรชหลุด) ต้องให้แอดมินปล่อยจากหน้า Monitor เท่านั้น
       const priorSnap = await getDocs(query(
         collection(db,"count_jobs"),
         where("location_scan","==",loc), where("round_id","==",roundId)
@@ -409,29 +461,33 @@
         .sort((a,b)=> (b.start_time?.toMillis?.()||0) - (a.start_time?.toMillis?.()||0));
       const inProgress = priorJobs.find(j=>j.count_status==="In Progress");
       if (inProgress) {
-        toast(`↩️ พบงานนับ Location นี้ค้างอยู่ — กลับเข้าไปต่อให้แล้ว`, "ok");
-        await openJob(inProgress.id);
-      } else {
-        const nowClient = new Date();
-        const latestPrior = priorJobs[0] || null;
-        const attempt = latestPrior ? (latestPrior.attempt||1) + 1 : 1;
-        const ref  = await addDoc(collection(db,"count_jobs"), {
-          location_scan: loc, zone_type: zone,
-          start_time: serverTimestamp(), count_status: "In Progress",
-          expected_target: rows.length, matched_count: 0, short_count: 0, over_count: 0,
-          round_id: roundId,
-          created_by: currentUser.uid, created_name: profile.name,
-          attempt, parent_job_id: latestPrior ? latestPrior.id : null
-        });
-        if (latestPrior?.needs_recount) {
-          updateDoc(doc(db,"count_jobs",latestPrior.id), { needs_recount: false }).catch(()=>{});
-        }
-        if (attempt > 1) toast(`🔁 นี่คือการนับรอบที่ ${attempt} ของ Location นี้`, "ok");
-        scanEvents=[];
-        curJob={id:ref.id, location:loc, zone, startTime:{toDate:()=>nowClient}, endTime:null, createdName:profile.name, attempt};
-        showScanScreen();
+        toast(`⛔ Location นี้กำลังถูกนับโดย ${inProgress.created_name||"คนอื่น"} อยู่ตอนนี้`, "err", 4500);
+        return;
       }
-      locInput.value=""; document.getElementById("loc-info").style.display="none";
+      const latestPrior = priorJobs[0] || null;
+      if (latestPrior && latestPrior.count_status === "Completed") {
+        const hasDiff = (latestPrior.short_count||0) > 0 || (latestPrior.over_count||0) > 0;
+        if (!hasDiff) { toast("✅ Location นี้นับเสร็จแล้ว (ตรง) ไม่ต้องนับซ้ำ", "err", 4500); return; }
+        if (!latestPrior.needs_recount) { toast("⏳ Location นี้มีของขาด/เกิน — รอแอดมินสั่งนับซ้ำก่อนถึงจะนับได้อีกครั้ง", "err", 4500); return; }
+      }
+      const nowClient = new Date();
+      const attempt = latestPrior ? (latestPrior.attempt||1) + 1 : 1;
+      const ref  = await addDoc(collection(db,"count_jobs"), {
+        location_scan: loc, zone_type: zone,
+        start_time: serverTimestamp(), count_status: "In Progress",
+        expected_target: rows.length, matched_count: 0, short_count: 0, over_count: 0,
+        round_id: roundId,
+        created_by: currentUser.uid, created_name: profile.name,
+        attempt, parent_job_id: latestPrior ? latestPrior.id : null
+      });
+      if (latestPrior?.needs_recount) {
+        updateDoc(doc(db,"count_jobs",latestPrior.id), { needs_recount: false }).catch(()=>{});
+      }
+      if (attempt > 1) toast(`🔁 นี่คือการนับรอบที่ ${attempt} ของ Location นี้`, "ok");
+      scanEvents=[];
+      curJob={id:ref.id, location:loc, zone, startTime:{toDate:()=>nowClient}, endTime:null, createdName:profile.name, attempt};
+      showScanScreen();
+      locInput.value=""; document.getElementById("loc-info").style.display="none"; document.getElementById("loc-unavailable-warn").style.display="none";
     } catch (err) {
       toast("❌ เริ่มนับไม่สำเร็จ: "+err.message, "err", 5000);
     } finally {
