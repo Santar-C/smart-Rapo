@@ -198,7 +198,7 @@
   import { signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     collection, doc, addDoc, updateDoc, deleteDoc, getDocs, getDoc, setDoc,
-    query, where, orderBy, serverTimestamp
+    query, where, orderBy, onSnapshot, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const CIRC = 2 * Math.PI * 43;
@@ -345,8 +345,42 @@
   const BARCODE_MAP_CACHE_KEY = "rapo_barcode_map_cache_v1";
   let barcodeMap = {}; // { "asdfth": "A01-01-1-10", ... } — จาก WMS
 
+  // ── สถานะ job ล่าสุดของแต่ละ location ในรอบปัจจุบัน (อัปเดตสด ข้ามเครื่องได้) ──
+  // ใช้กันไม่ให้พนักงานเลือก location ที่ (1) มีคนกำลังนับอยู่ (2) นับเสร็จแล้วตรง (3) มี short/over
+  // แล้วแอดมินยังไม่สั่งนับซ้ำ — ต้องรอ admin กด "สั่งนับซ้ำ" (needs_recount) ก่อนถึงจะกลับมาเลือกได้อีกครั้ง
+  let jobsByLoc = {};
+  function isLocationAvailable(loc) {
+    const j = jobsByLoc[loc];
+    if (!j) return true;
+    if (j.count_status === "In Progress") return false;
+    const hasDiff = (j.short_count||0) > 0 || (j.over_count||0) > 0;
+    if (!hasDiff) return false; // นับเสร็จแล้วตรง — ไม่ต้องนับซ้ำ
+    return !!j.needs_recount; // มี diff — ให้เลือกได้เฉพาะตอนแอดมินสั่งนับซ้ำแล้วเท่านั้น
+  }
+  function unavailableReason(loc) {
+    const j = jobsByLoc[loc];
+    if (!j) return null;
+    if (j.count_status === "In Progress") return `⛔ Location "${loc}" กำลังถูกนับโดย ${j.created_name||"พนักงานคนอื่น"} อยู่ตอนนี้ — รอให้นับเสร็จก่อน (ถ้าค้างนานให้แจ้งแอดมิน)`;
+    const hasDiff = (j.short_count||0) > 0 || (j.over_count||0) > 0;
+    if (!hasDiff) return `✅ Location "${loc}" นับเสร็จแล้ว (ตรง) ไม่ต้องนับซ้ำ`;
+    if (!j.needs_recount) return `⏳ Location "${loc}" มีของขาด/เกิน — รอแอดมินสั่งนับซ้ำก่อนถึงจะนับได้อีกครั้ง`;
+    return null;
+  }
+  function availableLocations() { return allLocations.filter(l => isLocationAvailable(l.location)); }
+
   async function init() {
     const roundId = await getCurrentRoundId();
+
+    // ฟังสถานะ job ของทุก location ในรอบนี้แบบสด — ให้เห็นทันทีถ้าเครื่องอื่นเริ่ม/จบนับ location ใดไป
+    onSnapshot(query(collection(db,"count_jobs"), where("round_id","==",roundId)), snap => {
+      jobsByLoc = {};
+      snap.docs.forEach(d => {
+        const j = { id:d.id, ...d.data() };
+        const cur = jobsByLoc[j.location_scan];
+        if (!cur || (j.start_time?.toMillis?.()||0) > (cur.start_time?.toMillis?.()||0)) jobsByLoc[j.location_scan] = j;
+      });
+      buildAreaDropdown();
+    });
 
     // ── โหลด "location_index" เอกสารเดียว (location+zone+count) แทน master_stock
     // เต็ม 5,862+ แถว — ลด read จากหลักพันเหลือแค่ 1 ต่อเครื่อง ─────────────
@@ -381,23 +415,7 @@
       try { sessionStorage.setItem(BARCODE_MAP_CACHE_KEY, JSON.stringify({roundId, map: barcodeMap})); } catch(e) {}
     }
 
-    // สร้างกลุ่มโซน (Area) เรียงตามหมวดแล้วเรียงชื่อในหมวด
-    const areaMap = {};
-    allLocations.forEach(l => {
-      const area = deriveArea(l.location);
-      if (!areaMap[area]) areaMap[area] = { area, group:areaGroup(area), count:0 };
-      areaMap[area].count++;
-    });
-    const areas = Object.values(areaMap).sort((a,b)=> a.group.localeCompare(b.group) || a.area.localeCompare(b.area));
-    const groups = {};
-    areas.forEach(a => { (groups[a.group] = groups[a.group]||[]).push(a); });
-
-    const areaSel = document.getElementById("area-select");
-    areaSel.innerHTML = `<option value="">-- เลือกโซน --</option>` +
-      Object.keys(groups).sort().map(g => `<optgroup label="${g}">` +
-        groups[g].map(a=>`<option value="${a.area}">${a.area} (${a.count} location)</option>`).join("") +
-        `</optgroup>`
-      ).join("");
+    buildAreaDropdown();
 
     // รายชื่อพนักงาน
     const staffSnap = await getDocs(query(collection(db,"staff_list"), orderBy("name")));
@@ -416,6 +434,31 @@
   }
   init();
   setTimeout(()=>document.getElementById("loc-barcode-input")?.focus(), 300);
+
+  // สร้างกลุ่มโซน (Area) จาก location ที่ "ยังเลือกได้" เท่านั้น (isLocationAvailable) เรียงตามหมวดแล้วเรียงชื่อในหมวด
+  // เรียกซ้ำได้ทุกครั้งที่สถานะ job เปลี่ยน (real-time) เพื่อไม่ให้ location ที่ถูกคนอื่นจับจองอยู่โผล่ให้เลือกซ้ำ
+  function buildAreaDropdown() {
+    const avail = availableLocations();
+    const areaMap = {};
+    avail.forEach(l => {
+      const area = deriveArea(l.location);
+      if (!areaMap[area]) areaMap[area] = { area, group:areaGroup(area), count:0 };
+      areaMap[area].count++;
+    });
+    const areas = Object.values(areaMap).sort((a,b)=> a.group.localeCompare(b.group) || a.area.localeCompare(b.area));
+    const groups = {};
+    areas.forEach(a => { (groups[a.group] = groups[a.group]||[]).push(a); });
+
+    const areaSel = document.getElementById("area-select");
+    if (!areaSel) return;
+    const keepArea = areaSel.value;
+    areaSel.innerHTML = `<option value="">-- เลือกโซน --</option>` +
+      Object.keys(groups).sort().map(g => `<optgroup label="${g}">` +
+        groups[g].map(a=>`<option value="${a.area}">${a.area} (${a.count} location)</option>`).join("") +
+        `</optgroup>`
+      ).join("");
+    if ([...areaSel.options].some(o=>o.value===keepArea)) { areaSel.value = keepArea; areaSel.dispatchEvent(new Event("change")); }
+  }
 
   // เรียง location แบบแนวเดิน (ซิกแซก) — จัดกลุ่มตาม prefix (ตัดเลข 2 ตัวท้ายออก = แถว/ช่องเดียวกัน)
   // แล้วเรียงในกลุ่มตามความสูง (เลข 2 ตัวท้าย) สลับทิศ ขึ้น-ลง-ขึ้น-ลง ทีละกลุ่ม ให้เดินเป็นเส้นเดียวไม่ย้อนกลับ
@@ -442,7 +485,7 @@
     const locSel = document.getElementById("loc-select");
     const card = document.getElementById("loc-select-card");
     if (!area) { card.style.display="none"; return; }
-    const locs = sortLocationsSnake(allLocations.filter(l => deriveArea(l.location)===area));
+    const locs = sortLocationsSnake(availableLocations().filter(l => deriveArea(l.location)===area));
     locSel.innerHTML = `<option value="">-- เลือก Location --</option>` +
       locs.map(l=>`<option value="${l.location}">${l.location} (${l.count} รายการ)</option>`).join("");
     card.style.display = "block";
@@ -456,6 +499,8 @@
   function selectLocation(code) {
     const loc = allLocations.find(l=>l.location===code);
     if (!loc) { toast(`⚠️ ไม่พบ location "${code}" — เช็คว่ามีในตารางเทียบบาร์โค้ด/Master หรือยัง`, "err", 3500); return; }
+    const reason = unavailableReason(code);
+    if (reason) { toast(reason, "err", 4500); return; }
     document.getElementById("area-select").value = deriveArea(code);
     document.getElementById("area-select").dispatchEvent(new Event("change"));
     setTimeout(() => {
@@ -490,6 +535,8 @@
     const name = document.getElementById("staff-select").value;
     if (!name) { toast("⚠️ เลือกชื่อก่อนนะครับ/ค่ะ"); return; }
     if (!selLoc) { toast("⚠️ เลือกโซนและ location ก่อนนะครับ/ค่ะ"); return; }
+    const reason = unavailableReason(selLoc);
+    if (reason) { toast(reason, "err", 4500); return; }
     if (!navigator.onLine) { toast("📴 ต้องมีเน็ตตอนเริ่มนับ Location ใหม่ครั้งแรก — เชื่อมต่อแล้วลองใหม่ครับ/ค่ะ", "err", 4000); return; }
     localStorage.setItem(LAST_STAFF_KEY, name);
     const btn = document.getElementById("btn-begin");
@@ -518,7 +565,9 @@
     // ตัดแถว placeholder (location ว่าง ไม่มีของ) ออก ไม่ให้ขึ้นเป็นรายการต้องสแกน
     const locRows = allRows.filter(r => !r.is_placeholder);
     const roundId = await getCurrentRoundId();
-    // ดึง job ทั้งหมดของ location นี้ในรอบปัจจุบัน (ทุกสถานะ) — ใช้ทั้งเช็ค resume และคำนวณรอบนับที่กี่ (attempt)
+    // เช็คซ้ำอีกครั้งด้วยข้อมูลสดจาก Firestore ตรงๆ (กันกรณี race condition กับเครื่องอื่นในเสี้ยววินาทีที่ผ่านมา)
+    // ก่อนหน้านี้ตรงนี้เคย "resume" job เดิมให้อัตโนมัติถ้ามีคนนับค้างอยู่ — เปลี่ยนเป็น "บล็อกเข้าไม่ได้" ตามนโยบายใหม่
+    // เพื่อกันสองคนนับที่เดียวกันซ้อนกัน ส่วน job ที่ค้างจริงๆ (คนเดิมรีเฟรชหลุด) ให้แอดมินปล่อยจากหน้า Monitor เท่านั้น
     const priorSnap = await getDocs(query(
       collection(db,"count_jobs"), where("location_scan","==",locCode), where("round_id","==",roundId)
     ));
@@ -526,35 +575,29 @@
       .sort((a,b)=> (b.start_time?.toMillis?.()||0) - (a.start_time?.toMillis?.()||0)); // ใหม่สุดก่อน
     const inProgress = priorJobs.find(j=>j.count_status==="In Progress");
     if (inProgress) {
-      const j = inProgress;
-      // ไม่ใช้ orderBy ร่วมกับ where ต่างฟิลด์ตรงนี้ — ต้องพึ่ง composite index ซึ่งถ้ายังไม่ได้สร้างไว้จะทำให้
-      // query ล้มเหลว (กลายเป็น "เข้า location นี้ไม่ได้อีกเลย" เพราะ resume ล้มเหลวทุกครั้ง) เรียงลำดับฝั่ง client แทน
-      const dd = await getDocs(query(collection(db,"count_details"), where("job_id","==",j.id)));
-      const allDocs = dd.docs.map(d=>({docId:d.id,...d.data()}))
-        .sort((a,b)=> (a.timestamp?.toMillis?.()||0) - (b.timestamp?.toMillis?.()||0));
-      qtyByTag = {};
-      allDocs.forEach(d => { if (d.qty !== undefined) qtyByTag[d.scanned_tag] = d.qty; });
-      scanEvents = allDocs; // เก็บไว้ทั้งหมด — ใช้กับ Over/extra detection และโซน Bulk เหมือนเดิม
-      curJob = { id:j.id, location:locCode, zone:j.zone_type, createdName: j.created_name, rows: locRows, attempt: j.attempt||1 };
-    } else {
-      const zone = allRows[0]?.zone || "Normal";
-      // ถ้าเคยมี job ของ location นี้มาก่อนในรอบนี้ (Completed แล้ว) ถือว่าครั้งนี้คือ "นับซ้ำ" — เก็บ attempt/parent ไว้ audit ย้อนหลังได้
-      const latestPrior = priorJobs[0] || null;
-      const attempt = latestPrior ? (latestPrior.attempt||1) + 1 : 1;
-      const ref = await addDoc(collection(db,"count_jobs"), {
-        location_scan: locCode, zone_type: zone,
-        start_time: serverTimestamp(), count_status: "In Progress",
-        expected_target: locRows.length, matched_count: 0, short_count: 0, over_count: 0,
-        round_id: roundId,
-        created_by: currentUser.uid, created_name: name,
-        attempt, parent_job_id: latestPrior ? latestPrior.id : null
-      });
-      if (latestPrior?.needs_recount) {
-        updateDoc(doc(db,"count_jobs",latestPrior.id), { needs_recount: false }).catch(()=>{});
-      }
-      scanEvents = []; qtyByTag = {};
-      curJob = { id: ref.id, location: locCode, zone, createdName: name, rows: locRows, attempt };
+      throw new Error(`Location นี้กำลังถูกนับโดย ${inProgress.created_name||"คนอื่น"} อยู่ตอนนี้ — เข้าไม่ได้จนกว่าจะนับเสร็จหรือแอดมินปล่อย`);
     }
+    const latestPrior = priorJobs[0] || null;
+    if (latestPrior && latestPrior.count_status === "Completed") {
+      const hasDiff = (latestPrior.short_count||0) > 0 || (latestPrior.over_count||0) > 0;
+      if (!hasDiff) throw new Error("Location นี้นับเสร็จแล้ว (ตรง) ไม่ต้องนับซ้ำ");
+      if (!latestPrior.needs_recount) throw new Error("Location นี้มีของขาด/เกิน — รอแอดมินสั่งนับซ้ำก่อนถึงจะนับได้อีกครั้ง");
+    }
+    const zone = allRows[0]?.zone || "Normal";
+    const attempt = latestPrior ? (latestPrior.attempt||1) + 1 : 1;
+    const ref = await addDoc(collection(db,"count_jobs"), {
+      location_scan: locCode, zone_type: zone,
+      start_time: serverTimestamp(), count_status: "In Progress",
+      expected_target: locRows.length, matched_count: 0, short_count: 0, over_count: 0,
+      round_id: roundId,
+      created_by: currentUser.uid, created_name: name,
+      attempt, parent_job_id: latestPrior ? latestPrior.id : null
+    });
+    if (latestPrior?.needs_recount) {
+      updateDoc(doc(db,"count_jobs",latestPrior.id), { needs_recount: false }).catch(()=>{});
+    }
+    scanEvents = []; qtyByTag = {};
+    curJob = { id: ref.id, location: locCode, zone, createdName: name, rows: locRows, attempt };
     showScanScreen();
   }
 
