@@ -328,7 +328,7 @@
     if (!j) return;
     const s = await getDocs(query(collection(db,"count_details"),where("job_id","==",id),orderBy("timestamp")));
     scanEvents = s.docs.map(d=>({docId:d.id,...d.data()}));
-    curJob = {id, location:j.location_scan, zone:j.zone_type, startTime:j.start_time, endTime:j.end_time, createdName:j.created_name};
+    curJob = {id, location:j.location_scan, zone:j.zone_type, startTime:j.start_time, endTime:j.end_time, createdName:j.created_name, attempt:j.attempt||1};
     if (j.count_status==="Completed") { await showSummary(); return; }
     showScanScreen();
   };
@@ -392,21 +392,51 @@
   document.getElementById("btn-start-job").addEventListener("click", async () => {
     const loc  = locInput.value.trim().toUpperCase();
     if (!loc) { toast("⚠️ ระบุ Location ก่อน"); return; }
-    const rows = masterRowsAt(loc);
-    const zone = rows[0]?.zone || "Normal";
-    const nowClient = new Date();
-    const roundId = await getCurrentRoundId();
-    const ref  = await addDoc(collection(db,"count_jobs"), {
-      location_scan: loc, zone_type: zone,
-      start_time: serverTimestamp(), count_status: "In Progress",
-      expected_target: rows.length, matched_count: 0, short_count: 0, over_count: 0,
-      round_id: roundId,
-      created_by: currentUser.uid, created_name: profile.name
-    });
-    scanEvents=[];
-    curJob={id:ref.id, location:loc, zone, startTime:{toDate:()=>nowClient}, endTime:null, createdName:profile.name};
-    locInput.value=""; document.getElementById("loc-info").style.display="none";
-    showScanScreen();
+    const btn = document.getElementById("btn-start-job");
+    const origLabel = btn.textContent;
+    btn.disabled = true; btn.textContent = "⏳ กำลังตรวจสอบ...";
+    try {
+      const rows = masterRowsAt(loc);
+      const zone = rows[0]?.zone || "Normal";
+      const roundId = await getCurrentRoundId();
+
+      // ดึง job ทั้งหมดของ location นี้ในรอบปัจจุบัน (ทุกสถานะ) — เช็ค resume + คำนวณรอบนับที่กี่ (attempt) ในคราวเดียว
+      const priorSnap = await getDocs(query(
+        collection(db,"count_jobs"),
+        where("location_scan","==",loc), where("round_id","==",roundId)
+      ));
+      const priorJobs = priorSnap.docs.map(d=>({id:d.id,...d.data()}))
+        .sort((a,b)=> (b.start_time?.toMillis?.()||0) - (a.start_time?.toMillis?.()||0));
+      const inProgress = priorJobs.find(j=>j.count_status==="In Progress");
+      if (inProgress) {
+        toast(`↩️ พบงานนับ Location นี้ค้างอยู่ — กลับเข้าไปต่อให้แล้ว`, "ok");
+        await openJob(inProgress.id);
+      } else {
+        const nowClient = new Date();
+        const latestPrior = priorJobs[0] || null;
+        const attempt = latestPrior ? (latestPrior.attempt||1) + 1 : 1;
+        const ref  = await addDoc(collection(db,"count_jobs"), {
+          location_scan: loc, zone_type: zone,
+          start_time: serverTimestamp(), count_status: "In Progress",
+          expected_target: rows.length, matched_count: 0, short_count: 0, over_count: 0,
+          round_id: roundId,
+          created_by: currentUser.uid, created_name: profile.name,
+          attempt, parent_job_id: latestPrior ? latestPrior.id : null
+        });
+        if (latestPrior?.needs_recount) {
+          updateDoc(doc(db,"count_jobs",latestPrior.id), { needs_recount: false }).catch(()=>{});
+        }
+        if (attempt > 1) toast(`🔁 นี่คือการนับรอบที่ ${attempt} ของ Location นี้`, "ok");
+        scanEvents=[];
+        curJob={id:ref.id, location:loc, zone, startTime:{toDate:()=>nowClient}, endTime:null, createdName:profile.name, attempt};
+        showScanScreen();
+      }
+      locInput.value=""; document.getElementById("loc-info").style.display="none";
+    } catch (err) {
+      toast("❌ เริ่มนับไม่สำเร็จ: "+err.message, "err", 5000);
+    } finally {
+      btn.disabled = false; btn.textContent = origLabel;
+    }
   });
 
   // ══ SCAN / CHECKLIST SCREEN ═══════════════════════════════
@@ -414,7 +444,7 @@
     document.getElementById("screen-home").style.display    = "none";
     document.getElementById("screen-summary").style.display = "none";
     document.getElementById("screen-scan").style.display    = "block";
-    document.getElementById("scan-loc-title").textContent   = curJob.location;
+    document.getElementById("scan-loc-title").textContent   = curJob.location + (curJob.attempt>1 ? ` 🔁 รอบ ${curJob.attempt}` : "");
     document.getElementById("scan-job-id").textContent      = curJob.id.slice(-6).toUpperCase();
     const badge = document.getElementById("scan-zone-badge");
     badge.textContent = ZL[curJob.zone]||curJob.zone;
