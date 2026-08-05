@@ -157,6 +157,15 @@
         <div id="tag-table" style="max-height:480px;overflow-y:auto;"></div>
       </div>
 
+      <!-- ═══ Job ที่กำลังนับอยู่นาน — อาจค้างจากการรีเฟรช/หลุดเน็ตกลางคัน ═══ -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div class="sec-head">
+          <span class="sec-title">🕒 กำลังนับอยู่ — อาจค้าง (รีเฟรช/หลุดเน็ตกลางคัน)</span>
+          <span style="font-size:0.75rem;color:var(--gray);">ไม่ต้องรอพนักงานแจ้ง "กดผิด Location" ก่อน — ปล่อย Location ได้จากตรงนี้เลย</span>
+        </div>
+        <div id="tag-stuck-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการ</div></div>
+      </div>
+
       <!-- ═══ กดผิด Location — พนักงานแจ้งมา ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="sec-head"><span class="sec-title">❌ พนักงานแจ้งว่ากดผิด Location</span></div>
@@ -306,6 +315,13 @@
   let tagSearch = "", tagDiffOnly = false;
   const TAG_Z = {"Normal":"badge-blue","Zone B":"badge-purple","Overflow":"badge-orange"};
 
+  // รวมหลาย snapshot event ที่ยิงถี่ๆ (เช่นระหว่าง import Master เป็น batch) ให้ render แค่ครั้งเดียว
+  // กัน browser ค้างจากการ build ตารางหลักพันแถวซ้ำๆ
+  function debounce(fn, ms) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  }
+
   // ══ ROUND SYSTEM ══════════════════════════════════════════
   // แก้ปัญหา "ล้าง Master แล้ว job เก่ายังค้าง" แบบไม่ทำลายประวัติ:
   // แท็ก round_id ให้ทุก Job/Master row ตอนสร้าง แล้ว Dashboard กรองโชว์
@@ -387,17 +403,20 @@
 
   loadTagMonitor(); // เรียกทันที ไม่ต้องรอคลิกแท็บแล้ว เพราะเป็นเนื้อหาเดียวของหน้านี้
 
+  const renderTagMonitorDebounced    = debounce(() => renderTagMonitor(), 300);
+  const renderTagMasterTableDebounced = debounce(() => renderTagMasterTable(), 300);
+
   function loadTagMonitor() {
     if (tagLoaded) return;
     tagLoaded = true;
     onSnapshot(query(collection(db,"master_stock"), orderBy("location")), snap => {
       tagMasterStock = snap.docs.map(d=>({id:d.id,...d.data()}));
-      renderTagMonitor();
-      renderTagMasterTable();
+      renderTagMonitorDebounced();
+      renderTagMasterTableDebounced();
     });
     onSnapshot(query(collection(db,"count_jobs"), orderBy("start_time","desc")), snap => {
       tagJobs = snap.docs.map(d=>({id:d.id,...d.data()}));
-      renderTagMonitor();
+      renderTagMonitorDebounced();
     });
     loadStaffList();
   }
@@ -420,18 +439,24 @@
 
   // ── Master Stock (Tag/Zone) management — ย้ายมาจาก stocktake.html ──
   let tagMasterSearch = "";
+  const TAG_MASTER_RENDER_CAP = 200; // กันตาราง 5,000+ แถวทำ browser ค้างตอน render — พิมพ์ค้นหาเพื่อกรองให้แคบลง
   function renderTagMasterTable() {
     const tbody = document.getElementById("tag-master-tbody");
     if (!tbody) return;
     document.getElementById("tag-master-count-badge").textContent = `${tagMasterStock.length} รายการ`;
     const q = tagMasterSearch.toLowerCase();
-    const data = tagMasterStock.filter(m =>
+    const filtered = tagMasterStock.filter(m =>
       (m.location||"").toLowerCase().includes(q) ||
       (m.tag_barcode||"").toLowerCase().includes(q) ||
       (m.sku||"").toLowerCase().includes(q) ||
       (m.item_name||"").toLowerCase().includes(q)
     );
-    tbody.innerHTML = data.length ? data.map(m => m.is_placeholder ? `<tr style="background:#f8fafc;">
+    const truncated = filtered.length > TAG_MASTER_RENDER_CAP;
+    const data = truncated ? filtered.slice(0, TAG_MASTER_RENDER_CAP) : filtered;
+    const hint = truncated
+      ? `<tr><td colspan="7" style="text-align:center;padding:0.75rem;color:var(--gray);background:#fffbeb;">แสดง ${TAG_MASTER_RENDER_CAP} จาก ${filtered.length} รายการ — พิมพ์ค้นหาให้แคบลงเพื่อดูรายการอื่น</td></tr>`
+      : "";
+    tbody.innerHTML = (data.length ? data.map(m => m.is_placeholder ? `<tr style="background:#f8fafc;">
         <td style="font-weight:700;">${m.location}</td>
         <td><span class="badge ${TAG_Z[m.zone]||"badge-gray"}">${m.zone||"Normal"}</span></td>
         <td colspan="3" style="color:var(--gray);font-style:italic;">📭 ไม่มีของ (location ว่าง)</td>
@@ -445,7 +470,7 @@
         <td>${m.item_name||"—"}</td>
         <td>${m.qty_system ?? "—"}</td>
         <td><button onclick="delTagMaster('${m.id}')" class="btn btn-red btn-sm">🗑️</button></td>
-      </tr>`).join("") : `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray);">ยังไม่มี Master</td></tr>`;
+      </tr>`).join("") + hint : `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray);">ยังไม่มี Master</td></tr>`);
   }
   document.getElementById("tag-master-search")?.addEventListener("input", e => { tagMasterSearch=e.target.value; renderTagMasterTable(); });
   window.delTagMaster = async id => {
@@ -774,6 +799,8 @@
           <span style="${r.status==='diff'?'color:var(--red);font-weight:700;':r.status==='ok'?'color:var(--green);font-weight:700;':r.status==='inprogress'?'color:var(--indigo);font-weight:700;':'color:var(--gray);'}">
             ${r.status==="idle"?"⬜":r.status==="inprogress"?"🔵":r.status==="ok"?"✅":"⚠️"} ${r.label}
           </span>
+          ${r.job?.attempt>1?`<span class="badge badge-indigo" style="font-size:0.68rem;">รอบ ${r.job.attempt}</span>`:""}
+          ${r.job?.needs_recount?`<span class="badge badge-amber" style="font-size:0.68rem;">🔁 รอนับซ้ำ</span>`:""}
           ${r.who?`<span style="color:var(--gray);font-size:0.78rem;">— ${r.who}</span>`:""}
         </div>
       `).join("") || `<div style="padding:1.5rem;text-align:center;color:var(--gray);">ไม่พบข้อมูล</div>`;
@@ -832,7 +859,7 @@
           : `<span style="color:var(--red);font-weight:700;">⚠️ มี diff</span>`;
         const dur = (isDone && j.start_time?.toDate && j.end_time?.toDate) ? fmtDuration(j.end_time.toDate()-j.start_time.toDate()) : "—";
         return `<tr>
-          <td style="font-weight:700;font-family:monospace;">${j.location_scan}</td>
+          <td style="font-weight:700;font-family:monospace;">${j.location_scan}${j.attempt>1?` <span class="badge badge-indigo" style="font-size:0.65rem;">รอบ ${j.attempt}</span>`:""}</td>
           <td><span class="badge ${TAG_Z[j.zone_type]||"badge-gray"}">${j.zone_type}</span></td>
           <td>${j.created_name||"—"}</td>
           <td style="font-size:0.8rem;">${fmtDT(j.start_time)}</td>
@@ -849,6 +876,11 @@
     // ── Reconciliation: Short/Over ในรอบปัจจุบันที่ยังไม่ได้ตรวจ ─
     const reconJobs = curJobs.filter(j => j.count_status==="Completed" && ((j.short_count||0)>0 || (j.over_count||0)>0));
     renderReconciliation(reconJobs);
+
+    // ── Job ที่ยัง In Progress นาน — เรียงอันที่เริ่มมานานสุดไว้บนสุด ให้เห็นตัวที่น่าจะค้างก่อน ──
+    const stuckJobs = curJobs.filter(j => j.count_status==="In Progress")
+      .sort((a,b) => (a.start_time?.toMillis?.()||0) - (b.start_time?.toMillis?.()||0));
+    renderStuckJobs(stuckJobs);
 
     // ── กดผิด Location: jobs ที่ถูก flag ไว้ (รอบปัจจุบัน) ──
     const wrongLocJobs = curJobs.filter(j => j.wrong_location_flag);
@@ -920,7 +952,7 @@
     if (!list.length) { el.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการต้องตรวจ 🎉</div>`; return; }
     el.innerHTML = list.map(j => `
       <div style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.85rem;border-bottom:1px solid var(--border);font-size:0.85rem;flex-wrap:wrap;${j.reviewed?'opacity:0.55;':''}">
-        <span style="font-weight:700;font-family:monospace;min-width:90px;">${j.location_scan}</span>
+        <span style="font-weight:700;font-family:monospace;min-width:90px;">${j.location_scan}${j.attempt>1?` <span class="badge badge-indigo" style="font-size:0.68rem;">รอบ ${j.attempt}</span>`:""}</span>
         <span>${j.created_name||"—"}</span>
         ${j.short_count>0?`<span style="color:var(--amber);font-weight:700;">ขาด ${j.short_count}</span>`:""}
         ${j.over_count>0?`<span style="color:var(--red);font-weight:700;">เกิน ${j.over_count}</span>`:""}
@@ -931,9 +963,16 @@
         ${j.reviewed
           ? `<span style="color:var(--green);font-weight:700;font-size:0.78rem;">✅ ตรวจแล้ว: ${j.reason||"—"}</span>`
           : `<button class="btn btn-sm" style="background:var(--indigo);color:white;border:none;" onclick="saveRecon('${j.id}')">✔️ บันทึก</button>`}
+        ${j.needs_recount
+          ? `<span style="color:var(--indigo);font-weight:700;font-size:0.78rem;">🔁 รอนับซ้ำ</span>`
+          : `<button class="btn btn-outline btn-sm" onclick="orderRecount('${j.id}')">🔁 สั่งนับซ้ำ</button>`}
       </div>
     `).join("");
   }
+  window.orderRecount = async (jobId) => {
+    await updateDoc(doc(db,"count_jobs",jobId), { needs_recount: true });
+    toast("🔁 สั่งนับซ้ำแล้ว — location นี้จะขึ้นให้พนักงานนับต่อได้ทันทีที่เข้าไปเลือก location เดิมอีกครั้ง");
+  };
   window.saveRecon = async (jobId) => {
     const sel = document.getElementById(`recon-reason-${jobId}`);
     const reason = sel?.value || "";
@@ -942,6 +981,44 @@
     toast("✅ บันทึกการตรวจแล้ว");
   };
   document.getElementById("tag-recon-hide-reviewed")?.addEventListener("change", () => renderReconciliation(window._tagReconJobs||[]));
+
+  // ── Job ที่กำลังนับอยู่นาน: ให้แอดมินปล่อย/รีเซ็ต location ได้เองโดยไม่ต้องรอพนักงานแจ้ง "กดผิด Location" ──
+  // (แก้ปัญหา: พนักงานเข้า location แล้วรีเฟรชหน้าจอ/หลุดเน็ตกลางคัน ทำให้ job ค้างเป็น In Progress
+  //  แล้วไม่มีใครกลับมาเคลียร์ ทำให้คนอื่นเข้า location นั้นไม่ได้อีก)
+  const STUCK_WARN_MS = 45 * 60 * 1000; // 45 นาที — เกินนี้ถือว่าน่าสงสัยว่าอาจค้าง
+  function renderStuckJobs(jobs) {
+    const el = document.getElementById("tag-stuck-list");
+    if (!el) return;
+    window._tagStuckJobs = jobs;
+    if (!jobs.length) { el.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการ</div>`; return; }
+    const now = Date.now();
+    el.innerHTML = jobs.map(j => {
+      const startMs = j.start_time?.toMillis?.() || now;
+      const elapsedMs = now - startMs;
+      const isStale = elapsedMs > STUCK_WARN_MS;
+      return `
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.85rem;border-bottom:1px solid var(--border);font-size:0.85rem;flex-wrap:wrap;${isStale?'background:#fef2f2;':''}">
+        <span style="font-weight:700;font-family:monospace;min-width:90px;">${j.location_scan}</span>
+        <span>${j.created_name||"—"}</span>
+        <span style="${isStale?'color:var(--red);font-weight:700;':'color:var(--gray);'}font-size:0.78rem;">เริ่มมาแล้ว ${fmtDuration(elapsedMs)}${isStale?" ⚠️":""}</span>
+        <span style="margin-left:auto;font-weight:700;">${j.matched_count??0}/${j.expected_target??"?"}</span>
+        <button class="btn btn-sm" style="background:var(--red);color:white;border:none;" onclick="releaseStuckJob('${j.id}')">🔓 ปล่อย & รีเซ็ต Location</button>
+      </div>`;
+    }).join("");
+  }
+  window.releaseStuckJob = async (jobId) => {
+    if (!confirm("ยืนยันปล่อย Location นี้? Job ที่ค้างอยู่จะถูกลบทิ้ง (รวมข้อมูลที่นับไปแล้วในนี้) แล้ว Location จะกลับไปเป็น \"ยังไม่เริ่ม\" ให้เริ่มนับใหม่ได้ทันที")) return;
+    try {
+      const dd = await getDocs(query(collection(db,"count_details"), where("job_id","==",jobId)));
+      const batch = writeBatch(db);
+      dd.docs.forEach(d => batch.delete(d.ref));
+      batch.delete(doc(db,"count_jobs",jobId));
+      await batch.commit();
+      toast("✅ ปล่อยและรีเซ็ต Location แล้ว");
+    } catch (err) {
+      toast("❌ ปล่อยไม่สำเร็จ: "+err.message, 5000);
+    }
+  };
 
   // ── กดผิด Location: แสดงรายการ + ปุ่มลบ&รีเซ็ต หรือไม่ต้องรีเซ็ต ──
   function renderWrongLocation(jobs) {
@@ -1005,12 +1082,12 @@
 
     // Sheet 4: ประวัติ/Transactions (รอบที่เลือกใน dropdown)
     const logRows = window._tagLogRows || [];
-    const logSheet = [["Location","Zone","ผู้นับ","เริ่มนับ","จบนับ","สถานะ","ตรง","ทั้งหมด","ขาด(Short)","เกิน(Over)"]];
+    const logSheet = [["Location","รอบนับ","Zone","ผู้นับ","เริ่มนับ","จบนับ","สถานะ","ตรง","ทั้งหมด","ขาด(Short)","เกิน(Over)"]];
     logRows.forEach(j => {
       const isDone = j.count_status==="Completed";
       const sc=j.short_count||0, oc=j.over_count||0;
       const st = !isDone ? "กำลังนับ" : (sc===0&&oc===0) ? "ตรง" : "มี diff";
-      logSheet.push([j.location_scan, j.zone_type, j.created_name||"", fmtDT(j.start_time), isDone?fmtDT(j.end_time):"", st, j.matched_count??"", j.expected_target??"", sc, oc]);
+      logSheet.push([j.location_scan, j.attempt||1, j.zone_type, j.created_name||"", fmtDT(j.start_time), isDone?fmtDT(j.end_time):"", st, j.matched_count??"", j.expected_target??"", sc, oc]);
     });
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(logSheet), "ประวัติ_Transactions");
 
