@@ -498,7 +498,7 @@
     try {
       await beginCounting(name, selLoc);
     } catch (err) {
-      toast("❌ เริ่มนับไม่สำเร็จ (เช็คสัญญาณเน็ต): "+err.message, "err", 5000);
+      toast("❌ เริ่มนับไม่สำเร็จ: "+err.message, "err", 6000);
     } finally {
       btn.disabled = false; btn.textContent = orig;
     }
@@ -518,30 +518,42 @@
     // ตัดแถว placeholder (location ว่าง ไม่มีของ) ออก ไม่ให้ขึ้นเป็นรายการต้องสแกน
     const locRows = allRows.filter(r => !r.is_placeholder);
     const roundId = await getCurrentRoundId();
-    const existing = await getDocs(query(
-      collection(db,"count_jobs"), where("location_scan","==",locCode), where("count_status","==","In Progress"),
-      where("round_id","==",roundId)
+    // ดึง job ทั้งหมดของ location นี้ในรอบปัจจุบัน (ทุกสถานะ) — ใช้ทั้งเช็ค resume และคำนวณรอบนับที่กี่ (attempt)
+    const priorSnap = await getDocs(query(
+      collection(db,"count_jobs"), where("location_scan","==",locCode), where("round_id","==",roundId)
     ));
-    if (!existing.empty) {
-      const j = existing.docs[0];
-      const jd = j.data();
-      const dd = await getDocs(query(collection(db,"count_details"), where("job_id","==",j.id), orderBy("timestamp")));
-      const allDocs = dd.docs.map(d=>({docId:d.id,...d.data()}));
+    const priorJobs = priorSnap.docs.map(d=>({id:d.id,...d.data()}))
+      .sort((a,b)=> (b.start_time?.toMillis?.()||0) - (a.start_time?.toMillis?.()||0)); // ใหม่สุดก่อน
+    const inProgress = priorJobs.find(j=>j.count_status==="In Progress");
+    if (inProgress) {
+      const j = inProgress;
+      // ไม่ใช้ orderBy ร่วมกับ where ต่างฟิลด์ตรงนี้ — ต้องพึ่ง composite index ซึ่งถ้ายังไม่ได้สร้างไว้จะทำให้
+      // query ล้มเหลว (กลายเป็น "เข้า location นี้ไม่ได้อีกเลย" เพราะ resume ล้มเหลวทุกครั้ง) เรียงลำดับฝั่ง client แทน
+      const dd = await getDocs(query(collection(db,"count_details"), where("job_id","==",j.id)));
+      const allDocs = dd.docs.map(d=>({docId:d.id,...d.data()}))
+        .sort((a,b)=> (a.timestamp?.toMillis?.()||0) - (b.timestamp?.toMillis?.()||0));
       qtyByTag = {};
       allDocs.forEach(d => { if (d.qty !== undefined) qtyByTag[d.scanned_tag] = d.qty; });
       scanEvents = allDocs; // เก็บไว้ทั้งหมด — ใช้กับ Over/extra detection และโซน Bulk เหมือนเดิม
-      curJob = { id:j.id, location:locCode, zone:jd.zone_type, createdName: jd.created_name, rows: locRows };
+      curJob = { id:j.id, location:locCode, zone:j.zone_type, createdName: j.created_name, rows: locRows, attempt: j.attempt||1 };
     } else {
       const zone = allRows[0]?.zone || "Normal";
+      // ถ้าเคยมี job ของ location นี้มาก่อนในรอบนี้ (Completed แล้ว) ถือว่าครั้งนี้คือ "นับซ้ำ" — เก็บ attempt/parent ไว้ audit ย้อนหลังได้
+      const latestPrior = priorJobs[0] || null;
+      const attempt = latestPrior ? (latestPrior.attempt||1) + 1 : 1;
       const ref = await addDoc(collection(db,"count_jobs"), {
         location_scan: locCode, zone_type: zone,
         start_time: serverTimestamp(), count_status: "In Progress",
         expected_target: locRows.length, matched_count: 0, short_count: 0, over_count: 0,
         round_id: roundId,
-        created_by: currentUser.uid, created_name: name
+        created_by: currentUser.uid, created_name: name,
+        attempt, parent_job_id: latestPrior ? latestPrior.id : null
       });
+      if (latestPrior?.needs_recount) {
+        updateDoc(doc(db,"count_jobs",latestPrior.id), { needs_recount: false }).catch(()=>{});
+      }
       scanEvents = []; qtyByTag = {};
-      curJob = { id: ref.id, location: locCode, zone, createdName: name, rows: locRows };
+      curJob = { id: ref.id, location: locCode, zone, createdName: name, rows: locRows, attempt };
     }
     showScanScreen();
   }
@@ -601,7 +613,7 @@
     document.getElementById("screen-start").style.display = "none";
     document.getElementById("screen-scan").style.display  = "block";
     document.getElementById("scan-loc-title").textContent = curJob.location;
-    document.getElementById("scan-who").textContent = `👤 ${curJob.createdName}`;
+    document.getElementById("scan-who").textContent = (curJob.attempt>1 ? `🔁 นับรอบ ${curJob.attempt} — ` : "") + `👤 ${curJob.createdName}`;
     const badge = document.getElementById("scan-zone-badge");
     badge.textContent = ZL[curJob.zone]||curJob.zone;
     badge.className   = `badge ${Z[curJob.zone]||"badge-gray"}`;
