@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Executive Dashboard - RAPO</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#021D49">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    body {
+      background:
+        radial-gradient(1000px 520px at 8% -10%, rgba(99,102,241,0.10), transparent),
+        radial-gradient(900px 460px at 100% 0%, rgba(2,29,73,0.07), transparent),
+        var(--light);
+    }
+    @keyframes fadeInUp { from{opacity:0; transform:translateY(16px);} to{opacity:1; transform:translateY(0);} }
+    @keyframes pulseDot { 0%,100%{opacity:1; transform:scale(1);} 50%{opacity:.45; transform:scale(.8);} }
+    @keyframes floaty   { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-4px);} }
+
+    .exec-body { max-width:1180px; }
+    .card, .group-card { animation: fadeInUp 0.5s cubic-bezier(.2,.8,.2,1) both; }
+
+    /* ── Filter bar ─────────────────────────────────────────── */
+    .exec-filterbar {
+      display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;
+      background:white; border:1.5px solid var(--border); border-radius:14px;
+      padding:0.8rem 1.1rem; margin-bottom:0.9rem; box-shadow:var(--shadow);
+    }
+    .exec-filterbar .live-dot { width:9px; height:9px; border-radius:50%; background:var(--green); animation:pulseDot 1.6s ease-in-out infinite; flex-shrink:0; }
+    .exec-filterbar .live-label { font-size:0.78rem; color:var(--gray); font-weight:700; display:flex; align-items:center; gap:0.4rem; }
+    .exec-filterbar select {
+      padding:0.5rem 0.8rem; border-radius:9px; border:1.5px solid var(--border);
+      font-family:Sarabun,sans-serif; font-size:0.85rem; font-weight:700; background:#f8fafc; cursor:pointer;
+    }
+    .group-chip {
+      padding:0.4rem 0.85rem; border-radius:999px; font-size:0.8rem; font-weight:700; cursor:pointer;
+      border:1.5px solid var(--border); background:#f8fafc; color:var(--gray); transition:all .15s ease; user-select:none;
+    }
+    .group-chip.active { color:white; border-color:transparent; }
+    .group-chip:hover { transform:translateY(-1px); }
+    .exec-filterbar .spacer { flex:1; }
+    .btn-tv {
+      padding:0.5rem 1rem; border-radius:9px; border:1.5px solid var(--indigo); background:white; color:var(--indigo);
+      font-family:Sarabun,sans-serif; font-size:0.82rem; font-weight:700; cursor:pointer; transition:all .15s ease;
+    }
+    .btn-tv:hover { background:var(--indigo); color:white; transform:translateY(-1px); }
+
+    /* ── Hero row ──────────────────────────────────────────── */
+    .exec-hero {
+      display:grid; grid-template-columns:auto 1fr; gap:1.5rem; align-items:center;
+      background:linear-gradient(135deg,#021D49,#0b3a8f 55%,#3730a3); color:white;
+      border-radius:18px; padding:1.5rem 1.75rem; margin-bottom:0.9rem; box-shadow:0 12px 32px rgba(2,29,73,0.28);
+      position:relative; overflow:hidden;
+    }
+    .exec-hero::after {
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background:radial-gradient(260px 160px at 95% -20%, rgba(255,255,255,0.16), transparent);
+    }
+    .hero-ring-wrap { position:relative; width:150px; height:150px; flex-shrink:0; }
+    .hero-ring-wrap svg { transform:rotate(-90deg); }
+    .hero-ring-num { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+    .hero-ring-num .v { font-size:2.3rem; font-weight:900; line-height:1; }
+    .hero-ring-num .l { font-size:0.68rem; opacity:.8; margin-top:2px; }
+    .hero-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:1rem; }
+    .hero-stat .v { font-size:1.7rem; font-weight:900; line-height:1.1; }
+    .hero-stat .l { font-size:0.72rem; opacity:.8; margin-top:2px; font-weight:600; }
+
+    /* ── Group cards ───────────────────────────────────────── */
+    .group-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:0.9rem; margin-bottom:0.9rem; }
+    .group-card {
+      background:white; border-radius:16px; padding:1.2rem 1.3rem; box-shadow:var(--shadow);
+      border-top:6px solid var(--gc, var(--indigo)); position:relative; overflow:hidden;
+      transition:transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s ease;
+    }
+    .group-card:hover { transform:translateY(-4px); box-shadow:0 16px 32px rgba(2,29,73,0.14); }
+    .group-card .gname { font-weight:800; color:var(--blue); font-size:1.05rem; display:flex; align-items:center; gap:0.4rem; }
+    .group-card .gicon { animation:floaty 3s ease-in-out infinite; display:inline-block; }
+    .group-card .gpct { font-size:2.4rem; font-weight:900; color:var(--gc, var(--indigo)); line-height:1.1; margin-top:0.3rem; }
+    .group-card .gbar { height:9px; background:#e2e8f0; border-radius:8px; overflow:hidden; margin-top:0.6rem; }
+    .group-card .gbar-fill { height:100%; border-radius:8px; background:var(--gc, var(--indigo)); transition:width .6s cubic-bezier(.2,.8,.2,1); }
+    .group-card .gbreak { display:flex; gap:0.9rem; flex-wrap:wrap; margin-top:0.85rem; font-size:0.78rem; color:var(--gray); }
+    .group-card .gbreak b { color:#1e293b; }
+    .group-card .gdiff { margin-top:0.5rem; font-size:0.78rem; font-weight:700; }
+
+    /* ── Chart cards ───────────────────────────────────────── */
+    .chart-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:0.9rem; }
+    .chart-card { background:white; border-radius:16px; padding:1.1rem 1.3rem; box-shadow:var(--shadow); border:1.5px solid var(--border); }
+    .chart-card .ctitle { font-weight:800; color:var(--blue); font-size:0.95rem; margin-bottom:0.7rem; }
+    .chart-card .cwrap { position:relative; height:260px; }
+
+    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
+    #toast.show { transform:translateX(-50%) translateY(0); }
+
+    /* ── TV / walk-by mode: big, clean, no chrome ────────────── */
+    body.tv-mode #topbar-placeholder,
+    body.tv-mode .exec-filterbar .btn-tv,
+    body.tv-mode .exec-filterbar select,
+    body.tv-mode .exec-filterbar .live-label span.txt { display:none; }
+    body.tv-mode .exec-body { max-width:100%; padding:2rem 3rem; }
+    body.tv-mode .hero-ring-num .v { font-size:3rem; }
+    body.tv-mode .hero-stat .v { font-size:2.2rem; }
+    body.tv-mode .group-card .gpct { font-size:3.2rem; }
+    body.tv-mode .chart-card .cwrap { height:320px; }
+  </style>
+</head>
+<body>
+
+<div id="topbar-placeholder"></div>
+<div class="page-body exec-body">
+
+  <div class="exec-filterbar">
+    <span class="live-dot"></span>
+    <span class="live-label"><span class="txt">อัปเดตสด</span></span>
+    <select id="round-select"><option>รอบปัจจุบัน</option></select>
+    <div id="group-chips" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>
+    <div class="spacer"></div>
+    <button class="btn-tv" id="btn-tv-mode">🖥️ โหมดจอผนัง (TV)</button>
+  </div>
+
+  <div class="exec-hero">
+    <div class="hero-ring-wrap">
+      <svg width="150" height="150" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="43" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="10"/>
+        <circle cx="50" cy="50" r="43" fill="none" stroke="#4ade80" stroke-width="10"
+          id="hero-ring" stroke-dasharray="270" stroke-dashoffset="270"
+          stroke-linecap="round" style="transition:stroke-dashoffset 0.7s cubic-bezier(.2,.8,.2,1);"/>
+      </svg>
+      <div class="hero-ring-num">
+        <div class="v" id="hero-pct">0%</div>
+        <div class="l">ความคืบหน้ารวม</div>
+      </div>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat"><div class="v" id="hero-total">—</div><div class="l">Location ทั้งหมด</div></div>
+      <div class="hero-stat"><div class="v" id="hero-done">—</div><div class="l">นับเสร็จ (ตรง)</div></div>
+      <div class="hero-stat"><div class="v" id="hero-acc">—</div><div class="l">ความแม่นยำ</div></div>
+      <div class="hero-stat"><div class="v" id="hero-short">—</div><div class="l">ยอดขาดรวม</div></div>
+      <div class="hero-stat"><div class="v" id="hero-over">—</div><div class="l">ยอดเกินรวม</div></div>
+    </div>
+  </div>
+
+  <div class="group-grid" id="group-grid"></div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="ctitle">📊 ความคืบหน้าตามกลุ่มโซน</div>
+      <div class="cwrap"><canvas id="chart-progress"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="ctitle">⚖️ ยอดขาด/เกิน ตามกลุ่มโซน</div>
+      <div class="cwrap"><canvas id="chart-diff"></canvas></div>
+    </div>
+  </div>
+
+</div>
+<div id="toast">—</div>
+
+<script type="module">
+  import { db } from "./firebase-config.js";
+  import { requireAdmin } from "./auth.js";
+  import {
+    collection, doc, query, orderBy, onSnapshot
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const { user, profile } = await requireAdmin();
+
+  document.getElementById("topbar-placeholder").innerHTML = `
+    <nav class="topbar">
+      <a class="topbar-back" href="monitor.html">←</a>
+      <div style="flex:1">
+        <div class="topbar-title">🖥️ Executive Dashboard</div>
+        <div class="topbar-sub">ภาพรวม Stock Take — สำหรับผู้บริหาร</div>
+      </div>
+      <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
+    </nav>`;
+
+  function toast(msg, d=2500) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), d);
+  }
+
+  // ── กลุ่มโซน: A+SA / C / B+Over (ตามที่ผู้บริหารต้องการดูสรุป) ──
+  const GROUPS = ["A+SA", "C", "B+Over"];
+  const GROUP_META = {
+    "A+SA":  { color:"#6366f1", icon:"🅰️", label:"A + SA" },
+    "C":     { color:"#0d9488", icon:"🅲",  label:"C" },
+    "B+Over":{ color:"#7c3aed", icon:"🅱️", label:"B + Overflow" },
+    "อื่นๆ": { color:"#94a3b8", icon:"⬜", label:"อื่นๆ" }
+  };
+  function groupOf(loc) {
+    const area = (String(loc).split("-")[0] || "").toUpperCase();
+    if (area.startsWith("SA")) return "A+SA";
+    if (area.startsWith("A"))  return "A+SA";
+    if (area.startsWith("C"))  return "C";
+    if (area.startsWith("B"))  return "B+Over";
+    if (area.startsWith("OVERFL")) return "B+Over";
+    return "อื่นๆ";
+  }
+
+  let visibleGroups = new Set(GROUPS); // เริ่มต้นโชว์ทั้ง 3 กลุ่มหลัก (ไม่รวม "อื่นๆ" ในกราฟ เว้นแต่มีข้อมูลจริง)
+
+  // ── Round system (เหมือน monitor.html) ──────────────────────
+  let currentRound = null, allRounds = [], selectedRoundId = null;
+  onSnapshot(doc(db,"app_settings","stocktake_round"), snap => {
+    currentRound = snap.exists() ? snap.data() : null;
+    if (!selectedRoundId) selectedRoundId = currentRound?.round_id || null;
+    render();
+  });
+  onSnapshot(query(collection(db,"stocktake_rounds"), orderBy("started_at","desc")), snap => {
+    allRounds = snap.docs.map(d=>d.data());
+    renderRoundSelect();
+  });
+  function renderRoundSelect() {
+    const sel = document.getElementById("round-select");
+    const keep = sel.value;
+    sel.innerHTML = allRounds.map(r =>
+      `<option value="${r.round_id}">${currentRound?.round_id===r.round_id?"🔵 ":""}${r.round_label||r.round_id}</option>`
+    ).join("") + `<option value="__legacy__">— ก่อนเริ่มระบบรอบ (Legacy) —</option>`;
+    if ([...sel.options].some(o=>o.value===keep)) sel.value = keep;
+    else if (currentRound) sel.value = currentRound.round_id;
+    selectedRoundId = sel.value;
+    render();
+  }
+  document.getElementById("round-select").addEventListener("change", e => {
+    selectedRoundId = e.target.value; render();
+  });
+
+  // ── กลุ่มโซน chips ────────────────────────────────────────
+  const chipsEl = document.getElementById("group-chips");
+  chipsEl.innerHTML = GROUPS.map(g => `<span class="group-chip active" data-g="${g}" style="--gc:${GROUP_META[g].color}">${GROUP_META[g].icon} ${GROUP_META[g].label}</span>`).join("");
+  chipsEl.querySelectorAll(".group-chip").forEach(chip => {
+    chip.style.background = chip.dataset.g ? GROUP_META[chip.dataset.g].color : "";
+    chip.addEventListener("click", () => {
+      const g = chip.dataset.g;
+      if (visibleGroups.has(g)) { visibleGroups.delete(g); chip.classList.remove("active"); chip.style.background="#f8fafc"; chip.style.color="var(--gray)"; }
+      else { visibleGroups.add(g); chip.classList.add("active"); chip.style.background=GROUP_META[g].color; chip.style.color="white"; }
+      render();
+    });
+  });
+
+  // ── TV mode ───────────────────────────────────────────────
+  document.getElementById("btn-tv-mode").addEventListener("click", () => {
+    document.body.classList.add("tv-mode");
+    toast("🖥️ โหมดจอผนัง — เลื่อนเมาส์ไปมุมบนซ้ายแล้วกด Back เพื่อออก", 4000);
+  });
+  if (new URLSearchParams(location.search).get("tv") === "1") document.body.classList.add("tv-mode");
+
+  // ── Data ──────────────────────────────────────────────────
+  let tagMasterStock = [], tagJobs = [];
+  onSnapshot(query(collection(db,"master_stock"), orderBy("location")), snap => {
+    tagMasterStock = snap.docs.map(d=>({id:d.id,...d.data()}));
+    render();
+  });
+  onSnapshot(query(collection(db,"count_jobs"), orderBy("start_time","desc")), snap => {
+    tagJobs = snap.docs.map(d=>({id:d.id,...d.data()}));
+    render();
+  });
+
+  function jobsInRound(roundId) {
+    if (roundId === "__legacy__") return tagJobs.filter(j=>!j.round_id);
+    if (!roundId) return currentRound ? tagJobs.filter(j=>j.round_id===currentRound.round_id) : tagJobs.filter(j=>!j.round_id);
+    return tagJobs.filter(j=>j.round_id===roundId);
+  }
+
+  function animateNumber(el, target) {
+    if (!el) return;
+    target = Number(target) || 0;
+    const from = Number(el.dataset.val || 0);
+    if (from === target) { el.textContent = target; return; }
+    el.dataset.val = target;
+    const dur = 450, start = performance.now();
+    function step(now) {
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(from + (target - from) * eased);
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = target;
+    }
+    requestAnimationFrame(step);
+  }
+
+  let chartProgress = null, chartDiff = null;
+  let firstGroupRender = true;
+
+  function render() {
+    if (!tagMasterStock.length && !tagJobs.length) return;
+    const jobs = jobsInRound(selectedRoundId);
+    const latestByLoc = {};
+    jobs.forEach(j => { if (!latestByLoc[j.location_scan]) latestByLoc[j.location_scan] = j; });
+
+    const distinctLocs = [...new Set(tagMasterStock.map(m=>m.location))];
+    const stats = {};
+    Object.keys(GROUP_META).forEach(g => stats[g] = { group:g, total:0, notStarted:0, inProg:0, done:0, diff:0, shortQty:0, overQty:0 });
+
+    let hTotal=0, hDone=0, hShort=0, hOver=0, hCounted=0;
+    distinctLocs.forEach(loc => {
+      const g = groupOf(loc);
+      const s = stats[g];
+      s.total++; hTotal++;
+      const j = latestByLoc[loc];
+      if (!j) { s.notStarted++; return; }
+      if (j.count_status === "In Progress") { s.inProg++; return; }
+      const sc = j.short_count||0, oc = j.over_count||0;
+      s.shortQty += sc; s.overQty += oc;
+      hShort += sc; hOver += oc; hCounted++;
+      if (sc===0 && oc===0) { s.done++; hDone++; } else { s.diff++; }
+    });
+
+    // ── Hero ──
+    const heroPct = hTotal ? Math.round(((hDone + (hCounted-hDone)) / hTotal) * 100) : 0;
+    const acc = hCounted ? Math.round((hDone/hCounted)*100) : 0;
+    const CIRC = 2 * Math.PI * 43;
+    document.getElementById("hero-ring").style.strokeDashoffset = CIRC - (heroPct/100)*CIRC;
+    document.getElementById("hero-pct").textContent = `${heroPct}%`;
+    animateNumber(document.getElementById("hero-total"), hTotal);
+    animateNumber(document.getElementById("hero-done"), hDone);
+    document.getElementById("hero-acc").textContent = hCounted ? `${acc}%` : "—";
+    animateNumber(document.getElementById("hero-short"), hShort);
+    animateNumber(document.getElementById("hero-over"), hOver);
+
+    // ── Group cards ──
+    const gridEl = document.getElementById("group-grid");
+    const activeGroups = GROUPS.filter(g => visibleGroups.has(g));
+    if (firstGroupRender || gridEl.children.length !== activeGroups.length) {
+      gridEl.innerHTML = activeGroups.map(g => `
+        <div class="group-card" style="--gc:${GROUP_META[g].color}">
+          <div class="gname"><span class="gicon">${GROUP_META[g].icon}</span> โซน ${GROUP_META[g].label}</div>
+          <div class="gpct" id="gpct-${g}">0%</div>
+          <div class="gbar"><div class="gbar-fill" id="gbar-${g}" style="width:0%"></div></div>
+          <div class="gbreak">
+            <span>ทั้งหมด <b id="gtotal-${g}">0</b></span>
+            <span>ยังไม่เริ่ม <b id="gidle-${g}">0</b></span>
+            <span>กำลังนับ <b id="ginprog-${g}">0</b></span>
+            <span>เสร็จตรง <b id="gdone-${g}">0</b></span>
+          </div>
+          <div class="gdiff" id="gdiff-${g}"></div>
+        </div>
+      `).join("");
+      firstGroupRender = false;
+    }
+    activeGroups.forEach(g => {
+      const s = stats[g];
+      const pct = s.total ? Math.round(((s.done+s.diff)/s.total)*100) : 0;
+      const pctEl = document.getElementById(`gpct-${g}`);
+      const barEl = document.getElementById(`gbar-${g}`);
+      if (pctEl) pctEl.textContent = `${pct}%`;
+      if (barEl) barEl.style.width = `${pct}%`;
+      animateNumber(document.getElementById(`gtotal-${g}`), s.total);
+      animateNumber(document.getElementById(`gidle-${g}`), s.notStarted);
+      animateNumber(document.getElementById(`ginprog-${g}`), s.inProg);
+      animateNumber(document.getElementById(`gdone-${g}`), s.done);
+      const diffEl = document.getElementById(`gdiff-${g}`);
+      if (diffEl) {
+        diffEl.innerHTML = (s.shortQty>0 || s.overQty>0)
+          ? `${s.shortQty>0?`<span style="color:var(--amber);">⚠️ ขาด ${s.shortQty}</span> `:""}${s.overQty>0?`<span style="color:var(--red);">🔺 เกิน ${s.overQty}</span>`:""}`
+          : `<span style="color:var(--green);">✅ ไม่มีปัญหา</span>`;
+      }
+    });
+
+    // ── Charts ──
+    const labels = activeGroups.map(g => GROUP_META[g].label);
+    const colors = activeGroups.map(g => GROUP_META[g].color);
+    const notStartedArr = activeGroups.map(g => stats[g].notStarted);
+    const inProgArr     = activeGroups.map(g => stats[g].inProg);
+    const doneArr       = activeGroups.map(g => stats[g].done);
+    const diffArr       = activeGroups.map(g => stats[g].diff);
+    const shortArr      = activeGroups.map(g => stats[g].shortQty);
+    const overArr       = activeGroups.map(g => stats[g].overQty);
+
+    const progCanvas = document.getElementById("chart-progress");
+    if (progCanvas) {
+      if (chartProgress) chartProgress.destroy();
+      chartProgress = new Chart(progCanvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label:'ยังไม่เริ่ม',   data:notStartedArr, backgroundColor:'#cbd5e1' },
+            { label:'กำลังนับ',     data:inProgArr,     backgroundColor:'#818cf8' },
+            { label:'เสร็จ-ตรง',    data:doneArr,       backgroundColor:'#16a34a' },
+            { label:'เสร็จ-มี diff', data:diffArr,       backgroundColor:'#E1261C' },
+          ]
+        },
+        options: {
+          indexAxis:'y', responsive:true, maintainAspectRatio:false,
+          scales: { x:{ stacked:true, ticks:{precision:0} }, y:{ stacked:true } },
+          plugins: { legend:{ position:'bottom', labels:{ boxWidth:12, font:{size:11} } } }
+        }
+      });
+    }
+
+    const diffCanvas = document.getElementById("chart-diff");
+    if (diffCanvas) {
+      if (chartDiff) chartDiff.destroy();
+      chartDiff = new Chart(diffCanvas, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label:'ขาด (Short)', data:shortArr, backgroundColor:'#d97706', borderRadius:6 },
+            { label:'เกิน (Over)', data:overArr,  backgroundColor:'#E1261C', borderRadius:6 },
+          ]
+        },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          scales: { y:{ beginAtZero:true, ticks:{precision:0} } },
+          plugins: { legend:{ position:'bottom', labels:{ boxWidth:12, font:{size:11} } } }
+        }
+      });
+    }
+  }
+</script>
+</body>
+</html>
