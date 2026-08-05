@@ -11,28 +11,86 @@
   <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <style>
-    .job-card { border:1.5px solid var(--border); border-radius:12px; padding:1rem; background:white; transition:all 0.2s; }
+    /* ── Playful, friendlier backdrop — scoped to this page only ─────── */
+    body {
+      background:
+        radial-gradient(900px 480px at 8% -8%, rgba(99,102,241,0.10), transparent),
+        radial-gradient(800px 420px at 100% 0%, rgba(2,29,73,0.07), transparent),
+        var(--light);
+    }
+
+    @keyframes fadeInUp   { from{opacity:0; transform:translateY(16px);} to{opacity:1; transform:translateY(0);} }
+    @keyframes floaty     { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-4px);} }
+    @keyframes wiggle     { 0%,100%{transform:rotate(0deg);} 25%{transform:rotate(-12deg);} 75%{transform:rotate(12deg);} }
+    @keyframes spin       { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+    @keyframes pop        { 0%{transform:scale(1);} 40%{transform:scale(1.18);} 100%{transform:scale(1);} }
+    @keyframes shimmer    { 0%{background-position:-200px 0;} 100%{background-position:200px 0;} }
+    @keyframes confettiFall {
+      0%   { transform:translateY(-12px) rotate(0deg);   opacity:1; }
+      100% { transform:translateY(120px) rotate(360deg); opacity:0; }
+    }
+
+    .card, .kpi-card, .job-card { animation: fadeInUp 0.5s cubic-bezier(.2,.8,.2,1) both; }
+    .kpi-grid .kpi-card:nth-child(1){ animation-delay:.02s }
+    .kpi-grid .kpi-card:nth-child(2){ animation-delay:.06s }
+    .kpi-grid .kpi-card:nth-child(3){ animation-delay:.10s }
+    .kpi-grid .kpi-card:nth-child(4){ animation-delay:.14s }
+    .kpi-grid .kpi-card:nth-child(5){ animation-delay:.18s }
+    .kpi-grid .kpi-card:nth-child(6){ animation-delay:.22s }
+    .kpi-grid .kpi-card:nth-child(7){ animation-delay:.26s }
+    .kpi-grid .kpi-card:nth-child(8){ animation-delay:.30s }
+
+    .job-card { border:1.5px solid var(--border); border-radius:12px; padding:1rem; background:white; transition:transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+    .job-card:hover { transform:translateY(-2px); box-shadow:0 10px 24px rgba(2,29,73,0.10); }
     .job-card.counting  { border-color:var(--indigo); }
     .job-card.finished  { border-color:var(--green); opacity:0.8; }
-    .progress-bar { height:8px; background:#e2e8f0; border-radius:10px; overflow:hidden; margin-top:6px; }
-    .progress-fill { height:100%; border-radius:10px; background:var(--indigo); transition:width 0.4s ease; }
+
+    .progress-bar { height:10px; background:#e2e8f0; border-radius:10px; overflow:hidden; margin-top:6px; position:relative; }
+    .progress-fill {
+      height:100%; border-radius:10px; transition:width 0.6s cubic-bezier(.2,.8,.2,1);
+      background:linear-gradient(90deg, var(--indigo), #818cf8, var(--indigo));
+      background-size:200px 100%;
+    }
+    .progress-fill.animated { animation: shimmer 1.6s linear infinite; }
+    .progress-fill.complete { background:linear-gradient(90deg, var(--green), #4ade80, var(--green)); background-size:200px 100%; box-shadow:0 0 14px rgba(22,163,74,0.55); }
+
     .diff-plus  { color:var(--green); font-weight:700; }
     .diff-minus { color:var(--red);   font-weight:700; }
     .diff-zero  { color:var(--gray); }
-    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s; box-shadow:0 8px 24px rgba(0,0,0,0.2); }
+
+    #toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(100px); background:#1e293b; color:white; padding:0.75rem 1.5rem; border-radius:12px; font-size:0.9rem; font-weight:600; z-index:9999; transition:transform 0.3s cubic-bezier(.2,.8,.2,1); box-shadow:0 8px 24px rgba(0,0,0,0.2); }
     #toast.show { transform:translateX(-50%) translateY(0); }
 
-    /* ── Round banner ───────────────────────────────────── */
-    .round-banner { background:linear-gradient(135deg,#021D49,#0b3a8f); color:white; border-radius:14px; padding:1.1rem 1.4rem; margin-bottom:0.85rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; }
-    .round-banner .rlabel { font-size:1.05rem; font-weight:800; }
-    .round-banner .rsub   { font-size:0.78rem; opacity:0.8; margin-top:2px; }
-    .round-select { padding:0.5rem 0.75rem; border-radius:9px; border:none; font-family:Sarabun,sans-serif; font-size:0.85rem; font-weight:700; }
+    /* ── Round banner — glassy gradient with a little life ─────────── */
+    .round-banner {
+      background:linear-gradient(135deg,#021D49,#0b3a8f 55%,#3730a3);
+      background-size:200% 200%;
+      color:white; border-radius:16px; padding:1.15rem 1.4rem; margin-bottom:0.85rem;
+      display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;
+      box-shadow:0 10px 30px rgba(2,29,73,0.25);
+      position:relative; overflow:hidden;
+    }
+    .round-banner::after {
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background:radial-gradient(220px 140px at 90% -20%, rgba(255,255,255,0.18), transparent);
+    }
+    .round-banner .rlabel { font-size:1.05rem; font-weight:800; display:flex; align-items:center; gap:0.5rem; }
+    .round-banner .rsub   { font-size:0.78rem; opacity:0.85; margin-top:2px; }
+    .wiggle-icon { display:inline-block; animation: wiggle 2.4s ease-in-out infinite; }
+    .round-select { padding:0.55rem 0.85rem; border-radius:10px; border:none; font-family:Sarabun,sans-serif; font-size:0.85rem; font-weight:700; cursor:pointer; transition:transform .15s ease; }
+    .round-select:hover { transform:translateY(-1px); }
 
-    /* ── KPI cards (enterprise style) ───────────────────── */
+    /* ── KPI cards — friendlier, with floaty icons + hover lift ────── */
     .kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:0.7rem; margin-bottom:0.85rem; }
-    .kpi-card { background:white; border-radius:12px; padding:0.9rem 1.1rem; border-left:5px solid var(--border); box-shadow:0 1px 3px rgba(0,0,0,0.06); }
-    .kpi-card .kicon { font-size:1.3rem; margin-bottom:0.2rem; }
-    .kpi-card .kval  { font-size:1.7rem; font-weight:900; line-height:1.1; }
+    .kpi-card {
+      background:white; border-radius:14px; padding:0.95rem 1.1rem; border-left:5px solid var(--border);
+      box-shadow:0 2px 10px rgba(2,29,73,0.05);
+      transition:transform 0.2s cubic-bezier(.2,.8,.2,1), box-shadow 0.2s ease;
+    }
+    .kpi-card:hover { transform:translateY(-4px) scale(1.015); box-shadow:0 14px 28px rgba(2,29,73,0.12); }
+    .kpi-card .kicon { font-size:1.35rem; margin-bottom:0.2rem; display:inline-block; animation: floaty 3s ease-in-out infinite; }
+    .kpi-card .kval  { font-size:1.75rem; font-weight:900; line-height:1.1; transition:color .2s ease; }
+    .kpi-card .kval.bump { animation: pop .35s ease; }
     .kpi-card .klabel{ font-size:0.75rem; color:var(--gray); font-weight:600; margin-top:2px; }
     .kpi-blue   { border-left-color:var(--blue); }
     .kpi-gray   { border-left-color:var(--gray); }
@@ -48,7 +106,25 @@
     /* ── Mini horizontal bar (staff / zone visual compare) ─ */
     .mini-bar-wrap { display:flex; align-items:center; gap:0.6rem; }
     .mini-bar-track { flex:1; height:8px; background:#e2e8f0; border-radius:6px; overflow:hidden; }
-    .mini-bar-fill  { height:100%; border-radius:6px; background:var(--indigo); }
+    .mini-bar-fill  { height:100%; border-radius:6px; background:linear-gradient(90deg,var(--indigo),#818cf8); transition:width .5s ease; }
+
+    /* ── Buttons — a little bounce on interaction ──────────────────── */
+    .btn { transition:transform .15s cubic-bezier(.2,.8,.2,1), box-shadow .15s ease, filter .15s ease; }
+    .btn:hover:not(:disabled)  { transform:translateY(-2px); filter:brightness(1.04); box-shadow:0 8px 18px rgba(2,29,73,0.12); }
+    .btn:active:not(:disabled) { transform:translateY(0) scale(.96); }
+
+    /* ── Badges — soft pop when they appear ────────────────────────── */
+    .badge { transition: transform .15s ease; }
+
+    /* ── Progress ring on cards that just hit 100% ─────────────────── */
+    .celebrate-wrap { position:relative; }
+    .confetti-piece {
+      position:absolute; top:0; font-size:1rem; pointer-events:none;
+      animation: confettiFall 1.1s ease-in forwards;
+    }
+
+    /* ── Round-progress % chip, spins briefly while KPIs recompute ──── */
+    .pct-spin { animation: spin 0.6s ease; }
   </style>
 </head>
 <body>
@@ -75,6 +151,7 @@
           <div class="rsub" id="round-sub">—</div>
         </div>
         <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
+          <a href="dashboard.html" class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.35);font-weight:700;text-decoration:none;">🖥️ Executive Dashboard</a>
           <select id="round-select" class="round-select"><option>รอบปัจจุบัน</option></select>
           <button class="btn btn-sm" id="btn-new-round" style="background:white;color:var(--blue);border:none;font-weight:700;">🆕 เริ่มรอบใหม่</button>
         </div>
@@ -307,6 +384,47 @@
     setTimeout(() => t.classList.remove("show"), d);
   }
 
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  // นับเลขไต่ขึ้น/ลงแบบนุ่มๆ แทนการเปลี่ยนตัวเลขวูบเดียว — ใช้กับตัวเลข KPI เท่านั้น (เบาและปลอดภัย)
+  function animateNumber(el, target) {
+    if (!el) return;
+    target = Number(target) || 0;
+    const from = Number(el.dataset.val || 0);
+    if (from === target) { el.textContent = target; return; }
+    el.dataset.val = target;
+    const dur = 450, start = performance.now();
+    function step(now) {
+      const p = Math.min(1, (now - start) / dur);
+      const eased = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(from + (target - from) * eased);
+      if (p < 1) requestAnimationFrame(step);
+      else { el.textContent = target; el.classList.add("bump"); setTimeout(()=>el.classList.remove("bump"), 350); }
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ฉลองเล็กๆ ตอนความคืบหน้ารอบปัจจุบันแตะ 100% — คอนเฟตตี้ใบเล็กๆ ลอยผ่านตัวเลข % ไม่กระทบ layout อื่น
+  const CONFETTI_EMOJI = ["🎉","✨","🎊","⭐"];
+  function burstConfetti(anchorEl) {
+    if (!anchorEl) return;
+    const wrap = anchorEl.parentElement;
+    if (!wrap) return;
+    wrap.classList.add("celebrate-wrap");
+    for (let i=0;i<8;i++) {
+      const span = document.createElement("span");
+      span.className = "confetti-piece";
+      span.textContent = CONFETTI_EMOJI[i % CONFETTI_EMOJI.length];
+      span.style.left = `${Math.random()*90}%`;
+      span.style.animationDelay = `${Math.random()*0.25}s`;
+      wrap.appendChild(span);
+      setTimeout(()=>span.remove(), 1400);
+    }
+    toast("🎉 นับครบ 100% แล้วในรอบนี้!", 3000);
+  }
+
   // ══════════════════════════════════════════════════════════
   // Stock Take (Tag) — ผูกกับ schema ของ stocktake.html / stocktake-scan.html จริง
   // (master_stock / count_jobs / count_details)
@@ -345,10 +463,10 @@
     const sub = document.getElementById("round-sub");
     if (!lbl) return;
     if (!currentRound) {
-      lbl.textContent = "⚠️ ยังไม่เคยเริ่มรอบ (ข้อมูลเก่าทั้งหมดถือเป็น Legacy)";
+      lbl.innerHTML = '<span class="wiggle-icon">⚠️</span> ยังไม่เคยเริ่มรอบ (ข้อมูลเก่าทั้งหมดถือเป็น Legacy)';
       sub.textContent = 'กด "เริ่มรอบใหม่" ด้านขวาเพื่อเริ่มระบบนับตามรอบ';
     } else {
-      lbl.textContent = `🔄 รอบปัจจุบัน: ${currentRound.round_label || currentRound.round_id}`;
+      lbl.innerHTML = `<span class="wiggle-icon">🔄</span> รอบปัจจุบัน: ${esc(currentRound.round_label || currentRound.round_id)}`;
       sub.textContent = `เริ่มเมื่อ ${fmtDT(currentRound.started_at)} โดย ${currentRound.started_by||"—"}`;
     }
   }
@@ -727,17 +845,29 @@
       return { loc, zone, area:deriveArea(loc), status, label, who, job:j };
     });
 
-    if (document.getElementById("tag-total"))     document.getElementById("tag-total").textContent     = distinctLocs.length;
-    if (document.getElementById("tag-notstart"))   document.getElementById("tag-notstart").textContent  = notStarted;
-    if (document.getElementById("tag-inprog"))     document.getElementById("tag-inprog").textContent    = inProg;
-    if (document.getElementById("tag-done"))       document.getElementById("tag-done").textContent      = done;
-    if (document.getElementById("tag-short"))      document.getElementById("tag-short").textContent     = hasShort;
-    if (document.getElementById("tag-over"))       document.getElementById("tag-over").textContent      = hasOver;
-    if (document.getElementById("tag-short-qty"))  document.getElementById("tag-short-qty").textContent = shortQty;
-    if (document.getElementById("tag-over-qty"))   document.getElementById("tag-over-qty").textContent  = overQty;
+    animateNumber(document.getElementById("tag-total"),     distinctLocs.length);
+    animateNumber(document.getElementById("tag-notstart"),  notStarted);
+    animateNumber(document.getElementById("tag-inprog"),    inProg);
+    animateNumber(document.getElementById("tag-done"),      done);
+    animateNumber(document.getElementById("tag-short"),     hasShort);
+    animateNumber(document.getElementById("tag-over"),      hasOver);
+    animateNumber(document.getElementById("tag-short-qty"), shortQty);
+    animateNumber(document.getElementById("tag-over-qty"),  overQty);
     const pct = distinctLocs.length ? Math.round(((done+hasShort+hasOver)/distinctLocs.length)*100) : 0;
-    if (document.getElementById("tag-pct")) document.getElementById("tag-pct").textContent = `${pct}%`;
-    if (document.getElementById("tag-bar")) document.getElementById("tag-bar").style.width = `${pct}%`;
+    const pctEl = document.getElementById("tag-pct");
+    const barEl = document.getElementById("tag-bar");
+    if (pctEl) {
+      const prevPct = Number(pctEl.dataset.pct||0);
+      pctEl.textContent = `${pct}%`;
+      pctEl.dataset.pct = pct;
+      if (prevPct !== pct) { pctEl.classList.remove("pct-spin"); void pctEl.offsetWidth; pctEl.classList.add("pct-spin"); }
+      if (pct >= 100 && prevPct < 100) burstConfetti(pctEl);
+    }
+    if (barEl) {
+      barEl.style.width = `${pct}%`;
+      barEl.classList.toggle("complete", pct >= 100);
+      barEl.classList.toggle("animated", pct > 0 && pct < 100);
+    }
 
     // ── สรุปตามโซน/Area ──────────────────────────────────────
     const zoneMap = {};
