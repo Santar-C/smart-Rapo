@@ -277,20 +277,29 @@
     document.getElementById("btn-create-user").disabled=true;
     document.getElementById("create-loading").style.display="block";
 
+    let cred;
     try {
       // สร้าง User ด้วย Secondary App (ไม่ logout Admin)
-      const cred = await createUser2(secondaryAuth, email, pass);
+      cred = await createUser2(secondaryAuth, email, pass);
       const uid  = cred.user.uid;
+
+      // บันทึก Profile ใน Firestore
+      try {
+        await setDoc(doc(db,"users",uid), {
+          name, email, role,
+          created_at: serverTimestamp(),
+          created_by: currentUser.uid
+        });
+      } catch (writeErr) {
+        // เขียน Firestore ไม่สำเร็จ ต้องลบ Auth account ที่เพิ่งสร้างทิ้ง
+        // ไม่งั้นจะเหลือ account ค้าง (ล็อกอินได้แต่ไม่มีโปรไฟล์) และสมัครซ้ำ email เดิมไม่ได้
+        try { await cred.user.delete(); } catch (_) {}
+        try { await secondaryAuth.signOut(); } catch (_) {}
+        throw writeErr;
+      }
 
       // Logout secondary app ทันที
       await secondaryAuth.signOut();
-
-      // บันทึก Profile ใน Firestore
-      await setDoc(doc(db,"users",uid), {
-        name, email, role,
-        created_at: serverTimestamp(),
-        created_by: currentUser.uid
-      });
 
       toast(`✅ สร้าง Account "${name}" เรียบร้อย`, "ok");
       ["new-name","new-email","new-password"].forEach(id => document.getElementById(id).value="");
