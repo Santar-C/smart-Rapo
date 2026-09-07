@@ -1,7 +1,6 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
     // ── Helper Functions ──────────────────────────────────
     function isLoggedIn() {
       return request.auth != null;
@@ -13,7 +12,6 @@ service cloud.firestore {
     function isOwner(uid) {
       return isLoggedIn() && request.auth.uid == uid;
     }
-
     // ── Users Collection ──────────────────────────────────
     match /users/{userId} {
       allow read:   if isLoggedIn();
@@ -21,48 +19,106 @@ service cloud.firestore {
       allow update: if isAdmin() || isOwner(userId);
       allow delete: if isAdmin();
     }
-
     // ── Products Collection ───────────────────────────────
     match /products/{productId} {
       allow read:   if isLoggedIn();
       allow write:  if isAdmin();
     }
-
     // ── Transactions Collection ───────────────────────────
     match /transactions/{txId} {
       allow read:   if isLoggedIn();
       allow create: if isLoggedIn();
       allow update, delete: if isAdmin();
     }
-
     // ── Stock Take Jobs ───────────────────────────────────
     match /stock_take_jobs/{jobId} {
       allow read:   if isLoggedIn();
       allow write:  if isLoggedIn();
     }
-
     // ── Medicines Collection ──────────────────────────────
     match /medicines/{medId} {
       allow read:   if isLoggedIn();
       allow write:  if isAdmin();
     }
-
     // ── Medicine Batches ──────────────────────────────────
     match /medicine_batches/{batchId} {
       allow read:   if isLoggedIn();
       allow write:  if isLoggedIn();
     }
-
     // ── Medicine Logs ─────────────────────────────────────
     match /medicine_logs/{logId} {
       allow read:   if isLoggedIn();
       allow create: if isLoggedIn();
       allow update, delete: if isAdmin();
     }
-
     // ── WI Documents ──────────────────────────────────────
     match /wi_documents/{docId} {
       allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+    // ── Stock Products ────────────────────────────────────
+    // anonymous auth (request.auth != null) อ่านได้
+    // เพื่อให้หน้าเบิกพนักงาน (stock-withdraw.html) ทำงานได้โดยไม่ต้อง login
+    match /stock_products/{productId} {
+      allow read:   if request.auth != null;
+      allow write:  if isAdmin();
+    }
+    // ── Stock Logs ────────────────────────────────────────
+    // anonymous auth อ่านและสร้าง record ได้ (เพื่อบันทึก transaction เบิก)
+    match /stock_logs/{logId} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Stock Take (Tag/Zone system) ───────────────────────
+    // ใช้โดย stocktake.html, stocktake-scan.html (QR kiosk, anonymous auth),
+    // และ monitor.html (แท็บ Stock Take (Tag))
+    //
+    // master_stock: import/แก้ไข/ลบ สงวนไว้ให้ admin เท่านั้น (จัดการผ่าน monitor.html)
+    // อ่านได้ทุกคนที่ login แล้ว รวมถึง anonymous ที่เข้าจาก QR kiosk
+    match /master_stock/{docId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+    // location_index: สรุปเบาๆ (แค่ location+zone+count) 1 เอกสารเดียว
+    // ให้ stocktake-scan.html โหลดแทน master_stock เต็ม (ลด read จาก 5,862 เหลือ 1)
+    // สร้าง/อัปเดตอัตโนมัติทุกครั้งที่ import/ล้าง Master ใน monitor.html
+    match /location_index/{docId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+    // location_barcode_map: ตารางเทียบ "รหัสบาร์โค้ดของ WMS" ↔ "รหัส Location ที่คนอ่าน"
+    // (บาร์โค้ดจริงที่ติดหน้าช่องเป็นรหัสที่ WMS generate ไว้ คนละค่ากับรหัส location ที่เห็นด้วยตา)
+    match /location_barcode_map/{docId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+    // count_jobs / count_details: พนักงานหน้างาน (รวม anonymous จาก QR) ต้อง
+    // อ่าน/เขียนได้เอง เพื่อเริ่ม/นับ/ปิดงานได้โดยไม่ต้อง login เต็มรูปแบบ
+    match /count_jobs/{jobId} {
+      allow read, write: if isLoggedIn();
+    }
+    match /count_details/{detId} {
+      allow read, write: if isLoggedIn();
+    }
+    // staff_list: รายชื่อพนักงานสำหรับ dropdown ตอนเริ่มนับ
+    // admin จัดการผ่าน monitor.html, ทุกคน (รวม anonymous) อ่านได้เพื่อแสดง dropdown
+    match /staff_list/{staffId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+    // app_settings: เก็บ "รอบ" (round) ปัจจุบันของ Stock Take
+    // ทุกคน (รวม anonymous จาก QR) ต้องอ่านได้เพื่อรู้ว่ากำลังนับรอบไหนอยู่
+    // เขียนได้เฉพาะ admin (ตอนเริ่มรอบใหม่ผ่าน monitor.html)
+    match /app_settings/{settingId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+    // stocktake_rounds: ประวัติทุก "รอบ" ที่เคยเริ่ม (ไม่ลบทิ้ง) ใช้โชว์ dropdown
+    // เลือกดูย้อนหลังใน Monitor — read ให้ admin (Monitor ใช้), เขียนตอนเริ่มรอบใหม่
+    match /stocktake_rounds/{roundId} {
+      allow read:   if isAdmin();
       allow write:  if isAdmin();
     }
   }
