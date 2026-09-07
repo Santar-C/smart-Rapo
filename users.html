@@ -325,8 +325,13 @@
 
   // ── เปลี่ยน Role ────────────────────────────────────────
   window.changeRole = async (uid, newRole) => {
-    await updateDoc(doc(db,"users",uid), { role: newRole });
-    toast(`✅ อัปเดต Role เป็น "${newRole}" แล้ว`, "ok");
+    try {
+      await updateDoc(doc(db,"users",uid), { role: newRole });
+      toast(`✅ อัปเดต Role เป็น "${newRole}" แล้ว`, "ok");
+    } catch (e) {
+      toast(`❌ เปลี่ยน Role ไม่สำเร็จ: ${e.code || e.message}`, "err", 5000);
+      renderUsers(); // คืนค่า dropdown กลับตามข้อมูลจริง (การเปลี่ยนล้มเหลว)
+    }
   };
 
   // ── Reset Password ───────────────────────────────────────
@@ -383,8 +388,12 @@
   // ── ลบ User ─────────────────────────────────────────────
   window.deleteUserAccount = async (uid, name, email) => {
     if (!confirm(`ลบผู้ใช้ "${name}" แน่ใจหรือไม่?\n\nจะลบเฉพาะข้อมูล Profile ใน Firestore\nถ้าต้องการลบ Account จาก Firebase Auth ต้องทำใน Firebase Console`)) return;
-    await deleteDoc(doc(db,"users",uid));
-    toast(`🗑️ ลบข้อมูล ${name} แล้ว`);
+    try {
+      await deleteDoc(doc(db,"users",uid));
+      toast(`🗑️ ลบข้อมูล ${name} แล้ว`);
+    } catch (e) {
+      toast(`❌ ลบไม่สำเร็จ: ${e.code || e.message}`, "err", 5000);
+    }
   };
 </script>
 </body>
