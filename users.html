@@ -187,6 +187,10 @@
     renderUsers();
     document.getElementById("users-loading").style.display       = "none";
     document.getElementById("users-table-wrap").style.display    = "block";
+  }, err => {
+    document.getElementById("users-loading").innerHTML =
+      `<span style="color:var(--red);">❌ โหลดรายชื่อผู้ใช้งานไม่สำเร็จ: ${err.message}</span>`;
+    toast(`❌ โหลดรายชื่อไม่สำเร็จ: ${err.code || err.message}`, "err", 5000);
   });
 
   function updateStats() {
