@@ -1934,8 +1934,9 @@ function computeAvgMonthly(logs, products){
 }
 
 function startListeners(){
-  const qP = query(collection(db, COL_PRODUCTS), orderBy('sku'));
-  const qL  = query(collection(db, COL_LOGS), limit(3000));
+  // ไม่ใช้ orderBy เพื่อให้ได้ทุก document ไม่ว่าจะมี field ครบหรือไม่
+  const qP = query(collection(db, COL_PRODUCTS), limit(500));
+  const qL = query(collection(db, COL_LOGS), limit(3000));
 
   // ใช้ Promise.all รอทั้งสองมาถึงพร้อมกันก่อน render ครั้งแรก
   let productsReady = false, logsReady = false;
@@ -1950,10 +1951,12 @@ function startListeners(){
 
   onSnapshot(qP, snap=>{
     allProducts = snap.docs.map(d=>({id:d.id,...d.data()}));
+    allProducts.sort((a,b)=>(a.sku||'').localeCompare(b.sku||''));
+    console.log('products loaded:', allProducts.length);
     productsReady = true;
     if(logsReady){ computeAvgMonthly(allLogs, allProducts); renderAll(); }
     else tryRender();
-  });
+  }, err=>console.error('stock_products error:', err.message));
 
   onSnapshot(qL, snap=>{
     allLogs = snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -1970,7 +1973,7 @@ function startListeners(){
     renderLog();
     if(productsReady){ computeAvgMonthly(allLogs, allProducts); renderAll(); }
     else tryRender();
-  }, err=>console.warn('stock_logs:', err.message));
+  }, err=>console.error('stock_logs error:', err.message));
 }
 
 // ══════════════════════════════════
