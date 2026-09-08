@@ -209,6 +209,7 @@
   <button class="tab-btn" onclick="switchTab('reorder')" id="tab-reorder">🔔 สั่งซื้อ</button>
   <button class="tab-btn" onclick="switchTab('log')" id="tab-log">📜 ประวัติ</button>
   <button class="tab-btn" onclick="switchTab('dashboard')" id="tab-dashboard">📊 Dashboard</button>
+  <button class="tab-btn" onclick="switchTab('cycle')" id="tab-cycle">🔢 Cycle Count</button>
   <button class="tab-btn admin-only" onclick="switchTab('manage')" id="tab-manage" style="display:none">⚙️ จัดการ</button>
 </div>
 
@@ -516,6 +517,50 @@
   </div>
 
 </div>
+
+<!-- CYCLE COUNT PANE -->
+<div id="pane-cycle" style="display:none">
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-title">🔢 Cycle Count — นับสต็อกตามรอบ (SCA 06.04.B)</div>
+    <div style="font-size:.82rem;color:#64748b;line-height:1.8;margin-bottom:.9rem">
+      นับตามหลัก ABC: <b style="color:#dc2626">A</b> นับทุกเดือน ·
+      <b style="color:#d97706">B</b> นับทุก 3 เดือน ·
+      <b style="color:#16a34a">C</b> นับทุก 6 เดือน — ระบบเลือกรายการที่ถึงรอบให้อัตโนมัติ
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+      <select id="cy-scope" style="padding:.5rem .75rem;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.85rem">
+        <option value="due">📌 ถึงรอบนับแล้ว</option>
+        <option value="A">🔴 กลุ่ม A ทั้งหมด</option>
+        <option value="B">🟠 กลุ่ม B ทั้งหมด</option>
+        <option value="C">🟢 กลุ่ม C ทั้งหมด</option>
+        <option value="all">ทั้งหมด</option>
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="renderCycle()">🔄 โหลดรายการ</button>
+      <button class="btn btn-ghost btn-sm" onclick="printCountSheet()">🖨️ พิมพ์ใบนับสต็อก</button>
+      <button class="btn btn-ghost btn-sm" onclick="saveCycleCount()">💾 บันทึกผลนับ</button>
+      <span id="cy-summary" style="margin-left:auto;font-size:.82rem;color:#64748b"></span>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th style="width:36px">ABC</th><th>ชื่อสินค้า</th><th>SKU</th><th>ที่เก็บ</th>
+        <th style="text-align:right">ยอดระบบ</th>
+        <th style="width:110px;background:#065f46">ยอดนับจริง</th>
+        <th style="text-align:right;width:80px">ผลต่าง</th>
+        <th style="width:90px">% ต่าง</th>
+        <th style="width:150px">เหตุผล</th>
+        <th style="width:80px">นับล่าสุด</th>
+      </tr></thead>
+      <tbody id="cycle-tbody"></tbody>
+    </table>
+  </div>
+  <div id="cycle-empty" style="display:none;text-align:center;padding:2.5rem;color:var(--gray)">
+    ✅ ไม่มีรายการที่ถึงรอบนับ
+  </div>
+</div>
+
 <!-- LOG -->
 <div id="pane-log" style="display:none">
   <div style="display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap;align-items:center">
@@ -1384,7 +1429,7 @@ window._sel = function(sku, searchId, dropId, skuId, infoId){
 // ══════════════════════════════════
 // TABS & FILTER
 // ══════════════════════════════════
-const PANES = ['list','withdraw','receive','reorder','log','dashboard','manage'];
+const PANES = ['list','withdraw','receive','reorder','log','dashboard','cycle','manage'];
 window.switchTab = function(id){
   PANES.forEach(p=>{
     document.getElementById('pane-'+p).style.display = p===id?'block':'none';
@@ -1393,6 +1438,7 @@ window.switchTab = function(id){
   if(id==='log')       renderLog();
   if(id==='reorder')   renderReorder();
   if(id==='dashboard') renderDashboard();
+  if(id==='cycle')     renderCycle();
 };
 
 // ════════════════════════════════════
@@ -1789,6 +1835,202 @@ window.printAnnualReview = function(){
   </body></html>`);
   w.document.close();
   setTimeout(()=>w.print(), 500);
+};
+
+
+// ══════════════════════════════════════════
+// CYCLE COUNT (SCA 06.04.B)
+// ความถี่ตาม ABC: A=30วัน B=90วัน C=180วัน
+// ══════════════════════════════════════════
+const CYCLE_FREQ = {A:30, B:90, C:180};
+
+function daysSinceCount(p){
+  const lc = p.last_count;
+  if(!lc) return 9999; // ไม่เคยนับ
+  const d = lc.toDate ? lc.toDate() : new Date(lc);
+  return Math.floor((Date.now() - d.getTime()) / 86400000);
+}
+function isCountDue(p){
+  const abc = p._abc || 'C';
+  return daysSinceCount(p) >= (CYCLE_FREQ[abc] ?? 180);
+}
+
+function renderCycle(){
+  const scope = document.getElementById('cy-scope').value;
+  let list = [...allProducts];
+  if(scope === 'due')      list = list.filter(isCountDue);
+  else if(scope !== 'all') list = list.filter(p => (p._abc||'C') === scope);
+  list.sort((a,b)=>(a._abc||'C').localeCompare(b._abc||'C') || (a.name||'').localeCompare(b.name||'','th'));
+
+  const tb = document.getElementById('cycle-tbody');
+  const em = document.getElementById('cycle-empty');
+  document.getElementById('cy-summary').textContent = `${list.length} รายการ`;
+
+  if(!list.length){ tb.innerHTML=''; em.style.display='block'; return; }
+  em.style.display='none';
+
+  tb.innerHTML = list.map(p=>{
+    const a  = abcStyle(p._abc);
+    const ds = daysSinceCount(p);
+    const dsTxt = ds >= 9999 ? 'ยังไม่เคย' : ds + ' วัน';
+    const due = isCountDue(p);
+    return `<tr data-id="${p.id}" data-sys="${p.qty??0}">
+      <td style="text-align:center"><span style="background:${a.bg};color:${a.color};padding:.15rem .45rem;border-radius:6px;font-size:.72rem;font-weight:900">${a.label}</span></td>
+      <td style="font-weight:600">${p.name}</td>
+      <td class="sku-cell">${p.sku??'—'}</td>
+      <td style="font-size:.78rem;color:var(--gray)">${p.location??'—'}</td>
+      <td style="text-align:right;font-weight:700">${p.qty??0}</td>
+      <td><input type="number" class="cy-actual" data-id="${p.id}" min="0"
+           style="width:100%;padding:.35rem .5rem;border:1.5px solid #16a34a;border-radius:6px;
+           font-family:inherit;font-size:.85rem;text-align:right"
+           oninput="calcDiff(this)"></td>
+      <td class="cy-diff" style="text-align:right;font-weight:800;color:#94a3b8">—</td>
+      <td class="cy-pct" style="text-align:center;font-size:.78rem;color:#94a3b8">—</td>
+      <td><input type="text" class="cy-reason" data-id="${p.id}" placeholder="เหตุผลถ้ามีผลต่าง"
+           style="width:100%;padding:.35rem .5rem;border:1.5px solid var(--border);border-radius:6px;
+           font-family:inherit;font-size:.8rem"></td>
+      <td style="text-align:center;font-size:.75rem;color:${due?'#dc2626':'#64748b'};font-weight:${due?'800':'400'}">${dsTxt}</td>
+    </tr>`;
+  }).join('');
+}
+
+window.calcDiff = function(inp){
+  const tr  = inp.closest('tr');
+  const sys = parseFloat(tr.dataset.sys) || 0;
+  const act = parseFloat(inp.value);
+  const dCell = tr.querySelector('.cy-diff');
+  const pCell = tr.querySelector('.cy-pct');
+  if(isNaN(act)){ dCell.textContent='—'; dCell.style.color='#94a3b8';
+                  pCell.textContent='—'; pCell.style.color='#94a3b8'; return; }
+  const diff = act - sys;
+  const pct  = sys > 0 ? (diff/sys*100) : (diff!==0 ? 100 : 0);
+  const color = diff === 0 ? '#16a34a' : (Math.abs(pct) > 5 ? '#dc2626' : '#d97706');
+  dCell.textContent = (diff>0?'+':'') + diff;
+  dCell.style.color = color;
+  pCell.textContent = (pct>0?'+':'') + pct.toFixed(1) + '%';
+  pCell.style.color = color;
+};
+
+window.saveCycleCount = async function(){
+  if(currentRole !== 'admin'){ toast('เฉพาะ Admin เท่านั้น'); return; }
+  const inputs = [...document.querySelectorAll('.cy-actual')].filter(i => i.value !== '');
+  if(!inputs.length){ toast('ยังไม่ได้กรอกยอดนับ'); return; }
+
+  let noReason = 0;
+  inputs.forEach(i=>{
+    const tr = i.closest('tr');
+    const diff = parseFloat(i.value) - parseFloat(tr.dataset.sys);
+    const rs = tr.querySelector('.cy-reason').value.trim();
+    if(diff !== 0 && !rs) noReason++;
+  });
+  if(noReason > 0 && !confirm(`มี ${noReason} รายการที่มีผลต่างแต่ยังไม่ระบุเหตุผล\nSCA ต้องการเหตุผลทุกรายการที่ต่าง — ยืนยันบันทึก?`)) return;
+  if(!confirm(`บันทึกผลนับ ${inputs.length} รายการ และปรับยอดสต็อกตามที่นับได้?`)) return;
+
+  let ok=0, err=0;
+  for(const inp of inputs){
+    const tr  = inp.closest('tr');
+    const id  = inp.dataset.id;
+    const sys = parseFloat(tr.dataset.sys) || 0;
+    const act = parseFloat(inp.value);
+    const rs  = tr.querySelector('.cy-reason').value.trim();
+    const diff = act - sys;
+    const p = allProducts.find(x=>x.id===id);
+    if(!p) continue;
+    try{
+      await updateDoc(doc(db, COL_PRODUCTS, id), {
+        qty: act, last_count: serverTimestamp(),
+        last_movement: diff!==0 ? serverTimestamp() : (p.last_movement ?? serverTimestamp())
+      });
+      if(diff !== 0){
+        await addDoc(collection(db, COL_LOGS), {
+          type:'ADJ', sku:p.sku??'', name:p.name??'',
+          category:p.category??'', unit:p.unit??'',
+          qty: Math.abs(diff), qty_before: sys, qty_after: act,
+          by: currentUser?.email ?? 'admin',
+          note: `Cycle Count: ${rs || '(ไม่ระบุเหตุผล)'}`,
+          source:'cycle_count', ts: serverTimestamp(), ts_import: serverTimestamp()
+        });
+      }
+      ok++;
+    }catch(e){ console.error(e); err++; }
+  }
+  toast(`บันทึกแล้ว ${ok} รายการ${err?` (ผิดพลาด ${err})`:''}`);
+  renderCycle();
+};
+
+// ══ พิมพ์ใบนับสต็อก (Count Sheet) ══
+window.printCountSheet = function(){
+  const scope = document.getElementById('cy-scope').value;
+  let list = [...allProducts];
+  if(scope === 'due')      list = list.filter(isCountDue);
+  else if(scope !== 'all') list = list.filter(p => (p._abc||'C') === scope);
+  if(!list.length){ alert('ไม่มีรายการ'); return; }
+  list.sort((a,b)=>(a.location||'').localeCompare(b.location||'') || (a.name||'').localeCompare(b.name||'','th'));
+
+  const today = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+  const sheetNo = 'CC-' + new Date().toISOString().slice(0,10).replace(/-/g,'');
+  let rows = '';
+  list.forEach((p,i)=>{
+    rows += `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td style="text-align:center;font-weight:900">${p._abc||'C'}</td>
+      <td>${p.sku??'—'}</td>
+      <td>${p.name}</td>
+      <td>${p.location??'—'}</td>
+      <td style="text-align:center">${p.unit??''}</td>
+      <td style="text-align:right">${p.qty??0}</td>
+      <td style="height:26px"></td>
+      <td></td>
+      <td></td>
+    </tr>`;
+  });
+
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8"><title>${sheetNo}</title>
+  <style>
+    @page{size:A4;margin:12mm}
+    body{font-family:'Sarabun',Arial,sans-serif;font-size:11px;color:#111}
+    h1{font-size:17px;margin:0;color:#002048}
+    .sub{font-size:10px;color:#555;margin:2px 0 8px}
+    .meta{display:flex;gap:22px;font-size:10.5px;margin-bottom:9px;flex-wrap:wrap}
+    .meta b{color:#002048}
+    table{width:100%;border-collapse:collapse}
+    th{background:#002048;color:#fff;padding:5px 4px;font-size:9.5px;border:1px solid #002048;text-align:left}
+    td{padding:4px;border:1px solid #bbb;font-size:10px}
+    tr:nth-child(even) td{background:#fafbfc}
+    .note{margin-top:9px;background:#f8fafc;border-left:3px solid #002048;padding:7px 10px;font-size:9.5px;line-height:1.7}
+    .sign{margin-top:18px;display:flex;gap:50px}
+    .sign div{flex:1;text-align:center}
+    .line{border-top:1px solid #333;margin-top:28px;padding-top:3px;font-size:9.5px}
+  </style></head><body>
+  <h1>ใบนับสต็อกวัสดุสิ้นเปลือง (Cycle Count Sheet)</h1>
+  <div class="sub">CEVA Logistics (Thailand) · RAPO Site THA088 · SCA v6 Requirement 06.04.B</div>
+  <div class="meta">
+    <span><b>เลขที่:</b> ${sheetNo}</span>
+    <span><b>วันที่:</b> ${today}</span>
+    <span><b>จำนวน:</b> ${list.length} รายการ</span>
+    <span><b>ผู้นับ:</b> ______________</span>
+    <span><b>ผู้ตรวจ:</b> ______________</span>
+  </div>
+  <table><thead><tr>
+    <th style="width:24px">#</th><th style="width:26px">ABC</th><th style="width:74px">SKU</th>
+    <th>ชื่อสินค้า</th><th style="width:74px">ที่เก็บ</th><th style="width:38px">หน่วย</th>
+    <th style="width:52px">ยอดระบบ</th><th style="width:60px">ยอดนับจริง</th>
+    <th style="width:48px">ผลต่าง</th><th style="width:130px">เหตุผล</th>
+  </tr></thead><tbody>${rows}</tbody></table>
+  <div class="note">
+    <b>ความถี่การนับตาม ABC:</b> A = ทุก 30 วัน · B = ทุก 90 วัน · C = ทุก 180 วัน<br>
+    <b>ข้อกำหนด:</b> ทุกรายการที่มีผลต่างต้องระบุเหตุผท และให้ผู้ตรวจสอบลงนามรับรอง<br>
+    <b>เหตุผลที่พบบ่อย:</b> เบิกไม่ลงระบบ · คีย์ผิด · ของเสียหาย · นับผิดครั้งก่อน · ของหาย
+  </div>
+  <div class="sign">
+    <div><div class="line">ผู้นับ / Counter</div></div>
+    <div><div class="line">ผู้ตรวจสอบ / Verifier</div></div>
+    <div><div class="line">ผู้อนุมัติ / Approver</div></div>
+  </div>
+  </body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(), 400);
 };
 
 window.printPR = function(){
