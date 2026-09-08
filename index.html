@@ -288,16 +288,53 @@
       color: var(--gray);
       margin-top: 0.2rem;
     }
-    /* Card Grid */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 1rem;
+    /* Menu Reel (การ์ดเมนูหมุนวนบนวงรี แทน grid เดิม) */
+    .menu-halo-wrap {
+      position: relative;
+      margin: 0 0.25rem;
     }
+    .menu-halo-stage {
+      position: relative;
+      height: 260px;
+      touch-action: pan-y;
+      outline: none;
+      cursor: grab;
+      user-select: none;
+    }
+    .menu-halo-stage:active { cursor: grabbing; }
+    .menu-halo-stage:focus-visible {
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.35);
+      border-radius: 20px;
+    }
+    .menu-nav-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      background: white;
+      box-shadow: var(--shadow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      line-height: 1;
+      color: var(--blue);
+      cursor: pointer;
+      z-index: 1200;
+    }
+    .menu-nav-btn:hover { background: var(--light); }
+    .menu-nav-prev { left: -6px; }
+    .menu-nav-next { right: -6px; }
     .menu-card {
+      position: absolute;
+      left: 50%;
+      top: 50%;
       background: white;
       border-radius: var(--radius);
-      padding: 1.5rem 1rem;
+      padding: 1.25rem 0.85rem;
       box-shadow: var(--shadow);
       border: 1.5px solid var(--border);
       text-decoration: none;
@@ -306,12 +343,11 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 160px;
-      gap: 0.75rem;
-      transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s;
+      gap: 0.6rem;
+      transition: box-shadow 0.25s, border-color 0.25s;
       cursor: pointer;
-      position: relative;
       overflow: hidden;
+      will-change: transform, opacity;
     }
     .menu-card::before {
       content: '';
@@ -322,7 +358,6 @@
       border-radius: 0 0 var(--radius) var(--radius);
     }
     .menu-card:hover {
-      transform: translateY(-6px);
       box-shadow: 0 12px 36px rgba(0,0,0,0.12);
       border-color: transparent;
     }
@@ -386,7 +421,7 @@
 
     /* ── RESPONSIVE ──────────────────────────────── */
     @media (max-width: 480px) {
-      .card-grid { grid-template-columns: repeat(2, 1fr); }
+      .menu-halo-stage { height: 230px; }
       .dash-body { padding: 1rem; }
       .user-badge span.name { display: none; }
     }
@@ -455,8 +490,12 @@
         <p>กรุณาเลือกระบบที่ต้องการใช้งาน</p>
       </div>
 
-      <div class="card-grid" id="card-grid">
-        <!-- การ์ดจะถูก render โดย JS ตาม Role -->
+      <div class="menu-halo-wrap">
+        <button class="menu-nav-btn menu-nav-prev" id="menu-prev" aria-label="เมนูก่อนหน้า" type="button">‹</button>
+        <div class="menu-halo-stage" id="menu-halo-stage" role="region" aria-label="เมนูหลัก" tabindex="0">
+          <!-- การ์ดจะถูก render โดย JS ตาม Role -->
+        </div>
+        <button class="menu-nav-btn menu-nav-next" id="menu-next" aria-label="เมนูถัดไป" type="button">›</button>
       </div>
     </div>
   </div>
@@ -542,23 +581,148 @@
       }
     ];
 
-    // ── Render การ์ด ──────────────────────────────
+    // ── Render เมนู (การ์ดหมุนวนบนวงรี) ───────────
     function renderCards(role) {
-      const grid = document.getElementById("card-grid");
-      grid.innerHTML = "";
-      MENUS.forEach(menu => {
-        if (menu.role === "admin" && role !== "admin") return;
-        const card = document.createElement("a");
-        card.className = `menu-card ${menu.color}`;
-        card.href = menu.href;
-        card.innerHTML = `
+      const stage = document.getElementById("menu-halo-stage");
+      if (!stage) return;
+      stage.innerHTML = "";
+
+      const items = MENUS.filter(menu => menu.role !== "admin" || role === "admin");
+      if (!items.length) return;
+
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const CARD_W = 168, CARD_H = 190, MIN_SCALE = 0.72, MAX_VISIBLE = 3;
+      const count = items.length;
+
+      const cards = items.map(menu => {
+        const el = document.createElement("div");
+        el.className = `menu-card ${menu.color}`;
+        el.style.width  = CARD_W + "px";
+        el.style.height = CARD_H + "px";
+        el.innerHTML = `
           ${menu.role === "admin" ? '<span class="admin-badge">Admin</span>' : ""}
           <span class="card-icon">${menu.icon}</span>
           <span class="card-title">${menu.title}</span>
           ${menu.sub ? `<span class="card-sub">${menu.sub}</span>` : ""}
         `;
-        grid.appendChild(card);
+        stage.appendChild(el);
+        return { el, href: menu.href };
       });
+
+      // coverflow แนวนอนล้วน (ไม่มีแกน y) — ระยะห่างระหว่างการ์ดคงที่กว่าครึ่งความกว้าง
+      // การ์ดเสมอ จึงไม่มีทางที่การ์ดสองใบจะทับกันจนอ่านตัวหนังสือไม่ออกแบบวงรีเต็มที่ลอง
+      // มาก่อน (เหมาะกับของตกแต่งหน้า login แต่ไม่เหมาะกับเมนูที่ต้องคลิกจริง)
+      let gap = 0;
+      function measure() {
+        gap = Math.max(CARD_W * 0.62, Math.min(stage.offsetWidth / 4.2, CARD_W * 0.95));
+      }
+
+      let position = 0; // หน่วยเป็น "ช่อง" (slot), ไม่ใช่ radian
+      function wrapDelta(d) {
+        // ระยะที่ใกล้ 0 ที่สุดของ d เมื่อวนรอบ count ช่อง → ได้ ring ที่หมุนวนไม่รู้จบ
+        let x = ((d % count) + count) % count;
+        if (x > count / 2) x -= count;
+        return x;
+      }
+
+      function render() {
+        cards.forEach((c, i) => {
+          const d = wrapDelta(i - position);
+          const ad = Math.abs(d);
+          const scale = Math.max(MIN_SCALE, 1 - ad * 0.16);
+          const visible = ad <= MAX_VISIBLE;
+          c.el.style.transform = `translate(-50%,-50%) translate(${d * gap}px, 0px) scale(${scale})`;
+          c.el.style.zIndex  = Math.round((10 - ad) * 100);
+          c.el.style.opacity = visible ? Math.max(0.25, 1 - ad * 0.3) : 0;
+          c.el.style.pointerEvents = visible ? "auto" : "none";
+        });
+      }
+
+      let raf = 0;
+      function animateTo(target, duration, onDone) {
+        const start = position, delta = target - start, t0 = performance.now();
+        cancelAnimationFrame(raf);
+        (function tick(now) {
+          const p = Math.min(1, (now - t0) / duration);
+          position = start + delta * (1 - Math.pow(1 - p, 3)); // ease-out cubic
+          render();
+          if (p < 1) raf = requestAnimationFrame(tick);
+          else if (onDone) onDone();
+        })(t0);
+      }
+
+      let dragging = false, hovering = false, holdTimer = 0;
+      let dragStartX = 0, dragStartPos = 0, pointerDownPos = null, moved = false, pressedCard = null;
+
+      function scheduleAutoplay() {
+        if (reduceMotion) return;
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(() => {
+          if (dragging || hovering) { scheduleAutoplay(); return; }
+          animateTo(Math.round(position) + 1, 700, scheduleAutoplay);
+        }, 2200);
+      }
+
+      stage.addEventListener("pointerenter", () => { hovering = true; });
+      stage.addEventListener("pointerleave", () => { hovering = false; });
+
+      stage.addEventListener("pointerdown", e => {
+        dragging = true;
+        moved = false;
+        // จำการ์ดที่กดไว้ตอนนี้ ก่อนเรียก setPointerCapture — เพราะหลัง capture
+        // ทั้ง pointerup/mouseup/click ที่ตามมาจะถูก retarget ไปที่ stage หมด
+        // (ไม่ใช่การ์ดที่นิ้ว/เมาส์อยู่จริง) ทำให้ click listener บนตัวการ์ดไม่ทำงาน
+        pressedCard = e.target.closest(".menu-card");
+        pointerDownPos = { x: e.clientX, y: e.clientY };
+        dragStartX = e.clientX;
+        dragStartPos = position;
+        stage.setPointerCapture(e.pointerId);
+        cancelAnimationFrame(raf);
+        clearTimeout(holdTimer);
+      });
+      stage.addEventListener("pointermove", e => {
+        if (!dragging) return;
+        if (pointerDownPos) {
+          const dx = e.clientX - pointerDownPos.x, dy = e.clientY - pointerDownPos.y;
+          if (Math.hypot(dx, dy) > 6) moved = true;
+        }
+        position = dragStartPos - (e.clientX - dragStartX) / gap;
+        render();
+      });
+      function endDrag() {
+        if (!dragging) return;
+        dragging = false;
+        if (!moved && pressedCard) {
+          const clicked = cards.find(c => c.el === pressedCard);
+          if (clicked) { window.location.href = clicked.href; return; }
+        }
+        animateTo(Math.round(position), 350, scheduleAutoplay);
+      }
+      stage.addEventListener("pointerup", endDrag);
+      stage.addEventListener("pointercancel", endDrag);
+
+      function spinBy(direction) {
+        clearTimeout(holdTimer);
+        cancelAnimationFrame(raf);
+        animateTo(Math.round(position) + direction, 400, scheduleAutoplay);
+      }
+      document.getElementById("menu-prev").onclick = () => spinBy(-1);
+      document.getElementById("menu-next").onclick = () => spinBy(1);
+
+      stage.onkeydown = e => {
+        if (e.key === "ArrowRight") { e.preventDefault(); spinBy(1); }
+        else if (e.key === "ArrowLeft") { e.preventDefault(); spinBy(-1); }
+        else if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          const frontIdx = ((Math.round(position) % count) + count) % count;
+          window.location.href = cards[frontIdx].href;
+        }
+      };
+
+      measure();
+      render();
+      scheduleAutoplay();
+      window.addEventListener("resize", () => { measure(); render(); });
     }
 
     // ── อัปเดต Header วันที่ ──────────────────────
