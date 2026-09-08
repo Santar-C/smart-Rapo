@@ -835,12 +835,11 @@ function renderStats(){
   const alertN = cnt.reorder + cnt.low + cnt.out;
   const banner = document.getElementById('alert-banner');
   if(alertN > 0){
+    banner.style.display = 'block';
+    const riskSoon = allProducts.filter(p=>{const cv=calcCoverage(p);return cv.days!==null&&cv.days<=7;}).length;
     const totalOrder = allProducts
       .filter(p=>['out','low','reorder'].includes(getStatus(p)))
       .reduce((s,p)=>s+calcOrderQty(p), 0);
-    banner.style.display = 'block';
-    const riskSoon = allProducts.filter(p=>{const cv=calcCoverage(p);return cv.days!==null&&cv.days<=7;}).length;
-    const totalOrder = allProducts.filter(p=>['out','low','reorder'].includes(getStatus(p))).reduce((s,p)=>s+calcOrderQty(p),0);
     document.getElementById('alert-text').textContent =
       `มี ${alertN} รายการถึงจุดสั่งซื้อ — รวมต้องสั่ง ${totalOrder.toLocaleString()} หน่วย` +
       (riskSoon>0 ? ` | ⚠️ ${riskSoon} รายการจะหมดใน 7 วัน` : '') + ` — คลิกดูรายละเอียด`;
