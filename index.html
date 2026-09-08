@@ -39,8 +39,56 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      gap: 3rem;
       background: linear-gradient(135deg, #021D49 0%, #1e3a8a 50%, #312e81 100%);
       padding: 1.5rem;
+    }
+    /* ── Login Visual (halo reel) ─────────────────── */
+    .login-visual {
+      display: none;
+      position: relative;
+      flex: 1;
+      max-width: 460px;
+      height: 460px;
+    }
+    @media (min-width: 901px) {
+      .login-visual { display: block; }
+    }
+    .halo-visual-label {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      color: rgba(255,255,255,0.92);
+      font-weight: 700;
+      font-size: 1.35rem;
+      pointer-events: none;
+    }
+    .halo-visual-label span {
+      display: block;
+      margin-top: 0.4rem;
+      font-size: 0.8rem;
+      font-weight: 400;
+      color: rgba(255,255,255,0.65);
+    }
+    .halo-card {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 20px 45px rgba(0,0,0,0.35);
+      will-change: transform, opacity;
+    }
+    .halo-card-icon {
+      font-size: 2.2rem;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
     }
     .login-card {
       background: var(--white);
@@ -354,6 +402,9 @@
 
   <!-- ── LOGIN PAGE ──────────────────────────────── -->
   <div id="login-page">
+    <div class="login-visual" id="halo-stage" aria-hidden="true">
+      <div class="halo-visual-label">RAPO System<span>Stock · Medicine · Smart Dock</span></div>
+    </div>
     <div class="login-card">
       <div class="login-logo">
         <img src="assets/logo.png" alt="RAPO Logo"
@@ -580,6 +631,111 @@
 
     // ── Logout Button ─────────────────────────────
     document.getElementById("btn-logout").addEventListener("click", logoutUser);
+
+    // ── Halo Reel (การ์ดหมุนวนบนวงรี, ตกแต่งหน้า Login) ──
+    // vanilla JS ล้วน ไม่มี dependency เพิ่ม — ระบบนี้ไม่มี build step
+    // ให้ตรงกับไฟล์อื่นๆ ในโปรเจกต์ทั้งหมด
+    initHaloReel();
+    function initHaloReel() {
+      const stage = document.getElementById("halo-stage");
+      if (!stage) return;
+
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const COLORS = ["#021D49", "#E1261C", "#6366f1", "#16a34a", "#d97706", "#0d9488"];
+      const ICONS  = ["📦", "💊", "📝", "🚢", "📄", "📊", "👥", "🖥️"];
+      const COUNT  = 8;
+      const CARD_W = 110, CARD_H = 150, MIN_SCALE = 0.42;
+      const step = (Math.PI * 2) / COUNT;
+
+      const cards = [];
+      for (let i = 0; i < COUNT; i++) {
+        const el = document.createElement("div");
+        el.className = "halo-card";
+        el.style.width  = CARD_W + "px";
+        el.style.height = CARD_H + "px";
+        el.style.background = `linear-gradient(160deg, ${COLORS[i % COLORS.length]}, ${COLORS[(i + 2) % COLORS.length]})`;
+        el.innerHTML = `<span class="halo-card-icon">${ICONS[i % ICONS.length]}</span>`;
+        stage.appendChild(el);
+        cards.push(el);
+      }
+
+      let rx = 0, ry = 0;
+      function measure() {
+        rx = stage.offsetWidth  * 0.42;
+        ry = stage.offsetHeight * 0.4;
+      }
+
+      let rotation = 0;
+      function render() {
+        cards.forEach((el, i) => {
+          const theta = i * step + rotation;
+          const cos = Math.cos(theta), sin = Math.sin(theta);
+          const scale = MIN_SCALE + (1 - MIN_SCALE) * ((cos + 1) / 2);
+          el.style.transform = `translate(-50%,-50%) translate(${cos * rx}px, ${sin * ry}px) scale(${scale})`;
+          el.style.zIndex  = Math.round(scale * 1000);
+          el.style.opacity = 0.35 + 0.65 * ((cos + 1) / 2);
+        });
+      }
+
+      let raf = 0;
+      function animateTo(target, duration, onDone) {
+        const start = rotation, delta = target - start, t0 = performance.now();
+        cancelAnimationFrame(raf);
+        (function tick(now) {
+          const p = Math.min(1, (now - t0) / duration);
+          rotation = start + delta * (1 - Math.pow(1 - p, 3)); // ease-out cubic
+          render();
+          if (p < 1) raf = requestAnimationFrame(tick);
+          else if (onDone) onDone();
+        })(t0);
+      }
+
+      let dragging = false, holdTimer = 0, lastAngle = 0;
+      function scheduleAutoplay() {
+        if (reduceMotion) return;
+        clearTimeout(holdTimer);
+        holdTimer = setTimeout(() => {
+          if (dragging) { scheduleAutoplay(); return; }
+          animateTo(rotation - step, 700, scheduleAutoplay);
+        }, 1400);
+      }
+
+      function angleFromEvent(e) {
+        const rect = stage.getBoundingClientRect();
+        return Math.atan2(
+          (e.clientY - rect.top  - stage.offsetHeight / 2) / (ry || 1),
+          (e.clientX - rect.left - stage.offsetWidth  / 2) / (rx || 1)
+        );
+      }
+
+      stage.addEventListener("pointerdown", e => {
+        dragging = true;
+        lastAngle = angleFromEvent(e);
+        stage.setPointerCapture(e.pointerId);
+        cancelAnimationFrame(raf);
+        clearTimeout(holdTimer);
+      });
+      stage.addEventListener("pointermove", e => {
+        if (!dragging) return;
+        const angle = angleFromEvent(e);
+        const delta = ((angle - lastAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        lastAngle = angle;
+        rotation += delta;
+        render();
+      });
+      function endDrag() {
+        if (!dragging) return;
+        dragging = false;
+        animateTo(Math.round(rotation / step) * step, 400, scheduleAutoplay);
+      }
+      stage.addEventListener("pointerup", endDrag);
+      stage.addEventListener("pointercancel", endDrag);
+
+      measure();
+      render();
+      scheduleAutoplay();
+      window.addEventListener("resize", () => { measure(); render(); });
+    }
   </script>
 </body>
 </html>
