@@ -41,6 +41,11 @@
     }
     .group-chip.active { color:white; border-color:transparent; }
     .group-chip:hover { transform:translateY(-1px); }
+    .group-badge {
+      display:inline-flex; align-items:center; justify-content:center;
+      width:18px; height:18px; border-radius:5px; background:rgba(255,255,255,0.35);
+      color:inherit; font-size:0.65rem; font-weight:800; flex-shrink:0;
+    }
     .exec-filterbar .spacer { flex:1; }
     .btn-tv {
       padding:0.5rem 1rem; border-radius:9px; border:1.5px solid var(--indigo); background:white; color:var(--indigo);
@@ -117,7 +122,7 @@
     <select id="round-select"><option>รอบปัจจุบัน</option></select>
     <div id="group-chips" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>
     <div class="spacer"></div>
-    <button class="btn-tv" id="btn-tv-mode">🖥️ โหมดจอผนัง (TV)</button>
+    <button class="btn-tv" id="btn-tv-mode" style="display:inline-flex;align-items:center;gap:0.4rem;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg> โหมดจอผนัง (TV)</button>
   </div>
 
   <div class="exec-hero">
@@ -146,11 +151,11 @@
 
   <div class="chart-grid">
     <div class="chart-card">
-      <div class="ctitle">📊 ความคืบหน้าตามกลุ่มโซน</div>
+      <div class="ctitle" style="display:flex;align-items:center;gap:0.4rem;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> ความคืบหน้าตามกลุ่มโซน</div>
       <div class="cwrap"><canvas id="chart-progress"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="ctitle">⚖️ ยอดขาด/เกิน ตามกลุ่มโซน</div>
+      <div class="ctitle" style="display:flex;align-items:center;gap:0.4rem;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg> ยอดขาด/เกิน ตามกลุ่มโซน</div>
       <div class="cwrap"><canvas id="chart-diff"></canvas></div>
     </div>
   </div>
@@ -161,6 +166,7 @@
 <script type="module">
   import { db } from "./firebase-config.js";
   import { requireAdmin } from "./auth.js";
+  import { icon } from "./icons.js";
   import {
     collection, doc, query, orderBy, onSnapshot
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -169,9 +175,9 @@
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">
-      <a class="topbar-back" href="monitor.html">←</a>
+      <a class="topbar-back" href="monitor.html" aria-label="กลับ">${icon("arrow_left", { size: 20 })}</a>
       <div style="flex:1">
-        <div class="topbar-title">🖥️ Executive Dashboard</div>
+        <div class="topbar-title" style="display:flex;align-items:center;gap:0.5rem;">${icon("monitor", { size: 20 })} Executive Dashboard</div>
         <div class="topbar-sub">ภาพรวม Stock Take — สำหรับผู้บริหาร</div>
       </div>
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
@@ -186,10 +192,10 @@
   // ── กลุ่มโซน: A+SA / C / B+Over (ตามที่ผู้บริหารต้องการดูสรุป) ──
   const GROUPS = ["A+SA", "C", "B+Over"];
   const GROUP_META = {
-    "A+SA":  { color:"#6366f1", icon:"🅰️", label:"A + SA" },
-    "C":     { color:"#0d9488", icon:"🅲",  label:"C" },
-    "B+Over":{ color:"#7c3aed", icon:"🅱️", label:"B + Overflow" },
-    "อื่นๆ": { color:"#94a3b8", icon:"⬜", label:"อื่นๆ" }
+    "A+SA":  { color:"#6366f1", icon:"A", label:"A + SA" },
+    "C":     { color:"#0d9488", icon:"C",  label:"C" },
+    "B+Over":{ color:"#7c3aed", icon:"B", label:"B + Overflow" },
+    "อื่นๆ": { color:"#94a3b8", icon:"—", label:"อื่นๆ" }
   };
   function groupOf(loc) {
     const area = (String(loc).split("-")[0] || "").toUpperCase();
@@ -218,7 +224,7 @@
     const sel = document.getElementById("round-select");
     const keep = sel.value;
     sel.innerHTML = allRounds.map(r =>
-      `<option value="${r.round_id}">${currentRound?.round_id===r.round_id?"🔵 ":""}${r.round_label||r.round_id}</option>`
+      `<option value="${r.round_id}">${currentRound?.round_id===r.round_id?"● ":""}${r.round_label||r.round_id}</option>`
     ).join("") + `<option value="__legacy__">— ก่อนเริ่มระบบรอบ (Legacy) —</option>`;
     if ([...sel.options].some(o=>o.value===keep)) sel.value = keep;
     else if (currentRound) sel.value = currentRound.round_id;
@@ -231,7 +237,7 @@
 
   // ── กลุ่มโซน chips ────────────────────────────────────────
   const chipsEl = document.getElementById("group-chips");
-  chipsEl.innerHTML = GROUPS.map(g => `<span class="group-chip active" data-g="${g}" style="--gc:${GROUP_META[g].color}">${GROUP_META[g].icon} ${GROUP_META[g].label}</span>`).join("");
+  chipsEl.innerHTML = GROUPS.map(g => `<span class="group-chip active" data-g="${g}" style="--gc:${GROUP_META[g].color};display:inline-flex;align-items:center;gap:0.35rem;"><span class="group-badge">${GROUP_META[g].icon}</span> ${GROUP_META[g].label}</span>`).join("");
   chipsEl.querySelectorAll(".group-chip").forEach(chip => {
     chip.style.background = chip.dataset.g ? GROUP_META[chip.dataset.g].color : "";
     chip.addEventListener("click", () => {
@@ -245,7 +251,7 @@
   // ── TV mode ───────────────────────────────────────────────
   document.getElementById("btn-tv-mode").addEventListener("click", () => {
     document.body.classList.add("tv-mode");
-    toast("🖥️ โหมดจอผนัง — เลื่อนเมาส์ไปมุมบนซ้ายแล้วกด Back เพื่อออก", 4000);
+    toast("โหมดจอผนัง — เลื่อนเมาส์ไปมุมบนซ้ายแล้วกด Back เพื่อออก", 4000);
   });
   if (new URLSearchParams(location.search).get("tv") === "1") document.body.classList.add("tv-mode");
 
@@ -328,7 +334,7 @@
     if (firstGroupRender || gridEl.children.length !== activeGroups.length) {
       gridEl.innerHTML = activeGroups.map(g => `
         <div class="group-card" style="--gc:${GROUP_META[g].color}">
-          <div class="gname"><span class="gicon">${GROUP_META[g].icon}</span> โซน ${GROUP_META[g].label}</div>
+          <div class="gname"><span class="gicon group-badge" style="background:${GROUP_META[g].color};">${GROUP_META[g].icon}</span> โซน ${GROUP_META[g].label}</div>
           <div class="gpct" id="gpct-${g}">0%</div>
           <div class="gbar"><div class="gbar-fill" id="gbar-${g}" style="width:0%"></div></div>
           <div class="gbreak">
@@ -356,8 +362,8 @@
       const diffEl = document.getElementById(`gdiff-${g}`);
       if (diffEl) {
         diffEl.innerHTML = (s.shortQty>0 || s.overQty>0)
-          ? `${s.shortQty>0?`<span style="color:var(--amber);">⚠️ ขาด ${s.shortQty}</span> `:""}${s.overQty>0?`<span style="color:var(--red);">🔺 เกิน ${s.overQty}</span>`:""}`
-          : `<span style="color:var(--green);">✅ ไม่มีปัญหา</span>`;
+          ? `${s.shortQty>0?`<span style="color:var(--amber);display:inline-flex;align-items:center;gap:0.25rem;">${icon("alert_triangle",{size:13})} ขาด ${s.shortQty}</span> `:""}${s.overQty>0?`<span style="color:var(--red);display:inline-flex;align-items:center;gap:0.25rem;">${icon("arrow_up",{size:13})} เกิน ${s.overQty}</span>`:""}`
+          : `<span style="color:var(--green);display:inline-flex;align-items:center;gap:0.25rem;">${icon("check_circle",{size:13})} ไม่มีปัญหา</span>`;
       }
     });
 
