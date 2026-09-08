@@ -54,7 +54,7 @@ body {
   transition: background 0.2s;
 }
 .topbar-back:hover { background: rgba(255,255,255,0.25); }
-.topbar-title { font-size: 1rem; font-weight: 700; flex: 1; }
+.topbar-title { font-size: 1rem; font-weight: 700; flex: 1; display: flex; align-items: center; gap: 0.5rem; }
 .topbar-sub   { font-size: 0.75rem; opacity: 0.7; }
 .topbar-user  {
   font-size: 0.8rem;
@@ -325,6 +325,9 @@ tbody tr:hover { background: #f8fafc; }
   overflow-x: auto;
 }
 .tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   flex-shrink: 0;
   padding: 0.5rem 1rem;
   border: none;
@@ -338,6 +341,7 @@ tbody tr:hover { background: #f8fafc; }
   transition: all 0.2s;
   white-space: nowrap;
 }
+.tab-btn svg { flex-shrink: 0; }
 .tab-btn.active {
   background: white;
   color: var(--blue);

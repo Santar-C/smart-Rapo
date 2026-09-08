@@ -24,17 +24,17 @@
 <div class="page-body">
 
   <div class="tab-bar">
-    <button class="tab-btn active" data-tab="dispense">💊 เบิกจ่ายยา</button>
-    <button class="tab-btn" data-tab="receive" id="tab-receive-btn">📥 รับยาเข้าคลัง</button>
-    <button class="tab-btn" data-tab="status" id="tab-status-btn">📊 สถานะยา</button>
-    <button class="tab-btn" data-tab="manage" id="tab-manage-btn">⚙️ จัดการยา</button>
-    <button class="tab-btn" data-tab="log">📜 ประวัติ</button>
+    <button class="tab-btn active" data-tab="dispense"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg> เบิกจ่ายยา</button>
+    <button class="tab-btn" data-tab="receive" id="tab-receive-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> รับยาเข้าคลัง</button>
+    <button class="tab-btn" data-tab="status" id="tab-status-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> สถานะยา</button>
+    <button class="tab-btn" data-tab="manage" id="tab-manage-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg> จัดการยา</button>
+    <button class="tab-btn" data-tab="log"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h12a2 2 0 0 0 2-2v-2H10v2a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v3h4"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/></svg> ประวัติ</button>
   </div>
 
   <!-- TAB: เบิกจ่ายยา -->
   <div id="tab-dispense">
     <div class="card">
-      <div class="card-title">💊 เบิกจ่ายยา</div>
+      <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg> เบิกจ่ายยา</div>
       <div class="form-group">
         <label>ค้นหายา (รหัส / ชื่อ)</label>
         <input type="text" id="d-search" placeholder="พิมพ์เพื่อค้นหา..." autocomplete="off">
@@ -47,7 +47,7 @@
         </div>
         <!-- แสดง Batch -->
         <div class="card" style="margin-top:0;">
-          <div class="card-title" style="font-size:0.9rem; margin-bottom:0.5rem;">📦 ล็อตยาที่มีอยู่ (FEFO — หมดอายุก่อน จ่ายก่อน)</div>
+          <div class="card-title" style="font-size:0.9rem; margin-bottom:0.5rem;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> ล็อตยาที่มีอยู่ (FEFO — หมดอายุก่อน จ่ายก่อน)</div>
           <div id="d-batches"></div>
         </div>
       </div>
@@ -68,7 +68,7 @@
   <!-- TAB: รับยาเข้าคลัง (Admin) -->
   <div id="tab-receive" style="display:none">
     <div class="card">
-      <div class="card-title">📥 รับยาเข้าคลัง (Receive)</div>
+      <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> รับยาเข้าคลัง (Receive)</div>
       <div class="form-group">
         <label>ค้นหายา (รหัส / ชื่อ)</label>
         <input type="text" id="rv-search" placeholder="พิมพ์เพื่อค้นหา..." autocomplete="off">
@@ -121,7 +121,7 @@
   <!-- TAB: จัดการยา (Admin) -->
   <div id="tab-manage" style="display:none">
     <div class="card">
-      <div class="card-title">➕ เพิ่ม / แก้ไข ยา</div>
+      <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> เพิ่ม / แก้ไข ยา</div>
       <div class="form-row">
         <div class="form-group">
           <label>รหัสยา (SKU) <span style="color:red">*</span></label>
@@ -149,7 +149,7 @@
         </div>
       </div>
       <div style="display:flex; gap:0.75rem;">
-        <button class="btn btn-primary" id="btn-save-med">💾 บันทึกยา</button>
+        <button class="btn btn-primary" id="btn-save-med"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> บันทึกยา</button>
         <button class="btn btn-outline" id="btn-cancel-med" style="display:none">ยกเลิก</button>
       </div>
     </div>
@@ -167,7 +167,7 @@
   <div id="tab-log" style="display:none">
     <div class="action-bar">
       <div class="search-bar" style="flex:1; margin-bottom:0;"><input type="text" id="log-search" placeholder="ค้นหาประวัติ..."></div>
-      <button class="btn btn-outline btn-sm" id="btn-export-log">⬇️ Export CSV</button>
+      <button class="btn btn-outline btn-sm" id="btn-export-log"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Export CSV</button>
     </div>
     <div class="card" style="padding:0; overflow:hidden;">
       <div class="table-wrap" style="border:none; border-radius:0;">
@@ -185,6 +185,7 @@
 <script type="module">
   import { auth, db } from "./firebase-config.js";
   import { requireAuth } from "./auth.js";
+  import { icon } from "./icons.js";
   import {
     collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
     deleteDoc, query, orderBy, limit, onSnapshot, serverTimestamp, where
@@ -199,9 +200,9 @@
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">
-      <a class="topbar-back" href="index.html">←</a>
+      <a class="topbar-back" href="index.html" aria-label="กลับ"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></a>
       <div style="flex:1">
-        <div class="topbar-title">💊 ระบบเบิกจ่ายยา</div>
+        <div class="topbar-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg> ระบบเบิกจ่ายยา</div>
         <div class="topbar-sub">Medicine Management</div>
       </div>
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
@@ -331,10 +332,10 @@
 
   // ── Dispense (FEFO) ───────────────────────────────────────
   document.getElementById("btn-dispense").addEventListener("click", async () => {
-    if (!selectedMedD) { toast("⚠️ กรุณาเลือกยาก่อน"); return; }
+    if (!selectedMedD) { toast("กรุณาเลือกยาก่อน"); return; }
     const amt = parseInt(document.getElementById("d-amount").value);
-    if (!amt || amt <= 0) { toast("⚠️ กรุณากรอกจำนวน"); return; }
-    if (amt > selectedMedD.total_quantity) { toast("❌ ยาไม่เพียงพอ"); return; }
+    if (!amt || amt <= 0) { toast("กรุณากรอกจำนวน"); return; }
+    if (amt > selectedMedD.total_quantity) { toast("ยาไม่เพียงพอ"); return; }
     const notes = document.getElementById("d-notes").value;
     let rem = amt;
     const usedLots = [];
@@ -361,7 +362,7 @@
       notes: notes || "",
       timestamp: serverTimestamp()
     });
-    toast(`✅ เบิกยา ${selectedMedD.name} จำนวน ${amt} เรียบร้อย`);
+    toast(`เบิกยา ${selectedMedD.name} จำนวน ${amt} เรียบร้อย`);
     selectedMedD = null;
     ["d-search","d-amount","d-notes"].forEach(id => document.getElementById(id).value = "");
     document.getElementById("d-selected").style.display = "none";
@@ -369,13 +370,13 @@
 
   // ── Receive Medicine ──────────────────────────────────────
   document.getElementById("btn-receive-med").addEventListener("click", async () => {
-    if (currentProfile.role !== "admin") { toast("⚠️ สิทธิ์ Admin เท่านั้น"); return; }
-    if (!selectedMedRv) { toast("⚠️ กรุณาเลือกยา"); return; }
+    if (currentProfile.role !== "admin") { toast("สิทธิ์ Admin เท่านั้น"); return; }
+    if (!selectedMedRv) { toast("กรุณาเลือกยา"); return; }
     const lot    = document.getElementById("rv-lot").value.trim();
     const expiry = document.getElementById("rv-expiry").value;
     const amt    = parseInt(document.getElementById("rv-amount").value);
     const notes  = document.getElementById("rv-notes").value;
-    if (!lot || !expiry || !amt) { toast("⚠️ กรุณากรอกข้อมูลให้ครบ"); return; }
+    if (!lot || !expiry || !amt) { toast("กรุณากรอกข้อมูลให้ครบ"); return; }
     await addDoc(collection(db, "medicine_batches"), {
       medicine_id:  selectedMedRv.id,
       lot_number:   lot,
@@ -394,7 +395,7 @@
       notes: notes || "",
       timestamp: serverTimestamp()
     });
-    toast(`✅ รับยา ${selectedMedRv.name} ล็อต ${lot} จำนวน ${amt} เรียบร้อย`);
+    toast(`รับยา ${selectedMedRv.name} ล็อต ${lot} จำนวน ${amt} เรียบร้อย`);
     selectedMedRv = null;
     ["rv-search","rv-lot","rv-expiry","rv-amount","rv-notes"].forEach(id => document.getElementById(id).value = "");
     document.getElementById("rv-selected").style.display = "none";
@@ -444,8 +445,8 @@
         <td>${m.min_stock}</td>
         <td>${m.shelf_life_after_open ? m.shelf_life_after_open + " วัน" : "—"}</td>
         <td>
-          <button class="btn btn-outline btn-sm" onclick="editMed('${m.id}')">✏️</button>
-          <button class="btn btn-red btn-sm" onclick="deleteMed('${m.id}','${m.name}')">🗑️</button>
+          <button class="btn btn-outline btn-sm" onclick="editMed('${m.id}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>
+          <button class="btn btn-red btn-sm" onclick="deleteMed('${m.id}','${m.name}')"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg></button>
         </td>
       </tr>`).join("");
   }
@@ -454,7 +455,7 @@
     const sku  = document.getElementById("mm-sku").value.trim();
     const name = document.getElementById("mm-name").value.trim();
     const unit = document.getElementById("mm-unit").value.trim();
-    if (!sku || !name || !unit) { toast("⚠️ กรุณากรอกข้อมูลให้ครบ"); return; }
+    if (!sku || !name || !unit) { toast("กรุณากรอกข้อมูลให้ครบ"); return; }
     await setDoc(doc(db, "medicines", sku), {
       name, unit,
       category: document.getElementById("mm-cat").value.trim(),
@@ -462,7 +463,7 @@
       shelf_life_after_open: parseInt(document.getElementById("mm-shelf").value) || null,
       updated_at: serverTimestamp()
     }, { merge: true });
-    toast(`✅ บันทึกยา ${name} เรียบร้อย`);
+    toast(`บันทึกยา ${name} เรียบร้อย`);
     ["mm-sku","mm-name","mm-cat","mm-unit","mm-min","mm-shelf"].forEach(id => document.getElementById(id).value = "");
     document.getElementById("mm-sku").removeAttribute("readonly");
     document.getElementById("btn-cancel-med").style.display = "none";
@@ -489,7 +490,7 @@
     const batches = await getDocs(query(collection(db, "medicine_batches"), where("medicine_id","==",id)));
     for (const b of batches.docs) await deleteDoc(b.ref);
     await deleteDoc(doc(db, "medicines", id));
-    toast(`🗑️ ลบยา ${name} เรียบร้อย`);
+    toast(`ลบยา ${name} เรียบร้อย`);
   };
 
   document.getElementById("btn-cancel-med").addEventListener("click", () => {
@@ -542,7 +543,7 @@
     a.href = URL.createObjectURL(blob);
     a.download = `medicine_log_${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
-    toast("✅ Export CSV เรียบร้อย");
+    toast("Export CSV เรียบร้อย");
   });
 </script>
 </body>
