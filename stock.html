@@ -224,11 +224,12 @@
     <span class="filter-chip" onclick="setFilter('low')" data-f="low">⚠️ Safety</span>
     <span class="filter-chip" onclick="setFilter('out')" data-f="out">🚫 หมด</span>
     <span class="filter-chip" onclick="setFilter('dead')" data-f="dead">💤 Dead</span>
+    <button class="btn btn-ghost btn-sm" onclick="exportStockCSV()" style="margin-left:auto;white-space:nowrap">📄 Export CSV (SCA)</button>
   </div>
   <div class="table-wrap">
     <table>
       <thead><tr>
-        <th>ชื่อสินค้า</th><th>SKU</th><th>หน่วย</th><th>Category</th><th>ที่เก็บ</th>
+        <th>ชื่อสินค้า</th><th>SKU</th><th>หน่วย</th><th>Category</th><th style="white-space:nowrap">ABC</th><th>ที่เก็บ</th>
         <th>ยอดคงเหลือ</th><th>ค่าเฉลี่ย/เดือน</th>
         <th>Lead Time (วัน)</th>
         <th>Safety Stock</th>
@@ -236,7 +237,10 @@
         <th>Min</th>
         <th>Max</th>
         <th>MOQ</th>
-        <th>กราฟ</th><th>สถานะเติม</th><th>Moving Status</th>
+        <th>กราฟ</th><th>สถานะเติม</th>
+        <th style="background:#065f46;white-space:nowrap">⏳ ใช้ได้</th>
+        <th style="background:#7f1d1d;white-space:nowrap">📦 ควรสั่ง</th>
+        <th>Moving Status</th>
         <th class="admin-only"></th>
       </tr></thead>
       <tbody id="product-tbody"></tbody>
@@ -399,6 +403,12 @@
 
 <!-- REORDER -->
 <div id="pane-reorder" style="display:none">
+  <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-bottom:.9rem">
+    <button class="btn btn-primary btn-sm" onclick="printPR()">🖨️ พิมพ์ใบขอซื้อ (PR)</button>
+    <button class="btn btn-ghost btn-sm" onclick="printKanban()">🏷️ พิมพ์ Kanban Card</button>
+    <button class="btn btn-ghost btn-sm" onclick="printAnnualReview()">📊 Annual Review</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportStockCSV()">📄 Export CSV</button>
+  </div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
     <div style="font-weight:700;font-size:.95rem;color:var(--navy)">🔔 รายการที่ควรสั่งซื้อ</div>
     <button class="btn btn-ghost btn-sm" onclick="exportReorder()">📄 Export CSV</button>
@@ -506,6 +516,19 @@
         <label>Safety Stock</label>
         <input type="number" id="m-safety" min="0" placeholder="5" oninput="calcPreview()">
         <div class="hint">📋 Manual — Admin กำหนดตามความเสี่ยง</div>
+      </div>
+      <div class="form-group">
+        <label>⭐ Essential Consumable</label>
+        <select id="m-essential">
+          <option value="no">ไม่ใช่ — ทั่วไป</option>
+          <option value="yes">ใช่ — Business Critical (หยุดงานถ้าขาด)</option>
+        </select>
+        <div class="hint">SCA 12.02.C — ระบุตัวที่ขาดไม่ได้</div>
+      </div>
+      <div class="form-group">
+        <label>ราคา/หน่วย (บาท)</label>
+        <input type="number" id="m-price" min="0" step="0.01" placeholder="0.00" oninput="calcPreview()">
+        <div class="hint">📋 ใช้คำนวณมูลค่าสต็อกรวม</div>
       </div>
       <div class="form-group">
         <label>MOQ (จำนวนสั่งขั้นต่ำ)</label>
@@ -620,7 +643,7 @@ function calcSafety(p){
 
 // Reorder Point = (avg_daily × lead_time) + safety
 function calcRP(p){
-  return Math.ceil(avgDaily(p) * (p.lead_time_days ?? 7) + calcSafety(p));
+  return Math.ceil(avgDaily(p) * (p.lead_time_days ?? 15) + calcSafety(p));
 }
 
 // Min Stock = Safety Stock (สต็อกขั้นต่ำที่ยอมรับได้ก่อนวิกฤต)
@@ -628,26 +651,84 @@ function calcRP(p){
 // ตัวอย่าง: safety=30 → Min=30 | RP=180 → สั่งตั้งแต่เหลือ 180 ไม่ใช่ 30
 function calcMin(p){
   if((p.min_stock ?? 0) > 0) return p.min_stock;
-  return calcSafety(p); // Min = Safety Stock
+  return Math.ceil(calcSafety(p) + avgDaily(p) * (p.lead_time_days ?? 15));
 }
 
 // Max Stock = Reorder Point + (avg_daily × lead_time)
 // = เติมให้พอใช้ 1 รอบ lead time หลังของมาถึง
 function calcMax(p){
   if((p.max_stock ?? 0) > 0) return p.max_stock;
-  return Math.ceil(calcRP(p) + avgDaily(p) * (p.lead_time_days ?? 7));
+  return Math.ceil(calcMin(p) + avgDaily(p) * (p.review_period ?? 30));
 }
 // จำนวนที่ควรสั่ง = cover Lead Time + Safety (ไม่ดูจาก Max Point)
 // สูตร: ROUNDUP((avg_daily × lead_time × 2) + safety - qty, 0) แล้วปัดเป็น × MOQ
+// ══ Stock Coverage: ของที่มีอยู่ใช้ได้กี่วัน ══
+// เขียว = พอเกิน lead time × 2 | เหลือง = พอแค่ lead time | แดง = ไม่พอ lead time
+// ══ ABC Analysis (Pareto) — จัดลำดับความสำคัญตามปริมาณใช้ ══
+// A = 20% ของ SKU ที่กินการใช้ 80% | B = 30% ถัดมา | C = ที่เหลือ
+function computeABC(products){
+  const sorted = [...products]
+    .filter(p=>(p.avg_monthly??0) > 0)
+    .sort((a,b)=>(b.avg_monthly??0)-(a.avg_monthly??0));
+  const total = sorted.reduce((s,p)=>s+(p.avg_monthly??0), 0);
+  if(total <= 0){ products.forEach(p=>p._abc='C'); return; }
+  let cum = 0;
+  sorted.forEach(p=>{
+    cum += (p.avg_monthly??0);
+    const pct = cum/total;
+    p._abc = pct <= 0.80 ? 'A' : (pct <= 0.95 ? 'B' : 'C');
+  });
+  products.forEach(p=>{ if(!p._abc) p._abc='C'; });
+}
+function abcStyle(cls){
+  return {A:{bg:'#fef2f2',color:'#dc2626',label:'A'},
+          B:{bg:'#fffbeb',color:'#d97706',label:'B'},
+          C:{bg:'#f0fdf4',color:'#16a34a',label:'C'}}[cls] || {bg:'#f8fafc',color:'#94a3b8',label:'—'};
+}
+
+// ══ Forecast เดือนหน้า (Moving Average) + Trend ══
+function calcForecast(p, logs){
+  const now = new Date();
+  const byMonth = {};
+  for(let i=0;i<3;i++){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    byMonth[d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')] = 0;
+  }
+  (logs||[]).forEach(l=>{
+    if(l.type!=='OUT') return;
+    if((l.name??'') !== (p.name??'')) return;
+    let d=null;
+    if(l.ts?.toDate) d=l.ts.toDate();
+    else if(l.ts_import?.toDate) d=l.ts_import.toDate();
+    else if(l.date) d=new Date(l.date+'T00:00:00');
+    if(!d) return;
+    const k = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    if(k in byMonth) byMonth[k] += (l.qty??0);
+  });
+  const vals = Object.values(byMonth);
+  const forecast = Math.round(vals.reduce((a,b)=>a+b,0)/Math.max(1,vals.length));
+  // trend: เดือนล่าสุด vs ค่าเฉลี่ย
+  const latest = vals[0] ?? 0;
+  const trend = forecast>0 ? Math.round(((latest-forecast)/forecast)*100) : 0;
+  return {forecast, trend, months:vals};
+}
+
+function calcCoverage(p){
+  const daily = avgDaily(p);
+  const qty   = p.qty ?? 0;
+  if(daily <= 0) return {days:null, level:'unknown', color:'#94a3b8', bg:'#f8fafc'};
+  const days = Math.floor(qty / daily);
+  const lead = p.lead_time_days ?? 15;
+  if(days >= lead*2) return {days, level:'safe',     color:'#16a34a', bg:'#f0fdf4'};
+  if(days >= lead)   return {days, level:'warning',  color:'#d97706', bg:'#fffbeb'};
+  return               {days, level:'critical', color:'#dc2626', bg:'#fef2f2'};
+}
+
 function calcOrderQty(p){
-  const qty    = p.qty ?? 0;
-  const moq    = Math.max(1, p.moq ?? 1);
-  const daily  = avgDaily(p);
-  const lead   = p.lead_time_days ?? 7;
-  const safety = calcSafety(p);
-  const needed = Math.ceil(daily * lead * 2) + safety;
-  const gap    = needed - qty;
-  if(gap <= 0) return moq;
+  const qty = p.qty ?? 0;
+  const moq = Math.max(1, p.moq ?? 1);
+  const gap = calcMax(p) - qty;
+  if(gap <= 0) return 0;
   return Math.ceil(gap / moq) * moq;
 }
 
@@ -655,17 +736,24 @@ function calcOrderQty(p){
 function calcOrderBreakdown(p){
   const qty    = p.qty ?? 0;
   const daily  = avgDaily(p);
-  const lead   = p.lead_time_days ?? 7;
+  const lead   = p.lead_time_days ?? 15;
+  const review = p.review_period  ?? 30;
   const safety = calcSafety(p);
   const moq    = Math.max(1, p.moq ?? 1);
-  const useDuringLead = Math.ceil(daily * lead);
-  const coverBuffer   = Math.ceil(daily * lead * 2);
-  const needed        = coverBuffer + safety;
-  const rawGap        = Math.max(0, needed - qty);
-  const orderQty      = rawGap <= 0 ? moq : Math.ceil(rawGap / moq) * moq;
-  const daysStock     = daily > 0 ? Math.floor((qty + orderQty) / daily) : 0;
-  return { useDuringLead, coverBuffer, safety, needed, rawGap, orderQty,
-           daysStock, daily: daily.toFixed(2), lead, moq };
+  const useDuringLead   = Math.ceil(daily * lead);
+  const useDuringReview = Math.ceil(daily * review);
+  const minPt  = calcMin(p);
+  const maxPt  = calcMax(p);
+  const needed = maxPt;
+  const rawGap = Math.max(0, maxPt - qty);
+  const orderQty = rawGap <= 0 ? 0 : Math.ceil(rawGap / moq) * moq;
+  const stockAfterReceive = qty + orderQty;
+  const daysAfterReceive  = daily > 0 ? Math.floor(stockAfterReceive / daily) : 0;
+  const targetDays     = lead + review;
+  const coverNextOrder = daysAfterReceive >= targetDays;
+  return { useDuringLead, useDuringReview, safety, needed, rawGap, orderQty,
+           minPt, maxPt, stockAfterReceive, daysAfterReceive, targetDays, coverNextOrder,
+           daily: daily.toFixed(2), lead, review, moq };
 }
 
 // Moving Status (ตาม Excel: ค่าเฉลี่ยรายเดือน)
@@ -751,8 +839,11 @@ function renderStats(){
       .filter(p=>['out','low','reorder'].includes(getStatus(p)))
       .reduce((s,p)=>s+calcOrderQty(p), 0);
     banner.style.display = 'block';
+    const riskSoon = allProducts.filter(p=>{const cv=calcCoverage(p);return cv.days!==null&&cv.days<=7;}).length;
+    const totalOrder = allProducts.filter(p=>['out','low','reorder'].includes(getStatus(p))).reduce((s,p)=>s+calcOrderQty(p),0);
     document.getElementById('alert-text').textContent =
-      `มี ${alertN} รายการถึงจุดสั่งซื้อ — รวมต้องสั่งทั้งหมด ${totalOrder.toLocaleString()} หน่วย — คลิกดูรายละเอียด`;
+      `มี ${alertN} รายการถึงจุดสั่งซื้อ — รวมต้องสั่ง ${totalOrder.toLocaleString()} หน่วย` +
+      (riskSoon>0 ? ` | ⚠️ ${riskSoon} รายการจะหมดใน 7 วัน` : '') + ` — คลิกดูรายละเอียด`;
   } else { banner.style.display='none'; }
 }
 
@@ -783,6 +874,9 @@ function renderList(){
       <td class="sku-cell">${p.sku}</td>
       <td>${p.unit??'—'}</td>
       <td><span style="background:#f1f5f9;padding:.15rem .5rem;border-radius:6px;font-size:.72rem;font-weight:700">${p.category??'—'}</span></td>
+      <td style="text-align:center">${(()=>{const a=abcStyle(p._abc);
+        return `<span style="background:${a.bg};color:${a.color};padding:.15rem .5rem;border-radius:6px;
+          font-size:.72rem;font-weight:900" title="A=สำคัญมาก B=ปานกลาง C=ทั่วไป">${a.label}</span>`;})()}</td>
       <td style="font-size:.75rem;color:var(--gray)">${p.location??'—'}</td>
       <td><b style="font-size:1rem">${p.qty??0}</b></td>
       <td style="color:var(--gray)">
@@ -812,6 +906,23 @@ function renderList(){
               ${oQty}
               <span style="font-size:.65rem;margin-left:1px">${p.unit??''}</span>
              </div>`}
+      </td>
+      <td style="text-align:center;min-width:66px">
+        ${(()=>{const cv=calcCoverage(p);
+          return cv.days===null ? '<span style="color:#cbd5e1;font-size:.75rem">—</span>'
+          : `<div style="background:${cv.bg};color:${cv.color};border-radius:8px;padding:.22rem .5rem;
+              font-weight:800;font-size:.8rem;display:inline-block">${cv.days}<span style="font-size:.6rem;opacity:.75"> วัน</span></div>`;
+        })()}
+      </td>
+      <td style="text-align:center;min-width:76px">
+        ${(()=>{const oQ=calcOrderQty(p), st=getStatus(p);
+          const need=['out','low','reorder'].includes(st);
+          return need
+          ? `<div style="background:#991b1b;color:#fff;border-radius:8px;padding:.25rem .6rem;
+              font-weight:900;font-size:.82rem;display:inline-block">${oQ}<span style="font-size:.62rem;opacity:.8"> ${p.unit??''}</span></div>`
+          : `<div style="color:#94a3b8;font-size:.76rem;border:1px dashed #e2e8f0;border-radius:6px;
+              padding:.18rem .5rem;display:inline-block">${oQ}</div>`;
+        })()}
       </td>
       <td><span class="badge ${mv.cls}">${mv.label}</span></td>
       <td>${adminBtn}</td>
@@ -882,18 +993,18 @@ function renderReorder(){
       <!-- การคำนวณจำนวนสั่งซื้อ -->
       <div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:.65rem .85rem">
         <div style="font-size:.73rem;font-weight:700;color:#c2410c;margin-bottom:.45rem">
-          🧮 จำนวนที่ควรสั่งซื้อ (cover Lead Time + Safety)
+          🧮 จำนวณที่ควรสั่งซื้อ (ครอบคลุมถึงรอบสั่งถัดไป)
         </div>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:.2rem .75rem;font-size:.78rem;color:#374151;align-items:center">
-          <span style="color:#64748b">ใช้ระหว่างรอ (${bd.lead}วัน × ${bd.daily}/วัน):</span>
-          <span><b>${bd.useDuringLead}</b> ${p.unit??''}</span>
-          <span style="color:#64748b">เผื่อ 2 รอบ lead time (×2):</span>
-          <span><b>${bd.coverBuffer}</b> ${p.unit??''}</span>
-          <span style="color:#64748b">Safety Stock (avg×20%):</span>
+          <span style="color:#64748b">ใช้ระหว่างรอของ (${bd.lead} วัน):</span>
+          <span><b>${bd.useDuringLead}</b> ${p.unit??''} (${bd.daily}/วัน × ${bd.lead} วัน)</span>
+          <span style="color:#64748b">ใช้ในรอบถัดไป (${bd.review} วัน):</span>
+          <span><b>${bd.useDuringReview}</b> ${p.unit??''} (${bd.daily}/วัน × ${bd.review} วัน)</span>
+          <span style="color:#64748b">Safety Stock:</span>
           <span><b>+${bd.safety}</b> ${p.unit??''}</span>
           <span style="color:#64748b">รวมต้องการ:</span>
           <span><b>${bd.needed}</b> ${p.unit??''}</span>
-          <span style="color:#64748b">หักคงเหลือปัจจุบัน:</span>
+          <span style="color:#64748b">คงเหลือปัจจุบัน:</span>
           <span>−<b>${p.qty??0}</b> ${p.unit??''}</span>
           <span style="color:#64748b">ขาดอยู่:</span>
           <span><b>${bd.rawGap}</b> ${p.unit??''}</span>
@@ -901,12 +1012,19 @@ function renderReorder(){
           <span style="color:#c2410c;font-weight:700">= <b>${bd.orderQty}</b> ${p.unit??''}</span>
         </div>
         <div style="margin-top:.5rem;padding-top:.45rem;border-top:1px solid #fed7aa;
-          font-size:.9rem;font-weight:900;color:var(--red);display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-          📦 สั่งซื้อ <span style="font-size:1.2rem">${bd.orderQty}</span> ${p.unit??''} 
-          ${bd.daysStock>0?`<span style="font-size:.73rem;font-weight:400;color:#64748b">(หลังรับของมีสต็อกใช้ได้ ~${bd.daysStock} วัน)</span>`:''}
+          font-size:.9rem;font-weight:900;color:var(--red)">
+          📦 สั่งซื้อ <span style="font-size:1.2rem">${bd.orderQty}</span> ${p.unit??''}
+        </div>
+        <div style="margin-top:.4rem;padding:.45rem .65rem;border-radius:8px;font-size:.8rem;
+          background:${bd.coverNextOrder?'#f0fdf4':'#fef2f2'};
+          border:1px solid ${bd.coverNextOrder?'#86efac':'#fca5a5'};color:${bd.coverNextOrder?'#166534':'#991b1b'}">
+          ${bd.coverNextOrder
+            ? '<b>✅ เพียงพอ</b> — หลังรับของมีสต็อก ~<b>'+bd.daysAfterReceive+' วัน</b> ครอบคลุมรอบสั่งถัดไป ('+bd.targetDays+' วัน)'
+            : '<b>⚠️ อาจไม่พอ</b> — หลังรับของมีสต็อก ~<b>'+bd.daysAfterReceive+' วัน</b> แต่รอบถัดไปอีก '+bd.targetDays+' วัน ควรเพิ่ม MOQ'
+          }
         </div>
         <div style="margin-top:.3rem;font-size:.68rem;color:#94a3b8;font-style:italic">
-          สูตร: (${bd.daily}/วัน × ${bd.lead}วัน × 2) + ${bd.safety} safety = ${bd.needed} หน่วย
+          สูตร: (${bd.daily}×${bd.lead}วัน)+(${bd.daily}×${bd.review}วัน)+${bd.safety} = ${bd.needed} หน่วย
         </div>
       </div>
     </div>`;
@@ -979,6 +1097,8 @@ window.calcPreview = function(){
   // Safety Stock = Auto ROUNDUP(avg_monthly × 20%, 0)
   const safety = Math.ceil(monthly * 0.2);
   const moq     = parseInt(document.getElementById('m-moq').value)       || 1;
+  const price  = parseFloat(document.getElementById('m-price').value) || 0;
+  const essential = document.getElementById('m-essential').value === 'yes';
   const daily   = monthly / 30;
   const rp      = Math.ceil(daily * lead + safety);
   const minCalc = rp;
@@ -1092,6 +1212,8 @@ window.saveProduct = async function(){
   const lead    = parseInt(document.getElementById('m-lead').value)      || 15;
   const safety  = parseInt(document.getElementById('m-safety').value)    || 0;
   const moq     = parseInt(document.getElementById('m-moq').value)       || 1;
+  const price  = parseFloat(document.getElementById('m-price').value) || 0;
+  const essential = document.getElementById('m-essential').value === 'yes';
   const minIn   = parseInt(document.getElementById('m-min').value)       || 0;
   const maxIn   = parseInt(document.getElementById('m-max').value)       || 0;
   const daily   = monthly / 30;
@@ -1143,6 +1265,8 @@ window.editP = function(id){
   document.getElementById('m-lead').value      = p.lead_time_days??15;
   // safety = Auto
   document.getElementById('m-moq').value       = p.moq??1;
+  document.getElementById('m-price').value    = p.unit_price??'';
+  document.getElementById('m-essential').value = p.is_essential ? 'yes' : 'no';
   document.getElementById('m-min').value       = p.min_stock??0;
   document.getElementById('m-max').value       = p.max_stock??0;
   document.getElementById('m-dead').value      = p.dead_stock_days??90;
@@ -1243,7 +1367,7 @@ function renderDashboard(){
   const totalOrderQty = needOrder.reduce((s,p)=>s+calcOrderQty(p),0);
   const totalOrderItems = needOrder.length;
   // มูลค่าสต็อก (ถ้ามีราคา)
-  const totalValue = allProducts.reduce((s,p)=>s+(p.qty??0)*(p.price??0),0);
+  const totalValue = allProducts.reduce((s,p)=>s+(p.qty??0)*(p.unit_price??p.price??0),0);
 
   document.getElementById('dash-kpi').innerHTML = [
     {label:'SKU ทั้งหมด',  val:allProducts.length, color:'var(--navy)', icon:'📦'},
@@ -1423,6 +1547,323 @@ window.exportReorder = function(){
   items.forEach(p=>rows.push([p.name,p.sku,p.unit??'',p.qty??0,p.safety_stock??0,calcRP(p),p.moq??'',p.lead_time_days??'',calcOrderQty(p),p.supplier??'',getStatus(p)]));
   dlCSV(rows,`reorder_${new Date().toISOString().split('T')[0]}.csv`);
 };
+
+// ══ สร้างใบขอซื้อ (Purchase Request) สำหรับพิมพ์ ══
+
+// ══ Kanban Card พิมพ์ติดชั้นวาง (SCA 12.07.B Visual Control) ══
+window.printKanban = function(){
+  const list = allProducts.filter(p=>(p.avg_monthly??0) > 0)
+    .sort((a,b)=>(a._abc||'C').localeCompare(b._abc||'C') || (b.avg_monthly??0)-(a.avg_monthly??0));
+  if(!list.length){ alert('ยังไม่มีสินค้าที่มีข้อมูลการใช้'); return; }
+
+  let cards = '';
+  list.forEach(p=>{
+    const ss=calcSafety(p), rp=calcRP(p), mn=calcMin(p), mx=calcMax(p);
+    const abc=p._abc||'C';
+    const abcColor = abc==='A'?'#dc2626':abc==='B'?'#d97706':'#16a34a';
+    const ess = p.is_essential ? '<span style="background:#fbbf24;color:#000;padding:1px 6px;border-radius:4px;font-size:8pt;font-weight:900">ESSENTIAL</span>' : '';
+    cards += `<div class="kb">
+      <div class="kb-h">
+        <span class="kb-abc" style="background:${abcColor}">${abc}</span>
+        <span class="kb-sku">${p.sku}</span>
+        ${ess}
+      </div>
+      <div class="kb-name">${p.name}</div>
+      <div class="kb-loc">📍 ${p.location||'—'} · หน่วย: ${p.unit||'—'}</div>
+      <table class="kb-t">
+        <tr><td class="red">🔴 สั่งทันที</td><td class="red-v">≤ ${ss}</td></tr>
+        <tr><td class="amb">🟡 จุดสั่งซื้อ</td><td class="amb-v">≤ ${rp}</td></tr>
+        <tr><td class="grn">🟢 ปกติ</td><td class="grn-v">${rp+1} – ${mx}</td></tr>
+      </table>
+      <div class="kb-f">
+        <span>Lead ${p.lead_time_days??15} วัน</span>
+        <span>MOQ ${p.moq??1}</span>
+        <span>ใช้ ~${p.avg_monthly}/เดือน</span>
+      </div>
+      <div class="kb-act">นับได้ต่ำกว่า <b>${rp}</b> → แจ้งหัวหน้าสั่งซื้อทันที</div>
+    </div>`;
+  });
+
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
+  <title>Kanban Cards</title><style>
+    @page{size:A4;margin:8mm}
+    body{font-family:'Sarabun',Arial,sans-serif;margin:0}
+    .wrap{display:grid;grid-template-columns:1fr 1fr;gap:5mm}
+    .kb{border:2px solid #002048;border-radius:6px;padding:7px 9px;page-break-inside:avoid;background:#fff}
+    .kb-h{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+    .kb-abc{color:#fff;font-weight:900;font-size:11pt;width:20px;height:20px;border-radius:4px;display:flex;align-items:center;justify-content:center}
+    .kb-sku{font-size:8.5pt;color:#666;font-weight:700}
+    .kb-name{font-size:13pt;font-weight:900;color:#002048;line-height:1.15;margin-bottom:2px}
+    .kb-loc{font-size:8.5pt;color:#555;margin-bottom:5px}
+    .kb-t{width:100%;border-collapse:collapse;font-size:9.5pt;margin-bottom:4px}
+    .kb-t td{padding:3px 6px;border:1px solid #ddd}
+    .red{background:#fef2f2;color:#991b1b;font-weight:700}.red-v{background:#fef2f2;color:#991b1b;font-weight:900;text-align:right;font-size:12pt}
+    .amb{background:#fffbeb;color:#92400e;font-weight:700}.amb-v{background:#fffbeb;color:#92400e;font-weight:900;text-align:right;font-size:12pt}
+    .grn{background:#f0fdf4;color:#166534;font-weight:700}.grn-v{background:#f0fdf4;color:#166534;font-weight:900;text-align:right;font-size:11pt}
+    .kb-f{display:flex;justify-content:space-between;font-size:8pt;color:#666;border-top:1px dashed #ccc;padding-top:3px}
+    .kb-act{margin-top:4px;background:#002048;color:#fff;padding:3px 6px;border-radius:4px;font-size:8.5pt;text-align:center}
+  </style></head><body><div class="wrap">${cards}</div></body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(), 400);
+};
+
+
+// ══ Annual Consumables Review (SCA 12.08.B) ══
+window.printAnnualReview = function(){
+  const now = new Date();
+  const yr  = now.getFullYear();
+
+  // จัดกลุ่มยอดใช้รายปี
+  const byYear = {};
+  allLogs.forEach(l=>{
+    if(l.type!=='OUT') return;
+    let d=null;
+    if(l.ts?.toDate) d=l.ts.toDate();
+    else if(l.ts_import?.toDate) d=l.ts_import.toDate();
+    else if(l.date) d=new Date(l.date+'T00:00:00');
+    if(!d) return;
+    const y=d.getFullYear(), n=l.name??'';
+    byYear[y] = byYear[y]||{};
+    byYear[y][n] = (byYear[y][n]||0) + (l.qty??0);
+  });
+  const years = Object.keys(byYear).map(Number).sort((a,b)=>b-a).slice(0,3);
+
+  // วิเคราะห์
+  const rows = allProducts.map(p=>{
+    const n=p.name;
+    const u = years.map(y=>byYear[y]?.[n]||0);
+    const trend = (u[0]&&u[1]) ? Math.round(((u[0]-u[1])/u[1])*100) : null;
+    const value = (p.qty??0)*(p.unit_price??0);
+    const cover = calcCoverage(p);
+    let opp = [];
+    if((p.avg_monthly??0)===0 && (p.qty??0)>0) opp.push('ไม่มีการใช้ — พิจารณาเลิกสต็อก');
+    if(cover.days!==null && cover.days>180)   opp.push('สต็อกเกิน 6 เดือน — ลดปริมาณสั่ง');
+    if(trend!==null && trend<-40)             opp.push('การใช้ลดลงมาก — ทบทวน MOQ');
+    if(trend!==null && trend>50)              opp.push('การใช้เพิ่มมาก — ทบทวน Safety Stock');
+    if((p.unit_price??0)===0)                 opp.push('ยังไม่มีราคา — ใส่เพื่อคำนวณมูลค่า');
+    return {p, u, trend, value, cover, opp, abc:p._abc||'C'};
+  }).sort((a,b)=>b.value-a.value);
+
+  const totalValue = rows.reduce((s,r)=>s+r.value,0);
+  const noMove = rows.filter(r=>(r.p.avg_monthly??0)===0).length;
+  const overStock = rows.filter(r=>r.cover.days!==null&&r.cover.days>180).length;
+  const withOpp = rows.filter(r=>r.opp.length>0);
+
+  // จัดกลุ่มชื่อคล้ายกัน (หา SKU ซ้ำซ้อน)
+  const groups = {};
+  allProducts.forEach(p=>{
+    const key = (p.name||'').replace(/[0-9()\/\-.xX×]+/g,'').replace(/\s+/g,'').slice(0,8);
+    if(!key) return;
+    groups[key] = groups[key]||[];
+    groups[key].push(p.name);
+  });
+  const dupGroups = Object.entries(groups).filter(([k,v])=>v.length>=3);
+
+  let tr='';
+  rows.slice(0,40).forEach((r,i)=>{
+    const t = r.trend===null?'—':(r.trend>0?'+':'')+r.trend+'%';
+    const tc = r.trend===null?'#999':(r.trend>0?'#dc2626':'#16a34a');
+    tr += `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td style="text-align:center;font-weight:900;color:${r.abc==='A'?'#dc2626':r.abc==='B'?'#d97706':'#16a34a'}">${r.abc}</td>
+      <td>${r.p.name}${r.p.is_essential?' <b style="color:#d97706">★</b>':''}</td>
+      ${r.u.map(x=>`<td style="text-align:right">${x||'—'}</td>`).join('')}
+      <td style="text-align:right;color:${tc};font-weight:700">${t}</td>
+      <td style="text-align:right">${r.p.qty??0}</td>
+      <td style="text-align:right">${r.cover.days??'—'}</td>
+      <td style="text-align:right">${r.value>0?r.value.toLocaleString(undefined,{maximumFractionDigits:0}):'—'}</td>
+      <td style="font-size:8pt">${r.opp.join(' · ')||'—'}</td>
+    </tr>`;
+  });
+
+  const w = window.open('','_blank');
+  w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
+  <title>Annual Consumables Review ${yr}</title><style>
+    @page{size:A4 landscape;margin:10mm}
+    body{font-family:'Sarabun',Arial,sans-serif;font-size:10px;color:#111}
+    h1{font-size:17px;margin:0;color:#002048}
+    .sub{font-size:10px;color:#555;margin:2px 0 8px}
+    .kpi{display:flex;gap:8px;margin-bottom:10px}
+    .k{flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-left:3px solid #002048;border-radius:5px;padding:6px 9px}
+    .k b{display:block;font-size:16px;color:#002048}
+    .k span{font-size:8.5px;color:#666}
+    table{width:100%;border-collapse:collapse}
+    th{background:#002048;color:#fff;padding:5px 4px;font-size:8.5px;border:1px solid #002048;text-align:left}
+    td{padding:3px 4px;border:1px solid #ddd;font-size:9px}
+    tr:nth-child(even) td{background:#fafbfc}
+    h2{font-size:12px;color:#002048;margin:12px 0 5px;border-bottom:1px solid #002048;padding-bottom:2px}
+    .box{background:#fffbeb;border:1px solid #fbbf24;border-radius:5px;padding:7px 10px;font-size:9px;line-height:1.7;margin-bottom:8px}
+    .sign{margin-top:20px;display:flex;gap:50px}
+    .sign div{flex:1;text-align:center}
+    .line{border-top:1px solid #333;margin-top:30px;padding-top:3px;font-size:9px}
+    .foot{margin-top:10px;font-size:8px;color:#777}
+  </style></head><body>
+  <h1>Annual Essential Consumables Review — ${yr}</h1>
+  <div class="sub">CEVA Logistics (Thailand) · RAPO Site THA088 Chonburi · SCA v6 Requirement 12.08.B</div>
+
+  <div class="kpi">
+    <div class="k"><b>${allProducts.length}</b><span>SKU ทั้งหมด</span></div>
+    <div class="k"><b>${rows.filter(r=>r.p.is_essential).length}</b><span>Essential (Critical)</span></div>
+    <div class="k"><b>${totalValue.toLocaleString(undefined,{maximumFractionDigits:0})}</b><span>มูลค่าสต็อกรวม (บาท)</span></div>
+    <div class="k"><b>${noMove}</b><span>ไม่มีการเคลื่อนไหว</span></div>
+    <div class="k"><b>${overStock}</b><span>สต็อกเกิน 6 เดือน</span></div>
+    <div class="k"><b>${withOpp.length}</b><span>มีโอกาสปรับปรุง</span></div>
+  </div>
+
+  <h2>1. การใช้งานรายปีและโอกาสปรับปรุง (40 อันดับตามมูลค่า)</h2>
+  <table><thead><tr>
+    <th style="width:22px">#</th><th style="width:24px">ABC</th><th>ชื่อสินค้า</th>
+    ${years.map(y=>`<th style="width:48px">${y}</th>`).join('')}
+    <th style="width:46px">Trend</th><th style="width:44px">คงเหลือ</th>
+    <th style="width:44px">ใช้ได้(วัน)</th><th style="width:60px">มูลค่า</th>
+    <th style="width:190px">โอกาสปรับปรุง</th>
+  </tr></thead><tbody>${tr}</tbody></table>
+
+  <h2>2. โอกาสลดจำนวน SKU (สินค้ากลุ่มคล้ายกัน)</h2>
+  <div class="box">
+    ${dupGroups.length
+      ? dupGroups.map(([k,v])=>`<b>${v.length} รายการคล้ายกัน:</b> ${v.slice(0,6).join(' / ')}${v.length>6?' …':''} → พิจารณารวมเหลือ ${Math.max(2,Math.ceil(v.length/2))} รายการ`).join('<br>')
+      : 'ไม่พบกลุ่มสินค้าที่ซ้ำซ้อนชัดเจน'}
+  </div>
+
+  <h2>3. สรุปข้อเสนอแนะ</h2>
+  <div class="box">
+    • <b>ลดต้นทุน:</b> ${noMove} SKU ไม่มีการเคลื่อนไหว — พิจารณาเลิกสต็อกหรือใช้ให้หมดก่อนสั่งใหม่<br>
+    • <b>ลดเงินจม:</b> ${overStock} SKU มีสต็อกเกิน 6 เดือน — ลดจำนวนสั่งต่อครั้งหรือขยายรอบสั่ง<br>
+    • <b>สิ่งแวดล้อม:</b> พิจารณาใช้วัสดุรีไซเคิลหรือลดขนาดบรรจุภัณฑ์สำหรับกลุ่ม C<br>
+    • <b>ความพร้อมใช้:</b> ตรวจสอบ Safety Stock ของกลุ่ม A และรายการ Essential ทุกไตรมาส
+  </div>
+
+  <div class="sign">
+    <div><div class="line">ผู้จัดทำ / Prepared by</div></div>
+    <div><div class="line">ผู้ทบทวน / Reviewed by</div></div>
+    <div><div class="line">ผู้อนุมัติ / Approved by</div></div>
+  </div>
+  <div class="foot">พิมพ์เมื่อ ${new Date().toLocaleString('th-TH')} · ข้อมูลจาก Transaction จริงในระบบ · ระบบสต็อก Consumables RAPO</div>
+  </body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(), 500);
+};
+
+window.printPR = function(){
+  const items = allProducts
+    .filter(p=>['out','low','reorder'].includes(getStatus(p)))
+    .sort((a,b)=>(a._abc||'C').localeCompare(b._abc||'C'));
+  if(!items.length){ alert('ไม่มีรายการที่ต้องสั่งซื้อ'); return; }
+
+  const today = new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
+  const prNo  = 'PR-' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-01';
+
+  let rows = '';
+  items.forEach((p,i)=>{
+    const bd = calcOrderBreakdown(p);
+    const cv = calcCoverage(p);
+    rows += `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td>${p.sku}</td>
+      <td>${p.name}</td>
+      <td style="text-align:center">${p._abc||'C'}</td>
+      <td style="text-align:right">${p.qty??0}</td>
+      <td style="text-align:right">${cv.days??'—'}</td>
+      <td style="text-align:right">${calcRP(p)}</td>
+      <td style="text-align:right;font-weight:900;color:#c00">${bd.orderQty}</td>
+      <td style="text-align:center">${p.unit??''}</td>
+      <td style="text-align:center">${p.lead_time_days??15}</td>
+      <td>${p.supplier??'—'}</td>
+    </tr>`;
+  });
+
+  const totalQty = items.reduce((s,p)=>s+calcOrderQty(p),0);
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html lang="th"><head><meta charset="UTF-8">
+  <title>${prNo}</title>
+  <style>
+    @page{size:A4 landscape;margin:12mm}
+    body{font-family:'Sarabun',Arial,sans-serif;font-size:11px;color:#111}
+    h1{font-size:18px;margin:0 0 2px;color:#002048}
+    .sub{font-size:11px;color:#555;margin-bottom:10px}
+    .meta{display:flex;gap:24px;font-size:11px;margin-bottom:10px;flex-wrap:wrap}
+    .meta b{color:#002048}
+    table{width:100%;border-collapse:collapse;margin-top:6px}
+    th{background:#002048;color:#fff;padding:6px 5px;font-size:10px;text-align:left;border:1px solid #002048}
+    td{padding:5px;border:1px solid #ccc;font-size:10.5px}
+    tr:nth-child(even) td{background:#f8fafc}
+    .foot{margin-top:14px;font-size:10px;color:#555}
+    .sign{margin-top:26px;display:flex;gap:60px}
+    .sign div{flex:1;text-align:center}
+    .line{border-top:1px solid #333;margin-top:34px;padding-top:4px}
+    .note{margin-top:10px;padding:8px;background:#f8fafc;border-left:3px solid #002048;font-size:10px;line-height:1.6}
+  </style></head><body>
+  <h1>ใบขอซื้อวัสดุสิ้นเปลือง (Purchase Request)</h1>
+  <div class="sub">CEVA Logistics (Thailand) — RAPO Site · THA088 Chonburi</div>
+  <div class="meta">
+    <span><b>เลขที่:</b> ${prNo}</span>
+    <span><b>วันที่:</b> ${today}</span>
+    <span><b>จำนวนรายการ:</b> ${items.length}</span>
+    <span><b>รวมจำนวน:</b> ${totalQty.toLocaleString()} หน่วย</span>
+    <span><b>ผู้ขอ:</b> ${currentUser?.email||'—'}</span>
+  </div>
+  <table>
+    <thead><tr>
+      <th style="width:28px">#</th><th style="width:80px">SKU</th><th>ชื่อสินค้า</th>
+      <th style="width:32px">ABC</th><th style="width:52px">คงเหลือ</th>
+      <th style="width:52px">ใช้ได้(วัน)</th><th style="width:56px">จุดสั่ง</th>
+      <th style="width:60px">ขอสั่ง</th><th style="width:44px">หน่วย</th>
+      <th style="width:44px">Lead</th><th style="width:110px">ซัพพลายเออร์</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="note">
+    <b>หลักการคำนวณจำนวนขอสั่ง:</b> (ค่าเฉลี่ยใช้ต่อวัน × Lead Time) + (ค่าเฉลี่ยใช้ต่อวัน × รอบสั่งซื้อ) + Safety Stock − คงเหลือปัจจุบัน แล้วปัดขึ้นเป็นจำนวนเท่าของ MOQ<br>
+    <b>Safety Stock:</b> ROUNDUP(ค่าเฉลี่ยใช้ต่อเดือน × 20%, 0) &nbsp;|&nbsp;
+    <b>จุดสั่งซื้อ:</b> (ค่าเฉลี่ยใช้ต่อวัน × Lead Time) + Safety Stock<br>
+    <b>ที่มาค่าเฉลี่ย:</b> คำนวณอัตโนมัติจาก Transaction OUT จริงย้อนหลัง 3 เดือน &nbsp;|&nbsp;
+    <b>ABC:</b> A = กินการใช้งาน 80% แรก, B = 15% ถัดมา, C = ที่เหลือ
+  </div>
+  <div class="sign">
+    <div><div class="line">ผู้ขอซื้อ / Requester</div></div>
+    <div><div class="line">หัวหน้าแผนก / Supervisor</div></div>
+    <div><div class="line">ผู้อนุมัติ / Approver</div></div>
+  </div>
+  <div class="foot">พิมพ์เมื่อ ${new Date().toLocaleString('th-TH')} · ระบบสต็อก Consumables RAPO</div>
+  </body></html>`);
+  w.document.close();
+  setTimeout(()=>w.print(), 400);
+};
+
+window.exportStockCSV = function(){
+  const DQ = String.fromCharCode(34);
+  const q  = s => DQ + String(s??'').split(DQ).join(DQ+DQ) + DQ;
+  const clean = s => String(s??'').replace(/[^\u0E00-\u0E7Fa-zA-Z0-9 .\-()]/g,'').trim();
+  const rows = [[
+    q('SKU'),q('ชื่อสินค้า'),q('หน่วย'),q('Category'),q('ที่เก็บ'),
+    q('คงเหลือ'),q('avg/เดือน'),q('avg/วัน'),q('Lead Time'),q('รอบสั่ง'),
+    q('Safety'),q('Reorder Point'),q('Min'),q('Max'),q('MOQ'),
+    q('ใช้ได้ (วัน)'),q('สถานะ'),q('ควรสั่ง'),q('Moving'),q('ราคา/หน่วย'),q('มูลค่าคงเหลือ'),
+    q('ที่มา avg'),q('สูตร Safety'),q('สูตร RP')
+  ].join(',')];
+  const stTxt={ok:'ปกติ',overstock:'มากเกิน',reorder:'ควรสั่งซื้อ',low:'ต่ำกว่า Safety',out:'หมดสต็อก',dead:'Dead Stock'};
+  allProducts.forEach(p=>{
+    const cv=calcCoverage(p), st=getStatus(p), mv=movingStatus(p);
+    rows.push([
+      q(p.sku),q(p.name),q(p.unit),q(p.category),q(p.location),
+      q(p.qty??0),q(p.avg_monthly??0),q(avgDaily(p).toFixed(2)),
+      q(p.lead_time_days??15),q(p.review_period??30),
+      q(calcSafety(p)),q(calcRP(p)),q(calcMin(p)),q(calcMax(p)),q(p.moq??1),
+      q(cv.days??''),q(stTxt[st]||st),q(calcOrderQty(p)),q(clean(mv.label)),q(p.unit_price??0),q(((p.qty??0)*(p.unit_price??0)).toFixed(2)),
+      q('Auto: sum(Transaction OUT 3 เดือน) / จำนวนเดือน'),
+      q('ROUNDUP(avg_monthly x 20%, 0)'),
+      q('(avg_daily x lead_time) + safety_stock')
+    ].join(','));
+  });
+  const blob=new Blob([String.fromCharCode(0xFEFF)+rows.join(String.fromCharCode(10))],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='RAPO_Stock_Coverage_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click(); URL.revokeObjectURL(url);
+};
+
 window.exportLog = function(){
   const rows=[['วันที่','ประเภท','SKU','ชื่อ','จำนวน','คงเหลือหลัง','โดย','PO','หมายเหตุ']];
   allLogs.forEach(l=>{ const dt=l.ts?.toDate?l.ts.toDate():new Date(l.ts??0); rows.push([dt.toLocaleString('th-TH'),l.type,l.sku??'',l.name??'',l.qty??0,l.qty_after??'',l.by??'',l.po??'',l.note??'']); });
@@ -1488,6 +1929,7 @@ function computeAvgMonthly(logs, products){
     p.safety_stock = Math.ceil(avg * 0.2); // Auto เสมอ
   });
 
+  computeABC(products);
   return months;
 }
 
