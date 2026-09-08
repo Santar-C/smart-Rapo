@@ -88,7 +88,7 @@
       transition:transform 0.2s cubic-bezier(.2,.8,.2,1), box-shadow 0.2s ease;
     }
     .kpi-card:hover { transform:translateY(-4px) scale(1.015); box-shadow:0 14px 28px rgba(2,29,73,0.12); }
-    .kpi-card .kicon { font-size:1.35rem; margin-bottom:0.2rem; display:inline-block; animation: floaty 3s ease-in-out infinite; }
+    .kpi-card .kicon { margin-bottom:0.2rem; display:flex; align-items:center; justify-content:center; animation: floaty 3s ease-in-out infinite; }
     .kpi-card .kval  { font-size:1.75rem; font-weight:900; line-height:1.1; transition:color .2s ease; }
     .kpi-card .kval.bump { animation: pop .35s ease; }
     .kpi-card .klabel{ font-size:0.75rem; color:var(--gray); font-weight:600; margin-top:2px; }
@@ -119,7 +119,7 @@
     /* ── Progress ring on cards that just hit 100% ─────────────────── */
     .celebrate-wrap { position:relative; }
     .confetti-piece {
-      position:absolute; top:0; font-size:1rem; pointer-events:none;
+      position:absolute; top:0; width:8px; height:8px; border-radius:2px; pointer-events:none;
       animation: confettiFall 1.1s ease-in forwards;
     }
 
@@ -134,11 +134,11 @@
 
   <div id="tab-tagcount">
     <div class="alert alert-info" style="font-size:0.82rem;margin-bottom:0.75rem;">
-      📝 Stock Take (Zone/Tag System) — ข้อมูลจาก <code>master_stock</code> / <code>count_jobs</code>
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h6"/><path d="M9 8h1"/></svg> Stock Take (Zone/Tag System) — ข้อมูลจาก <code>master_stock</code> / <code>count_jobs</code>
     </div>
     <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
-      <button class="btn btn-sm" id="tagcount-sub-overview" style="flex:1;background:var(--indigo);color:white;border:none;">📊 ภาพรวม</button>
-      <button class="btn btn-outline btn-sm" id="tagcount-sub-manage" style="flex:1;">🗄️ Master + พนักงาน</button>
+      <button class="btn btn-sm" id="tagcount-sub-overview" style="flex:1;background:var(--indigo);color:white;border:none;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> ภาพรวม</button>
+      <button class="btn btn-outline btn-sm" id="tagcount-sub-manage" style="flex:1;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg> Master + พนักงาน</button>
     </div>
 
     <!-- SUB: ภาพรวม/มอนิเตอร์ -->
@@ -147,26 +147,26 @@
       <!-- ═══ ROUND BANNER ═══ -->
       <div class="round-banner">
         <div>
-          <div class="rlabel" id="round-label">🔄 กำลังโหลดรอบปัจจุบัน...</div>
+          <div class="rlabel" id="round-label">กำลังโหลดรอบปัจจุบัน...</div>
           <div class="rsub" id="round-sub">—</div>
         </div>
         <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap;">
-          <a href="dashboard.html" class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.35);font-weight:700;text-decoration:none;">🖥️ Executive Dashboard</a>
+          <a href="dashboard.html" class="btn btn-sm" style="background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.35);font-weight:700;text-decoration:none;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg> Executive Dashboard</a>
           <select id="round-select" class="round-select"><option>รอบปัจจุบัน</option></select>
-          <button class="btn btn-sm" id="btn-new-round" style="background:white;color:var(--blue);border:none;font-weight:700;">🆕 เริ่มรอบใหม่</button>
+          <button class="btn btn-sm" id="btn-new-round" style="background:white;color:var(--blue);border:none;font-weight:700;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> เริ่มรอบใหม่</button>
         </div>
       </div>
 
       <!-- ═══ KPI GRID ═══ -->
       <div class="kpi-grid">
-        <div class="kpi-card kpi-blue"><div class="kicon">📍</div><div class="kval" id="tag-total">—</div><div class="klabel">Location ทั้งหมด</div></div>
-        <div class="kpi-card kpi-gray"><div class="kicon">⬜</div><div class="kval" id="tag-notstart">—</div><div class="klabel">ยังไม่เริ่ม</div></div>
-        <div class="kpi-card kpi-indigo"><div class="kicon">🔵</div><div class="kval" id="tag-inprog">—</div><div class="klabel">กำลังนับ</div></div>
-        <div class="kpi-card kpi-green"><div class="kicon">✅</div><div class="kval" id="tag-done">—</div><div class="klabel">เสร็จแล้ว (ตรง)</div></div>
-        <div class="kpi-card kpi-amber"><div class="kicon">📉</div><div class="kval" id="tag-short">—</div><div class="klabel">Location มีขาด</div></div>
-        <div class="kpi-card kpi-red"><div class="kicon">📈</div><div class="kval" id="tag-over">—</div><div class="klabel">Location มีเกิน</div></div>
-        <div class="kpi-card kpi-amber"><div class="kicon">🔻</div><div class="kval" id="tag-short-qty">—</div><div class="klabel">ยอดขาดรวม (ชิ้น/tag)</div></div>
-        <div class="kpi-card kpi-red"><div class="kicon">🔺</div><div class="kval" id="tag-over-qty">—</div><div class="klabel">ยอดเกินรวม (ชิ้น/tag)</div></div>
+        <div class="kpi-card kpi-blue"><div class="kicon" style="color:var(--blue);"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></div><div class="kval" id="tag-total">—</div><div class="klabel">Location ทั้งหมด</div></div>
+        <div class="kpi-card kpi-gray"><div class="kicon" style="color:var(--gray);"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg></div><div class="kval" id="tag-notstart">—</div><div class="klabel">ยังไม่เริ่ม</div></div>
+        <div class="kpi-card kpi-indigo"><div class="kicon" style="color:var(--indigo);"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg></div><div class="kval" id="tag-inprog">—</div><div class="klabel">กำลังนับ</div></div>
+        <div class="kpi-card kpi-green"><div class="kicon" style="color:var(--green);"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div><div class="kval" id="tag-done">—</div><div class="klabel">เสร็จแล้ว (ตรง)</div></div>
+        <div class="kpi-card kpi-amber"><div class="kicon" style="color:var(--amber);"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></svg></div><div class="kval" id="tag-short">—</div><div class="klabel">Location มีขาด</div></div>
+        <div class="kpi-card kpi-red"><div class="kicon" style="color:var(--red);"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg></div><div class="kval" id="tag-over">—</div><div class="klabel">Location มีเกิน</div></div>
+        <div class="kpi-card kpi-amber"><div class="kicon" style="color:var(--amber);"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></div><div class="kval" id="tag-short-qty">—</div><div class="klabel">ยอดขาดรวม (ชิ้น/tag)</div></div>
+        <div class="kpi-card kpi-red"><div class="kicon" style="color:var(--red);"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></div><div class="kval" id="tag-over-qty">—</div><div class="klabel">ยอดเกินรวม (ชิ้น/tag)</div></div>
       </div>
 
       <div class="card">
@@ -179,7 +179,7 @@
 
       <!-- ═══ สรุปตามโซน/Area ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
-        <div class="sec-head"><span class="sec-title">📦 สรุปตามโซน</span></div>
+        <div class="sec-head"><span class="sec-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> สรุปตามโซน</span></div>
         <div class="table-wrap" style="border:none;border-radius:0;">
           <table>
             <thead><tr><th>โซน</th><th>ทั้งหมด</th><th>ยังไม่เริ่ม</th><th>กำลังนับ</th><th>เสร็จ (ตรง)</th><th>เสร็จ (มี diff)</th><th>ขาดรวม</th><th>เกินรวม</th><th style="min-width:110px;">ความคืบหน้า</th></tr></thead>
@@ -190,12 +190,12 @@
 
       <!-- ═══ แนวโน้มข้ามรอบ ═══ -->
       <div class="card">
-        <div style="font-weight:800;color:var(--blue);margin-bottom:0.6rem;">📈 แนวโน้มความแม่นยำข้ามรอบ</div>
+        <div style="font-weight:800;color:var(--blue);margin-bottom:0.6rem;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></svg> แนวโน้มความแม่นยำข้ามรอบ</div>
         <div style="position:relative;height:220px;"><canvas id="trend-chart"></canvas></div>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="sec-head">
-          <span class="sec-title">🔁 Location ที่มีปัญหาซ้ำๆ (Chronic Problem Spots)</span>
+          <span class="sec-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> Location ที่มีปัญหาซ้ำๆ (Chronic Problem Spots)</span>
           <span style="font-size:0.75rem;color:var(--gray);">มี Short/Over ตั้งแต่ 2 รอบขึ้นไป</span>
         </div>
         <div id="chronic-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">กำลังคำนวณ...</div></div>
@@ -204,7 +204,7 @@
       <!-- ═══ สรุปตามพนักงาน / Leaderboard ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="sec-head">
-          <span class="sec-title">🏆 สรุปผลงาน & Leaderboard (รอบที่เลือก)</span>
+          <span class="sec-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526"/><circle cx="12" cy="8" r="6"/></svg> สรุปผลงาน & Leaderboard (รอบที่เลือก)</span>
         </div>
         <div class="alert alert-info" style="margin:0.75rem 1.25rem 0;font-size:0.78rem;">
           จัดอันดับตาม <b>ความแม่นยำ (%)</b> เป็นหลัก ไม่ใช่ความเร็ว — เพื่อไม่ให้กดดันจนรีบนับจนพลาด
@@ -219,13 +219,13 @@
       </div>
 
       <div class="card" style="padding:0;overflow:hidden;">
-        <div class="sec-head"><span class="sec-title">🟢 กำลังนับอยู่ตอนนี้</span></div>
+        <div class="sec-head"><span class="sec-title" style="display:inline-flex;align-items:center;gap:0.4rem;"><span style="width:9px;height:9px;border-radius:50%;background:var(--green);display:inline-block;"></span> กำลังนับอยู่ตอนนี้</span></div>
         <div id="tag-active-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีใครกำลังนับอยู่</div></div>
       </div>
 
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="sec-head">
-          <span class="sec-title">📍 ตารางความคืบหน้าตาม Location (รอบปัจจุบัน)</span>
+          <span class="sec-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg> ตารางความคืบหน้าตาม Location (รอบปัจจุบัน)</span>
           <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap;">
             <input type="text" id="tag-search" placeholder="ค้นหา Location..." style="padding:0.4rem 0.7rem;border:1.5px solid var(--border);border-radius:8px;font-size:0.8rem;">
             <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;"><input type="checkbox" id="tag-diff-only"> เฉพาะที่มี diff</label>
@@ -237,7 +237,7 @@
       <!-- ═══ Job ที่กำลังนับอยู่นาน — อาจค้างจากการรีเฟรช/หลุดเน็ตกลางคัน ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="sec-head">
-          <span class="sec-title">🕒 กำลังนับอยู่ — อาจค้าง (รีเฟรช/หลุดเน็ตกลางคัน)</span>
+          <span class="sec-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> กำลังนับอยู่ — อาจค้าง (รีเฟรช/หลุดเน็ตกลางคัน)</span>
           <span style="font-size:0.75rem;color:var(--gray);">ไม่ต้องรอพนักงานแจ้ง "กดผิด Location" ก่อน — ปล่อย Location ได้จากตรงนี้เลย</span>
         </div>
         <div id="tag-stuck-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการ</div></div>
@@ -245,14 +245,14 @@
 
       <!-- ═══ กดผิด Location — พนักงานแจ้งมา ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
-        <div class="sec-head"><span class="sec-title">❌ พนักงานแจ้งว่ากดผิด Location</span></div>
+        <div class="sec-head"><span class="sec-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> พนักงานแจ้งว่ากดผิด Location</span></div>
         <div id="tag-wrongloc-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการ</div></div>
       </div>
 
       <!-- ═══ Reconciliation: ตรวจ Short/Over + ระบุสาเหตุ ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="sec-head">
-          <span class="sec-title">🔍 Reconciliation — ตรวจสอบ Short/Over (รอบปัจจุบัน)</span>
+          <span class="sec-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> Reconciliation — ตรวจสอบ Short/Over (รอบปัจจุบัน)</span>
           <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.78rem;cursor:pointer;"><input type="checkbox" id="tag-recon-hide-reviewed" checked> ซ่อนที่ตรวจแล้ว</label>
         </div>
         <div id="tag-recon-list"><div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการต้องตรวจ</div></div>
@@ -261,7 +261,7 @@
       <!-- ═══ ประวัติ/Transactions ═══ -->
       <div class="card" style="padding:0;overflow:hidden;">
         <div class="sec-head">
-          <span class="sec-title">📜 ประวัติการนับ / Transactions (รอบที่เลือก)</span>
+          <span class="sec-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h12a2 2 0 0 0 2-2v-2H10v2a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v3h4"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/></svg> ประวัติการนับ / Transactions (รอบที่เลือก)</span>
           <input type="text" id="tag-log-search" placeholder="ค้นหา Location / ชื่อคน..." style="padding:0.4rem 0.7rem;border:1.5px solid var(--border);border-radius:8px;font-size:0.8rem;">
         </div>
         <div class="table-wrap" style="border:none;border-radius:0;">
@@ -274,18 +274,18 @@
 
       <!-- ═══ Export ═══ -->
       <div class="card" style="text-align:center;">
-        <div style="font-weight:700;color:var(--blue);margin-bottom:0.6rem;">⬇️ Export Excel — ครบทุกอย่างในไฟล์เดียว</div>
+        <div style="font-weight:700;color:var(--blue);margin-bottom:0.6rem;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Export Excel — ครบทุกอย่างในไฟล์เดียว</div>
         <div style="font-size:0.78rem;color:var(--gray);margin-bottom:0.85rem;">
           Coverage · สรุปตามโซน · สรุปพนักงาน · ประวัติ/Transactions (รอบที่เลือก) · Master + Status · Reconciliation
         </div>
-        <button class="btn btn-primary" id="btn-export-tag-xlsx" style="padding:0.75rem 2rem;">📥 Export Excel ทั้งหมด</button>
+        <button class="btn btn-primary" id="btn-export-tag-xlsx" style="padding:0.75rem 2rem;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Export Excel ทั้งหมด</button>
         <div style="border-top:1px dashed var(--border);margin:1rem 0;"></div>
-        <div style="font-weight:700;color:var(--red);margin-bottom:0.4rem;">🗑️ นับจบรอบทั้งหมดแล้ว? ล้างข้อมูลได้เลย</div>
+        <div style="font-weight:700;color:var(--red);margin-bottom:0.4rem;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> นับจบรอบทั้งหมดแล้ว? ล้างข้อมูลได้เลย</div>
         <div style="font-size:0.78rem;color:var(--gray);margin-bottom:0.85rem;">
           ปุ่มนี้แยกจาก Export ด้านบน — <b>ไม่ export ให้อัตโนมัติ</b> ใช้ตอนแน่ใจว่านับครบ + export
           เก็บไฟล์ไว้แล้วเท่านั้น ลบ Job/รายการนับของ<b>รอบปัจจุบัน</b>ทิ้งจาก Firestore ทั้งหมด กู้คืนไม่ได้
         </div>
-        <button class="btn" id="btn-clear-round" style="padding:0.75rem 2rem;background:var(--red);color:white;border:none;">🗑️ ล้างข้อมูลรอบนี้ (กลับไป 0 พร้อมรอบใหม่)</button>
+        <button class="btn" id="btn-clear-round" style="padding:0.75rem 2rem;background:var(--red);color:white;border:none;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> ล้างข้อมูลรอบนี้ (กลับไป 0 พร้อมรอบใหม่)</button>
       </div>
     </div>
     </div>
@@ -293,25 +293,25 @@
     <!-- SUB: จัดการ Master Stock + พนักงาน (ย้ายมาจาก stocktake.html) -->
     <div id="tagcount-manage" style="display:none">
       <div class="card">
-        <div class="card-title">🗄️ Import Master Stock (Tag/Zone)</div>
+        <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg> Import Master Stock (Tag/Zone)</div>
         <div class="alert alert-warning" style="font-size:0.82rem;margin-bottom:0.75rem;">
           <b>Format CSV หัวคอลัมน์จริง:</b> <code>Location,Tag,SKU,Name,Qty_System</code><br>
           <small>ไม่ต้องมีคอลัมน์ zone — ระบบคำนวณ zone ให้อัตโนมัติจาก prefix ของ Location:<br>
           Location ขึ้นต้นด้วย <b>B</b> (เช่น B01, B02...) → Zone B (bulk, 1 tag = 1 ชิ้น)<br>
           Location ขึ้นต้นด้วย <b>OVERFL</b> → Overflow (bulk, 1 tag = 1 ชิ้น)<br>
           Location อื่นๆ ทั้งหมด (A01-A20, C01-C04, SA12, RECEIVE ฯลฯ) → Normal (ยิงบาร์โค้ดซ้ำนับจำนวนจริง เทียบ Qty_System)<br><br>
-          <b>🆕 Location ที่ไม่มีของ:</b> ใส่แค่ Location ไว้ เว้น Tag ว่าง (เช่น <code>A05-10-1-10,,,,</code>)
+          <b>Location ที่ไม่มีของ:</b> ใส่แค่ Location ไว้ เว้น Tag ว่าง (เช่น <code>A05-10-1-10,,,,</code>)
           → จะขึ้นให้เลือกใน dropdown ปกติ พนักงานไปเช็คแล้วกด "นับเสร็จ" ได้เลย = ยืนยันว่า location นี้ว่างจริง</small>
         </div>
         <div class="alert alert-error" style="font-size:0.8rem;margin-bottom:0.75rem;">
-          ⚠️ ก่อนเริ่ม Stock Take รอบใหม่ ต้อง <b>ล้าง Master เก่าออกก่อนแล้วค่อย Import ใหม่</b>
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> ก่อนเริ่ม Stock Take รอบใหม่ ต้อง <b>ล้าง Master เก่าออกก่อนแล้วค่อย Import ใหม่</b>
         </div>
         <div class="form-group"><label>เลือกไฟล์ CSV</label><input type="file" id="tag-master-csv" accept=".csv"></div>
         <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;cursor:pointer;font-size:0.9rem;">
           <input type="checkbox" id="tag-master-clear" checked> ล้างข้อมูล Master เก่าก่อน Import
         </label>
-        <button class="btn btn-primary btn-full" id="btn-tag-import-master">📥 Import Master Stock</button>
-        <button class="btn btn-outline btn-full" id="btn-tag-clear-master-only" style="margin-top:0.5rem;">🗑️ ล้าง Master ทั้งหมด (ไม่ import)</button>
+        <button class="btn btn-primary btn-full" id="btn-tag-import-master"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Import Master Stock</button>
+        <button class="btn btn-outline btn-full" id="btn-tag-clear-master-only" style="margin-top:0.5rem;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> ล้าง Master ทั้งหมด (ไม่ import)</button>
       </div>
       <div class="card" style="padding:0;overflow:hidden;">
         <div style="padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
@@ -329,7 +329,7 @@
         </div>
       </div>
       <div class="card">
-        <div class="card-title">🏷️ Import ตาราง Barcode ↔ Location (จาก WMS)</div>
+        <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg> Import ตาราง Barcode ↔ Location (จาก WMS)</div>
         <div class="alert alert-info" style="font-size:0.8rem;margin-bottom:0.75rem;">
           บาร์โค้ดจริงที่ติดหน้าช่องเป็นรหัสที่ระบบ WMS generate ไว้ <b>คนละค่ากับรหัส Location ที่คนอ่านเห็น</b>
           (เช่น A01-01-1-10) ต้อง export ตารางเทียบจาก WMS มา import ที่นี่ก่อน ไม่งั้นพนักงานยิงบาร์โค้ดแล้วระบบจะหาไม่เจอ<br><br>
@@ -339,14 +339,14 @@
         <label style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;cursor:pointer;font-size:0.9rem;">
           <input type="checkbox" id="barcode-map-clear" checked> ล้างตารางเทียบเก่าก่อน Import
         </label>
-        <button class="btn btn-primary btn-full" id="btn-import-barcode-map">📥 Import ตารางเทียบ</button>
+        <button class="btn btn-primary btn-full" id="btn-import-barcode-map"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Import ตารางเทียบ</button>
         <div style="font-size:0.8rem;color:var(--gray);margin-top:0.6rem;" id="barcode-map-status">ยังไม่ได้เช็คสถานะ</div>
       </div>
       <div class="card">
-        <div class="card-title">👤 รายชื่อพนักงาน (สำหรับ Dropdown ตอนเริ่มนับ)</div>
+        <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> รายชื่อพนักงาน (สำหรับ Dropdown ตอนเริ่มนับ)</div>
         <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;">
           <input type="text" id="staff-name-input" placeholder="ชื่อพนักงาน" style="flex:1;">
-          <button class="btn btn-primary btn-sm" id="btn-add-staff">➕ เพิ่ม</button>
+          <button class="btn btn-primary btn-sm" id="btn-add-staff"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> เพิ่ม</button>
         </div>
         <div id="staff-list-el" style="display:flex;flex-direction:column;gap:0.35rem;"></div>
       </div>
@@ -358,6 +358,7 @@
 <script type="module">
   import { auth, db } from "./firebase-config.js";
   import { requireAdmin } from "./auth.js";
+  import { icon } from "./icons.js";
   import {
     collection, doc, getDocs, setDoc, addDoc, updateDoc,
     deleteDoc, query, orderBy, where, onSnapshot, serverTimestamp, writeBatch, getCountFromServer
@@ -370,9 +371,9 @@
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">
-      <a class="topbar-back" href="index.html">←</a>
+      <a class="topbar-back" href="index.html" aria-label="กลับ">${icon("arrow_left", { size: 20 })}</a>
       <div style="flex:1">
-        <div class="topbar-title">📊 Monitor & Audit</div>
+        <div class="topbar-title">${icon("bar_chart", { size: 20 })} Monitor & Audit</div>
         <div class="topbar-sub">สำหรับหัวหน้างาน</div>
       </div>
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
@@ -407,7 +408,7 @@
   }
 
   // ฉลองเล็กๆ ตอนความคืบหน้ารอบปัจจุบันแตะ 100% — คอนเฟตตี้ใบเล็กๆ ลอยผ่านตัวเลข % ไม่กระทบ layout อื่น
-  const CONFETTI_EMOJI = ["🎉","✨","🎊","⭐"];
+  const CONFETTI_COLORS = ["#f59e0b","#6366f1","#16a34a","#ec4899","#0ea5e9"];
   function burstConfetti(anchorEl) {
     if (!anchorEl) return;
     const wrap = anchorEl.parentElement;
@@ -416,13 +417,14 @@
     for (let i=0;i<8;i++) {
       const span = document.createElement("span");
       span.className = "confetti-piece";
-      span.textContent = CONFETTI_EMOJI[i % CONFETTI_EMOJI.length];
+      span.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+      span.style.transform = `rotate(${Math.random()*360}deg)`;
       span.style.left = `${Math.random()*90}%`;
       span.style.animationDelay = `${Math.random()*0.25}s`;
       wrap.appendChild(span);
       setTimeout(()=>span.remove(), 1400);
     }
-    toast("🎉 นับครบ 100% แล้วในรอบนี้!", 3000);
+    toast("นับครบ 100% แล้วในรอบนี้!", 3000);
   }
 
   // ══════════════════════════════════════════════════════════
@@ -463,10 +465,10 @@
     const sub = document.getElementById("round-sub");
     if (!lbl) return;
     if (!currentRound) {
-      lbl.innerHTML = '<span class="wiggle-icon">⚠️</span> ยังไม่เคยเริ่มรอบ (ข้อมูลเก่าทั้งหมดถือเป็น Legacy)';
+      lbl.innerHTML = `<span class="wiggle-icon">${icon("alert_triangle",{size:16})}</span> ยังไม่เคยเริ่มรอบ (ข้อมูลเก่าทั้งหมดถือเป็น Legacy)`;
       sub.textContent = 'กด "เริ่มรอบใหม่" ด้านขวาเพื่อเริ่มระบบนับตามรอบ';
     } else {
-      lbl.innerHTML = `<span class="wiggle-icon">🔄</span> รอบปัจจุบัน: ${esc(currentRound.round_label || currentRound.round_id)}`;
+      lbl.innerHTML = `<span class="wiggle-icon">${icon("refresh",{size:16})}</span> รอบปัจจุบัน: ${esc(currentRound.round_label || currentRound.round_id)}`;
       sub.textContent = `เริ่มเมื่อ ${fmtDT(currentRound.started_at)} โดย ${currentRound.started_by||"—"}`;
     }
   }
@@ -476,7 +478,7 @@
     if (!sel) return;
     const keep = sel.value;
     sel.innerHTML = allRounds.map(r =>
-      `<option value="${r.round_id}">${currentRound?.round_id===r.round_id?"🔵 ":""}${r.round_label||r.round_id}</option>`
+      `<option value="${r.round_id}">${currentRound?.round_id===r.round_id?"● ":""}${r.round_label||r.round_id}</option>`
     ).join("") + `<option value="__legacy__">— ก่อนเริ่มระบบรอบ (Legacy) —</option>`;
     if ([...sel.options].some(o=>o.value===keep)) sel.value = keep;
     else if (currentRound) sel.value = currentRound.round_id;
@@ -500,7 +502,7 @@
     if (!confirm('เริ่มรอบใหม่?\n\nประวัติของรอบเก่าจะยังอยู่ครบ ดูย้อนหลังได้ผ่าน dropdown เลือกรอบด้านบน\nแค่ Dashboard หลัก (Coverage/สรุปตามโซน) จะเริ่มนับใหม่จาก 0')) return;
     const label = prompt("ตั้งชื่อรอบนี้ (เว้นว่างได้ ระบบจะตั้งเป็นวันที่ให้):", "") || undefined;
     await startNewRound(label);
-    toast("🆕 เริ่มรอบใหม่แล้ว");
+    toast("เริ่มรอบใหม่แล้ว");
   });
 
   // จำกัด jobs ให้อยู่ในรอบที่ต้องการ
@@ -577,9 +579,9 @@
     tbody.innerHTML = (data.length ? data.map(m => m.is_placeholder ? `<tr style="background:#f8fafc;">
         <td style="font-weight:700;">${m.location}</td>
         <td><span class="badge ${TAG_Z[m.zone]||"badge-gray"}">${m.zone||"Normal"}</span></td>
-        <td colspan="3" style="color:var(--gray);font-style:italic;">📭 ไม่มีของ (location ว่าง)</td>
+        <td colspan="3" style="color:var(--gray);font-style:italic;display:flex;align-items:center;gap:0.4rem;">${icon("archive",{size:14})} ไม่มีของ (location ว่าง)</td>
         <td>—</td>
-        <td><button onclick="delTagMaster('${m.id}')" class="btn btn-red btn-sm">🗑️</button></td>
+        <td><button onclick="delTagMaster('${m.id}')" class="btn btn-red btn-sm">${icon("trash",{size:14})}</button></td>
       </tr>` : `<tr>
         <td style="font-weight:700;">${m.location}</td>
         <td><span class="badge ${TAG_Z[m.zone]||"badge-gray"}">${m.zone||"Normal"}</span></td>
@@ -587,14 +589,14 @@
         <td style="font-family:monospace;font-size:0.8rem;">${m.sku||"—"}</td>
         <td>${m.item_name||"—"}</td>
         <td>${m.qty_system ?? "—"}</td>
-        <td><button onclick="delTagMaster('${m.id}')" class="btn btn-red btn-sm">🗑️</button></td>
+        <td><button onclick="delTagMaster('${m.id}')" class="btn btn-red btn-sm">${icon("trash",{size:14})}</button></td>
       </tr>`).join("") + hint : `<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--gray);">ยังไม่มี Master</td></tr>`);
   }
   document.getElementById("tag-master-search")?.addEventListener("input", e => { tagMasterSearch=e.target.value; renderTagMasterTable(); });
   window.delTagMaster = async id => {
     if (!confirm("ลบ?")) return;
     await deleteDoc(doc(db,"master_stock",id));
-    toast("🗑️ ลบแล้ว");
+    toast("ลบแล้ว");
   };
   document.getElementById("btn-tag-clear-master-only")?.addEventListener("click", async () => {
     if (!tagMasterStock.length) { toast("ไม่มี Master ให้ล้าง"); return; }
@@ -605,9 +607,9 @@
     try {
       await deleteInChunks(tagMasterStock.map(m=>m.id), msg => { btn.textContent = msg; });
       await setDoc(doc(db,"location_index","current"), { locations: [], updated_at: serverTimestamp() });
-      toast("🗑️ ล้าง Master ทั้งหมดแล้ว");
+      toast("ล้าง Master ทั้งหมดแล้ว");
     } catch (err) {
-      toast("❌ ล้างไม่สำเร็จ: "+err.message, 6000);
+      toast("ล้างไม่สำเร็จ: "+err.message, 6000);
     } finally {
       btn.disabled = false; btn.textContent = orig;
     }
@@ -633,7 +635,7 @@
       const snap = await getDocs(collection(db,"location_barcode_map"));
       let total = 0;
       snap.forEach(d => { const m = d.data().map || {}; total += Object.keys(m).length; });
-      el.textContent = total ? `✅ มีตารางเทียบอยู่แล้ว ${total} รายการ` : "⚠️ ยังไม่มีตารางเทียบ";
+      el.textContent = total ? `มีตารางเทียบอยู่แล้ว ${total} รายการ` : "ยังไม่มีตารางเทียบ";
     } catch (e) { el.textContent = "เช็คสถานะไม่ได้"; }
   }
   checkBarcodeMapStatus();
@@ -641,7 +643,7 @@
   document.getElementById("btn-import-barcode-map")?.addEventListener("click", async () => {
     const file = document.getElementById("barcode-map-csv").files[0];
     const clear = document.getElementById("barcode-map-clear").checked;
-    if (!file) { toast("⚠️ เลือกไฟล์ก่อน"); return; }
+    if (!file) { toast("เลือกไฟล์ก่อน"); return; }
     const btn = document.getElementById("btn-import-barcode-map");
     const orig = btn.textContent;
     btn.disabled = true;
@@ -668,10 +670,10 @@
       }
       // เก็บเป็นเอกสารเดียว (โหลดครั้งเดียวฝั่งพนักงาน — เหมือน location_index)
       await setDoc(doc(db,"location_barcode_map","current"), { map, updated_at: serverTimestamp() });
-      toast(`✅ Import ตารางเทียบ ${count} รายการ${skipped?` (ข้าม ${skipped} แถวไม่ครบ)`:""}`);
+      toast(`Import ตารางเทียบ ${count} รายการ${skipped?` (ข้าม ${skipped} แถวไม่ครบ)`:""}`);
       checkBarcodeMapStatus();
     } catch (err) {
-      toast("❌ Import ไม่สำเร็จ: "+err.message, 6000);
+      toast("Import ไม่สำเร็จ: "+err.message, 6000);
     } finally {
       btn.disabled = false; btn.textContent = orig;
     }
@@ -686,7 +688,7 @@
       const batch = writeBatch(db);
       chunk.forEach(id => batch.delete(doc(db,"master_stock",id)));
       await batch.commit();
-      if (onProgress) onProgress(`⏳ ลบ ${Math.min(i+CHUNK_SIZE, ids.length)}/${ids.length}...`);
+      if (onProgress) onProgress(`ลบ ${Math.min(i+CHUNK_SIZE, ids.length)}/${ids.length}...`);
     }
   }
   async function setInChunks(rows, onProgress) {
@@ -695,7 +697,7 @@
       const batch = writeBatch(db);
       chunk.forEach(r => batch.set(doc(collection(db,"master_stock")), r));
       await batch.commit();
-      if (onProgress) onProgress(`⏳ Import ${Math.min(i+CHUNK_SIZE, rows.length)}/${rows.length}...`);
+      if (onProgress) onProgress(`Import ${Math.min(i+CHUNK_SIZE, rows.length)}/${rows.length}...`);
     }
   }
 
@@ -729,7 +731,7 @@
   document.getElementById("btn-tag-import-master")?.addEventListener("click", async () => {
     const file  = document.getElementById("tag-master-csv").files[0];
     const clear = document.getElementById("tag-master-clear").checked;
-    if (!file) { toast("⚠️ เลือกไฟล์ก่อน"); return; }
+    if (!file) { toast("เลือกไฟล์ก่อน"); return; }
     const btn = document.getElementById("btn-tag-import-master");
     const orig = btn.textContent;
     btn.disabled = true;
@@ -767,11 +769,11 @@
         await deleteInChunks(tagMasterStock.map(m=>m.id), msg => { btn.textContent = msg; });
       }
       await setInChunks(rows, msg => { btn.textContent = msg; });
-      btn.textContent = "⏳ อัปเดต location index...";
+      btn.textContent = "อัปเดต location index...";
       await rebuildLocationIndex(rows);
-      toast(`✅ Import ${rows.length} รายการ${placeholders?` (มี ${placeholders} location ว่าง)`:""}${skipped?` (ข้าม ${skipped} แถวไม่มี Location)`:""}`);
+      toast(`Import ${rows.length} รายการ${placeholders?` (มี ${placeholders} location ว่าง)`:""}${skipped?` (ข้าม ${skipped} แถวไม่มี Location)`:""}`);
     } catch (err) {
-      toast("❌ Import ไม่สำเร็จ: "+err.message, 6000);
+      toast("Import ไม่สำเร็จ: "+err.message, 6000);
     } finally {
       btn.disabled = false; btn.textContent = orig;
     }
@@ -790,21 +792,21 @@
     el.innerHTML = staffListData.length ? staffListData.map(s => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:0.4rem 0.7rem;background:#f8fafc;border-radius:8px;">
         <span>${s.name}</span>
-        <button class="btn btn-red btn-sm" onclick="delStaff('${s.id}')">🗑️</button>
+        <button class="btn btn-red btn-sm" onclick="delStaff('${s.id}')">${icon("trash",{size:14})}</button>
       </div>`).join("") : `<div style="color:var(--gray);font-size:0.85rem;padding:0.5rem 0;">ยังไม่มีรายชื่อ</div>`;
   }
   document.getElementById("btn-add-staff")?.addEventListener("click", async () => {
     const inp = document.getElementById("staff-name-input");
     const name = inp.value.trim();
-    if (!name) { toast("⚠️ ระบุชื่อก่อน"); return; }
+    if (!name) { toast("ระบุชื่อก่อน"); return; }
     await addDoc(collection(db,"staff_list"), { name, created_at: serverTimestamp() });
     inp.value=""; await loadStaffList();
-    toast(`✅ เพิ่ม ${name}`);
+    toast(`เพิ่ม ${name}`);
   });
   window.delStaff = async id => {
     if (!confirm("ลบชื่อนี้?")) return;
     await deleteDoc(doc(db,"staff_list",id));
-    await loadStaffList(); toast("🗑️ ลบแล้ว");
+    await loadStaffList(); toast("ลบแล้ว");
   };
 
   document.getElementById("tag-search")?.addEventListener("input", e => { tagSearch=e.target.value; renderTagMonitor(); });
@@ -906,12 +908,12 @@
       activeEl.innerHTML = active.length ? active.map(j => {
         const ts = fmtDT(j.start_time);
         return `<div style="display:flex;align-items:center;gap:0.6rem;padding:0.55rem 0.85rem;border-bottom:1px solid var(--border);font-size:0.85rem;flex-wrap:wrap;">
-          <span style="font-weight:700;font-family:monospace;">📍 ${j.location_scan}</span>
+          <span style="font-weight:700;font-family:monospace;display:inline-flex;align-items:center;gap:0.25rem;"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg> ${j.location_scan}</span>
           <span class="badge ${TAG_Z[j.zone_type]||"badge-gray"}">${j.zone_type}</span>
           <span>${j.created_name||"—"}</span>
           <span style="color:var(--gray);font-size:0.78rem;">เริ่ม ${ts}</span>
           <span style="margin-left:auto;font-weight:700;">${j.matched_count??0}/${j.expected_target??"?"}</span>
-          ${j.over_count>0?`<span class="diff-minus">🔺 ${j.over_count}</span>`:""}
+          ${j.over_count>0?`<span class="diff-minus"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg> ${j.over_count}</span>`:""}
         </div>`;
       }).join("") : `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีใครกำลังนับอยู่</div>`;
     }
@@ -927,10 +929,10 @@
           <span style="font-weight:700;font-family:monospace;min-width:90px;">${r.loc}</span>
           <span class="badge ${TAG_Z[r.zone]||"badge-gray"}">${r.zone}</span>
           <span style="${r.status==='diff'?'color:var(--red);font-weight:700;':r.status==='ok'?'color:var(--green);font-weight:700;':r.status==='inprogress'?'color:var(--indigo);font-weight:700;':'color:var(--gray);'}">
-            ${r.status==="idle"?"⬜":r.status==="inprogress"?"🔵":r.status==="ok"?"✅":"⚠️"} ${r.label}
+            ${r.status==="idle"?"<span style=\"display:inline-block;width:8px;height:8px;border-radius:2px;background:#cbd5e1;\"></span>":r.status==="inprogress"?"<span style=\"display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--indigo);\"></span>":r.status==="ok"?icon("check_circle",{size:13}):icon("alert_triangle",{size:13})} ${r.label}
           </span>
           ${r.job?.attempt>1?`<span class="badge badge-indigo" style="font-size:0.68rem;">รอบ ${r.job.attempt}</span>`:""}
-          ${r.job?.needs_recount?`<span class="badge badge-amber" style="font-size:0.68rem;">🔁 รอนับซ้ำ</span>`:""}
+          ${r.job?.needs_recount?`<span class="badge badge-amber" style="font-size:0.68rem;display:inline-flex;align-items:center;gap:0.2rem;"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> รอนับซ้ำ</span>`:""}
           ${r.who?`<span style="color:var(--gray);font-size:0.78rem;">— ${r.who}</span>`:""}
         </div>
       `).join("") || `<div style="padding:1.5rem;text-align:center;color:var(--gray);">ไม่พบข้อมูล</div>`;
@@ -955,12 +957,12 @@
     // จัดอันดับตามความแม่นยำ (%) เป็นหลัก แล้วค่อยดูจำนวนที่นับ (ไม่จัดตามความเร็ว โดยเจตนา)
     const staffRows = Object.values(staffMap).map(s => ({...s, accuracy: s.locCount ? Math.round((s.okCount/s.locCount)*100) : 0}))
       .sort((a,b) => b.accuracy - a.accuracy || b.locCount - a.locCount);
-    const medals = ["🥇","🥈","🥉"];
+    const medalColors = ["#eab308","#94a3b8","#b45309"];
     const staffTbody = document.getElementById("tag-staff-tbody");
     if (staffTbody) {
       staffTbody.innerHTML = staffRows.length ? staffRows.map((s,i) => `
         <tr>
-          <td style="font-weight:900;">${medals[i]||i+1}</td>
+          <td style="font-weight:900;">${i<3?`<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:${medalColors[i]};color:white;font-size:0.7rem;">${i+1}</span>`:i+1}</td>
           <td style="font-weight:700;">${s.name}</td>
           <td style="font-weight:700;color:${s.accuracy>=95?'var(--green)':s.accuracy>=80?'var(--amber)':'var(--red)'};">${s.accuracy}%</td>
           <td>${s.locCount}</td>
@@ -984,9 +986,9 @@
       logTbody.innerHTML = logRows.length ? logRows.map(j => {
         const isDone = j.count_status==="Completed";
         const sc = j.short_count||0, oc = j.over_count||0;
-        const statusTxt = !isDone ? `<span style="color:var(--indigo);font-weight:700;">🔵 กำลังนับ</span>`
-          : (sc===0 && oc===0) ? `<span style="color:var(--green);font-weight:700;">✅ ตรง</span>`
-          : `<span style="color:var(--red);font-weight:700;">⚠️ มี diff</span>`;
+        const statusTxt = !isDone ? `<span style="color:var(--indigo);font-weight:700;">กำลังนับ</span>`
+          : (sc===0 && oc===0) ? `<span style="color:var(--green);font-weight:700;display:inline-flex;align-items:center;gap:0.25rem;"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> ตรง</span>`
+          : `<span style="color:var(--red);font-weight:700;display:inline-flex;align-items:center;gap:0.25rem;"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> มี diff</span>`;
         const dur = (isDone && j.start_time?.toDate && j.end_time?.toDate) ? fmtDuration(j.end_time.toDate()-j.start_time.toDate()) : "—";
         return `<tr>
           <td style="font-weight:700;font-family:monospace;">${j.location_scan}${j.attempt>1?` <span class="badge badge-indigo" style="font-size:0.65rem;">รอบ ${j.attempt}</span>`:""}</td>
@@ -1068,7 +1070,7 @@
           <span style="font-weight:700;font-family:monospace;">${c.loc}</span>
           <span style="color:var(--red);font-weight:700;">มีปัญหา ${c.count} รอบ</span>
         </div>
-      `).join("") : `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ยังไม่พบ location ที่มีปัญหาซ้ำ 🎉</div>`;
+      `).join("") : `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ยังไม่พบ location ที่มีปัญหาซ้ำ</div>`;
     }
   }
 
@@ -1079,7 +1081,7 @@
     if (!el) return;
     const hideReviewed = document.getElementById("tag-recon-hide-reviewed")?.checked;
     const list = hideReviewed ? jobs.filter(j=>!j.reviewed) : jobs;
-    if (!list.length) { el.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการต้องตรวจ 🎉</div>`; return; }
+    if (!list.length) { el.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--gray);font-size:0.85rem;">ไม่มีรายการต้องตรวจ</div>`; return; }
     el.innerHTML = list.map(j => `
       <div style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.85rem;border-bottom:1px solid var(--border);font-size:0.85rem;flex-wrap:wrap;${j.reviewed?'opacity:0.55;':''}">
         <span style="font-weight:700;font-family:monospace;min-width:90px;">${j.location_scan}${j.attempt>1?` <span class="badge badge-indigo" style="font-size:0.68rem;">รอบ ${j.attempt}</span>`:""}</span>
@@ -1091,24 +1093,24 @@
           ${RECON_REASONS.map(r=>`<option value="${r}" ${j.reason===r?"selected":""}>${r}</option>`).join("")}
         </select>
         ${j.reviewed
-          ? `<span style="color:var(--green);font-weight:700;font-size:0.78rem;">✅ ตรวจแล้ว: ${j.reason||"—"}</span>`
-          : `<button class="btn btn-sm" style="background:var(--indigo);color:white;border:none;" onclick="saveRecon('${j.id}')">✔️ บันทึก</button>`}
+          ? `<span style="color:var(--green);font-weight:700;font-size:0.78rem;display:inline-flex;align-items:center;gap:0.25rem;"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> ตรวจแล้ว: ${j.reason||"—"}</span>`
+          : `<button class="btn btn-sm" style="background:var(--indigo);color:white;border:none;" onclick="saveRecon('${j.id}')"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> บันทึก</button>`}
         ${j.needs_recount
-          ? `<span style="color:var(--indigo);font-weight:700;font-size:0.78rem;">🔁 รอนับซ้ำ</span>`
-          : `<button class="btn btn-outline btn-sm" onclick="orderRecount('${j.id}')">🔁 สั่งนับซ้ำ</button>`}
+          ? `<span style="color:var(--indigo);font-weight:700;font-size:0.78rem;display:inline-flex;align-items:center;gap:0.25rem;"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> รอนับซ้ำ</span>`
+          : `<button class="btn btn-outline btn-sm" onclick="orderRecount('${j.id}')"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg> สั่งนับซ้ำ</button>`}
       </div>
     `).join("");
   }
   window.orderRecount = async (jobId) => {
     await updateDoc(doc(db,"count_jobs",jobId), { needs_recount: true });
-    toast("🔁 สั่งนับซ้ำแล้ว — location นี้จะขึ้นให้พนักงานนับต่อได้ทันทีที่เข้าไปเลือก location เดิมอีกครั้ง");
+    toast("สั่งนับซ้ำแล้ว — location นี้จะขึ้นให้พนักงานนับต่อได้ทันทีที่เข้าไปเลือก location เดิมอีกครั้ง");
   };
   window.saveRecon = async (jobId) => {
     const sel = document.getElementById(`recon-reason-${jobId}`);
     const reason = sel?.value || "";
-    if (!reason) { toast("⚠️ เลือกสาเหตุก่อน"); return; }
+    if (!reason) { toast("เลือกสาเหตุก่อน"); return; }
     await updateDoc(doc(db,"count_jobs",jobId), { reviewed: true, reason, reviewed_by: currentProfile.name, reviewed_at: serverTimestamp() });
-    toast("✅ บันทึกการตรวจแล้ว");
+    toast("บันทึกการตรวจแล้ว");
   };
   document.getElementById("tag-recon-hide-reviewed")?.addEventListener("change", () => renderReconciliation(window._tagReconJobs||[]));
 
@@ -1130,9 +1132,9 @@
       <div style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.85rem;border-bottom:1px solid var(--border);font-size:0.85rem;flex-wrap:wrap;${isStale?'background:#fef2f2;':''}">
         <span style="font-weight:700;font-family:monospace;min-width:90px;">${j.location_scan}</span>
         <span>${j.created_name||"—"}</span>
-        <span style="${isStale?'color:var(--red);font-weight:700;':'color:var(--gray);'}font-size:0.78rem;">เริ่มมาแล้ว ${fmtDuration(elapsedMs)}${isStale?" ⚠️":""}</span>
+        <span style="${isStale?'color:var(--red);font-weight:700;':'color:var(--gray);'}font-size:0.78rem;">เริ่มมาแล้ว ${fmtDuration(elapsedMs)}</span>
         <span style="margin-left:auto;font-weight:700;">${j.matched_count??0}/${j.expected_target??"?"}</span>
-        <button class="btn btn-sm" style="background:var(--red);color:white;border:none;" onclick="releaseStuckJob('${j.id}')">🔓 ปล่อย & รีเซ็ต Location</button>
+        <button class="btn btn-sm" style="background:var(--red);color:white;border:none;" onclick="releaseStuckJob('${j.id}')"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> ปล่อย & รีเซ็ต Location</button>
       </div>`;
     }).join("");
   }
@@ -1144,9 +1146,9 @@
       dd.docs.forEach(d => batch.delete(d.ref));
       batch.delete(doc(db,"count_jobs",jobId));
       await batch.commit();
-      toast("✅ ปล่อยและรีเซ็ต Location แล้ว");
+      toast("ปล่อยและรีเซ็ต Location แล้ว");
     } catch (err) {
-      toast("❌ ปล่อยไม่สำเร็จ: "+err.message, 5000);
+      toast("ปล่อยไม่สำเร็จ: "+err.message, 5000);
     }
   };
 
@@ -1162,8 +1164,8 @@
         <span>${j.created_name||"—"}</span>
         <span style="color:var(--gray);font-size:0.78rem;">แจ้งเมื่อ ${fmtDT(j.flagged_at)}</span>
         <span style="margin-left:auto;font-weight:700;">${j.matched_count??0}/${j.expected_target??"?"}</span>
-        <button class="btn btn-sm" style="background:var(--red);color:white;border:none;" onclick="resetWrongLocation('${j.id}')">🗑️ ลบ & รีเซ็ต Location</button>
-        <button class="btn btn-outline btn-sm" onclick="dismissWrongLocation('${j.id}')">✔️ ไม่ต้องรีเซ็ต</button>
+        <button class="btn btn-sm" style="background:var(--red);color:white;border:none;" onclick="resetWrongLocation('${j.id}')"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> ลบ & รีเซ็ต Location</button>
+        <button class="btn btn-outline btn-sm" onclick="dismissWrongLocation('${j.id}')"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> ไม่ต้องรีเซ็ต</button>
       </div>
     `).join("");
   }
@@ -1175,14 +1177,14 @@
       dd.docs.forEach(d => batch.delete(d.ref));
       batch.delete(doc(db,"count_jobs",jobId));
       await batch.commit();
-      toast("✅ ลบและรีเซ็ต Location แล้ว");
+      toast("ลบและรีเซ็ต Location แล้ว");
     } catch (err) {
-      toast("❌ ลบไม่สำเร็จ: "+err.message, 5000);
+      toast("ลบไม่สำเร็จ: "+err.message, 5000);
     }
   };
   window.dismissWrongLocation = async (jobId) => {
     await updateDoc(doc(db,"count_jobs",jobId), { wrong_location_flag: false });
-    toast("✅ ปิดการแจ้งเตือนแล้ว (ข้อมูลยังอยู่เหมือนเดิม)");
+    toast("ปิดการแจ้งเตือนแล้ว (ข้อมูลยังอยู่เหมือนเดิม)");
   };
 
   function runExportExcel() {
@@ -1250,14 +1252,14 @@
   }
 
   document.getElementById("btn-export-tag-xlsx")?.addEventListener("click", () => {
-    if (runExportExcel()) toast("✅ Export Excel แล้ว (6 ชีท)");
+    if (runExportExcel()) toast("Export Excel แล้ว (6 ชีท)");
   });
 
   // ── ล้างข้อมูลรอบนี้ (แยกจาก Export โดยตั้งใจ — ใช้ตอนนับจบรอบทั้งหมดแล้วเท่านั้น) ──
   document.getElementById("btn-clear-round")?.addEventListener("click", async () => {
     const curJobs = jobsForCurrentRound();
     if (!curJobs.length) { toast("ไม่มีข้อมูลของรอบปัจจุบันให้ล้าง"); return; }
-    if (!confirm(`⚠️ ยืนยันล้างข้อมูลรอบปัจจุบันทั้งหมด (${curJobs.length} job)?\n\nอย่าลืม Export เก็บไฟล์ไว้ก่อนถ้ายังไม่ได้ทำ — ลบแล้วกู้คืนไม่ได้`)) return;
+    if (!confirm(`ยืนยันล้างข้อมูลรอบปัจจุบันทั้งหมด (${curJobs.length} job)?\n\nอย่าลืม Export เก็บไฟล์ไว้ก่อนถ้ายังไม่ได้ทำ — ลบแล้วกู้คืนไม่ได้`)) return;
     if (!confirm("ยืนยันอีกครั้ง — ล้างข้อมูลจริงตอนนี้เลยหรือไม่?")) return;
 
     const btn = document.getElementById("btn-clear-round");
@@ -1271,25 +1273,25 @@
         const dd = await getDocs(query(collection(db,"count_details"), where("job_id","==",jobId)));
         allDetailIds.push(...dd.docs.map(d=>d.id));
       }
-      btn.textContent = `⏳ ลบ Detail 0/${allDetailIds.length}...`;
+      btn.textContent = `ลบ Detail 0/${allDetailIds.length}...`;
       for (let i=0;i<allDetailIds.length;i+=400) {
         const chunk = allDetailIds.slice(i,i+400);
         const batch = writeBatch(db);
         chunk.forEach(id => batch.delete(doc(db,"count_details",id)));
         await batch.commit();
-        btn.textContent = `⏳ ลบ Detail ${Math.min(i+400,allDetailIds.length)}/${allDetailIds.length}...`;
+        btn.textContent = `ลบ Detail ${Math.min(i+400,allDetailIds.length)}/${allDetailIds.length}...`;
       }
-      btn.textContent = `⏳ ลบ Job 0/${jobIds.length}...`;
+      btn.textContent = `ลบ Job 0/${jobIds.length}...`;
       for (let i=0;i<jobIds.length;i+=400) {
         const chunk = jobIds.slice(i,i+400);
         const batch = writeBatch(db);
         chunk.forEach(id => batch.delete(doc(db,"count_jobs",id)));
         await batch.commit();
-        btn.textContent = `⏳ ลบ Job ${Math.min(i+400,jobIds.length)}/${jobIds.length}...`;
+        btn.textContent = `ลบ Job ${Math.min(i+400,jobIds.length)}/${jobIds.length}...`;
       }
-      toast(`✅ ล้างข้อมูลรอบนี้เรียบร้อย (ลบ ${jobIds.length} job, ${allDetailIds.length} รายการนับ)`);
+      toast(`ล้างข้อมูลรอบนี้เรียบร้อย (ลบ ${jobIds.length} job, ${allDetailIds.length} รายการนับ)`);
     } catch (err) {
-      toast("❌ ล้างข้อมูลไม่สำเร็จ: "+err.message, 6000);
+      toast("ล้างข้อมูลไม่สำเร็จ: "+err.message, 6000);
     } finally {
       btn.disabled = false; btn.textContent = orig;
     }
