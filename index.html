@@ -87,9 +87,11 @@
       will-change: transform, opacity;
     }
     .halo-card-icon {
-      font-size: 2.2rem;
+      display: flex;
+      color: white;
       filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
     }
+    .halo-card-icon svg { width: 34px; height: 34px; }
     .login-card {
       background: var(--white);
       border-radius: 20px;
@@ -282,7 +284,11 @@
       font-size: 1.4rem;
       font-weight: 700;
       color: var(--blue);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
+    .dash-greeting h2 svg { color: var(--amber); flex-shrink: 0; }
     .dash-greeting p {
       font-size: 0.9rem;
       color: var(--gray);
@@ -361,7 +367,8 @@
       box-shadow: 0 12px 36px rgba(0,0,0,0.12);
       border-color: transparent;
     }
-    .menu-card .card-icon { font-size: 2.5rem; line-height: 1; }
+    .menu-card .card-icon { display: flex; color: var(--card-color, var(--blue)); }
+    .menu-card .card-icon svg { width: 34px; height: 34px; }
     .menu-card .card-title {
       font-size: 1rem;
       font-weight: 700;
@@ -486,7 +493,7 @@
 
     <div class="dash-body">
       <div class="dash-greeting">
-        <h2>สวัสดี, <span id="greeting-name">—</span> 👋</h2>
+        <h2>สวัสดี, <span id="greeting-name">—</span> <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg></h2>
         <p>กรุณาเลือกระบบที่ต้องการใช้งาน</p>
       </div>
 
@@ -503,13 +510,14 @@
   <script type="module">
     import { auth, db } from "./firebase-config.js";
     import { loginUser, logoutUser, getUserProfile } from "./auth.js";
+    import { icon } from "./icons.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
     // ── เมนูทั้งหมด (role: all = ทุกคน, admin = เฉพาะ admin) ──
     const MENUS = [
       {
         id: "medicine",
-        icon: "💊",
+        icon: "pill",
         title: "ระบบเบิกจ่ายยา",
         sub: "",
         href: "medicine.html",
@@ -518,7 +526,7 @@
       },
       {
         id: "stock",
-        icon: "📦",
+        icon: "package",
         title: "ระบบสต็อกทั่วไป",
         sub: "Consumer / General",
         href: "stock.html",
@@ -527,7 +535,7 @@
       },
       {
         id: "stocktake",
-        icon: "📝",
+        icon: "clipboard_list",
         title: "Stock Take",
         sub: "สำหรับพนักงานนับ",
         href: "stocktake.html",
@@ -536,7 +544,7 @@
       },
       {
         id: "monitor",
-        icon: "📊",
+        icon: "bar_chart",
         title: "Monitor & Audit",
         sub: "สำหรับหัวหน้างาน",
         href: "monitor.html",
@@ -545,7 +553,7 @@
       },
       {
         id: "dashboard",
-        icon: "🖥️",
+        icon: "monitor",
         title: "Executive Dashboard",
         sub: "ภาพรวมสำหรับผู้บริหาร",
         href: "dashboard.html",
@@ -554,7 +562,7 @@
       },
       {
         id: "dock",
-        icon: "🚢",
+        icon: "ship",
         title: "Smart Dock",
         sub: "Management",
         href: "dock.html",
@@ -563,7 +571,7 @@
       },
       {
         id: "wi",
-        icon: "📄",
+        icon: "file_text",
         title: "คู่มือการทำงาน",
         sub: "WI Documents",
         href: "wi.html",
@@ -572,7 +580,7 @@
       },
       {
         id: "users",
-        icon: "👥",
+        icon: "users",
         title: "จัดการ Users",
         sub: "User Management",
         href: "users.html",
@@ -601,7 +609,7 @@
         el.style.height = CARD_H + "px";
         el.innerHTML = `
           ${menu.role === "admin" ? '<span class="admin-badge">Admin</span>' : ""}
-          <span class="card-icon">${menu.icon}</span>
+          <span class="card-icon">${icon(menu.icon, { size: 34 })}</span>
           <span class="card-title">${menu.title}</span>
           ${menu.sub ? `<span class="card-sub">${menu.sub}</span>` : ""}
         `;
@@ -806,7 +814,7 @@
 
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const COLORS = ["#021D49", "#E1261C", "#6366f1", "#16a34a", "#d97706", "#0d9488"];
-      const ICONS  = ["📦", "💊", "📝", "🚢", "📄", "📊", "👥", "🖥️"];
+      const ICONS  = ["package", "pill", "clipboard_list", "ship", "file_text", "bar_chart", "users", "monitor"];
       const COUNT  = 8;
       const CARD_W = 110, CARD_H = 150, MIN_SCALE = 0.42;
       const step = (Math.PI * 2) / COUNT;
@@ -818,7 +826,7 @@
         el.style.width  = CARD_W + "px";
         el.style.height = CARD_H + "px";
         el.style.background = `linear-gradient(160deg, ${COLORS[i % COLORS.length]}, ${COLORS[(i + 2) % COLORS.length]})`;
-        el.innerHTML = `<span class="halo-card-icon">${ICONS[i % ICONS.length]}</span>`;
+        el.innerHTML = `<span class="halo-card-icon">${icon(ICONS[i % ICONS.length], { size: 34 })}</span>`;
         stage.appendChild(el);
         cards.push(el);
       }
