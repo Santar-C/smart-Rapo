@@ -139,30 +139,40 @@
       .rapo-dock-word:last-child { display: none; }
     }
 
-    /* ── Login Visual (procedural crate-stack 3D scene) ──
-       A vanilla WebGL2 scene: no three.js, no build step, matching the rest
-       of this codebase. Stacked crates in the RAPO accent colors, drifting
-       dust motes, gentle pointer parallax. */
+    /* ── Login Visual (real warehouse photo, cinematic grade + parallax) ── */
     .login-visual {
       display: none;
       position: relative;
       flex: 1;
       max-width: 460px;
       height: 460px;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,.4);
     }
     @media (min-width: 901px) {
       .login-visual { display: block; }
     }
-    .login-visual canvas {
+    .login-visual .wh-photo {
       position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
+      inset: -5%;
+      width: 110%;
+      height: 110%;
+      object-fit: cover;
+      filter: brightness(.62) contrast(1.14) saturate(.7);
       opacity: 0;
-      transition: opacity .8s ease;
+      transition: opacity 1s ease;
+      will-change: transform;
     }
-    .login-visual canvas.is-ready { opacity: 1; }
+    .login-visual .wh-photo.is-ready { opacity: 1; }
+    .login-visual::after {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,.58) 100%),
+        linear-gradient(160deg, rgba(2,29,73,.5) 0%, rgba(2,10,30,.12) 45%, rgba(2,29,73,.58) 100%);
+      pointer-events: none;
+    }
     .login-visual-caption {
       position: absolute;
       left: 0; right: 0; bottom: 0.5rem;
@@ -171,6 +181,7 @@
       color: rgba(255,255,255,0.55);
       font-size: 0.78rem;
       font-weight: 400;
+      z-index: 1;
     }
     .login-card {
       background: var(--white);
@@ -614,7 +625,7 @@
       </div>
     </div>
     <div class="login-visual" aria-hidden="true">
-      <canvas id="wh-scene"></canvas>
+      <img class="wh-photo" id="wh-photo" src="assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg" alt="">
       <div class="login-visual-caption">RAPO System — Stock · Medicine · Smart Dock</div>
     </div>
     <div class="login-card">
@@ -1556,445 +1567,29 @@ void main(){
     // No three.js, no build step — a small hand-rolled 3D scene in the same
     // spirit as the reference hero: crates instead of the moss root, dust
     // motes instead of pollen, pointer parallax, a soft fade-in reveal.
-    initWarehouseScene();
-    function initWarehouseScene() {
-      const canvas = document.getElementById("wh-scene");
-      if (!canvas) return;
-      const gl = canvas.getContext("webgl2", { alpha: true, antialias: true, premultipliedAlpha: false });
-      if (!gl) return;
+    initLoginPhotoParallax();
+    function initLoginPhotoParallax() {
+      const visual = document.querySelector(".login-visual");
+      const photo = document.getElementById("wh-photo");
+      if (!visual || !photo) return;
+      const markReady = () => photo.classList.add("is-ready");
+      photo.addEventListener("load", markReady);
+      if (photo.complete && photo.naturalWidth) markReady();
 
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-      // ── fullscreen-triangle helper (shared by post-process passes) ──
-      const fsqVAO = gl.createVertexArray(); gl.bindVertexArray(fsqVAO);
-      const fsqBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, fsqBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-
-      function makeRT() {
-        const tex = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        const fbo = gl.createFramebuffer();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-        return { tex, fbo, w: 0, h: 0 };
-      }
-      function sizeRT(t, w, h, withDepth) {
-        if (t.w === w && t.h === h) return;
-        t.w = w; t.h = h;
-        gl.bindTexture(gl.TEXTURE_2D, t.tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-        if (withDepth) {
-          if (!t.depth) t.depth = gl.createRenderbuffer();
-          gl.bindRenderbuffer(gl.RENDERBUFFER, t.depth);
-          gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
-          gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
-          gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, t.depth);
-        }
-      }
-      const T_scene = makeRT(), T_bloomA = makeRT(), T_bloomB = makeRT();
-
-      function fsCompile(fs) {
-        const vsrc = `#version 300 es
-in vec2 position; out vec2 vUv;
-void main(){ vUv = position * 0.5 + 0.5; gl_Position = vec4(position, 0.0, 1.0); }`;
-        const p = gl.createProgram();
-        const vs = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vs, vsrc); gl.compileShader(vs);
-        const f = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(f, fs); gl.compileShader(f);
-        if (!gl.getShaderParameter(f, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(f));
-        gl.attachShader(p, vs); gl.attachShader(p, f);
-        gl.bindAttribLocation(p, 0, "position");
-        gl.linkProgram(p);
-        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(p));
-        const u = {};
-        const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
-        for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); u[info.name] = gl.getUniformLocation(p, info.name); }
-        return { p, u };
-      }
-      // bright-pass extract + box blur (bloom), reused two ways for a soft glow
-      const bloomExtract = fsCompile(`#version 300 es
-precision highp float;
-in vec2 vUv; uniform sampler2D uTex; out vec4 o;
-void main(){
-  vec3 c = texture(uTex, vUv).rgb;
-  float l = dot(c, vec3(0.299, 0.587, 0.114));
-  o = vec4(c * smoothstep(0.55, 0.95, l), 1.0);
-}`);
-      const boxBlur = fsCompile(`#version 300 es
-precision highp float;
-in vec2 vUv; uniform sampler2D uTex; uniform vec2 uTexel; out vec4 o;
-void main(){
-  vec3 s = vec3(0.0);
-  for (int x = -2; x <= 2; x++) for (int y = -2; y <= 2; y++)
-    s += texture(uTex, vUv + uTexel * vec2(float(x), float(y))).rgb;
-  o = vec4(s / 25.0, 1.0);
-}`);
-      // final composite: bloom add + soft vignette + film grain + gentle cool-shadow grade
-      const composite = fsCompile(`#version 300 es
-precision highp float;
-in vec2 vUv; uniform sampler2D uScene, uBloom; uniform float uT; out vec4 o;
-float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
-void main(){
-  vec4 scene = texture(uScene, vUv);
-  vec3 bloom = texture(uBloom, vUv).rgb;
-  vec3 c = scene.rgb + bloom * 0.55;
-  vec2 d = vUv - 0.5;
-  float vig = smoothstep(0.9, 0.28, length(d) * 1.15);
-  c *= mix(0.72, 1.0, vig);
-  c = mix(c, c * vec3(0.92, 0.97, 1.06), 0.28); // cool shadow tint
-  c = pow(max(c, 0.0), vec3(0.94)); // gentle filmic lift
-  float grain = (hash(vUv * vec2(1300.0, 900.0) + uT) - 0.5) * 0.035;
-  c += grain;
-  o = vec4(c, scene.a);
-}`);
-
-      // ── tiny mat4 helpers (no dependency) ──
-      function m4id() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
-      function m4mul(a, b) {
-        const o = new Float32Array(16);
-        for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
-          o[c * 4 + r] = a[0*4+r]*b[c*4+0] + a[1*4+r]*b[c*4+1] + a[2*4+r]*b[c*4+2] + a[3*4+r]*b[c*4+3];
-        }
-        return o;
-      }
-      function m4persp(fovy, aspect, near, far) {
-        const f = 1 / Math.tan(fovy / 2), o = new Float32Array(16);
-        o[0] = f / aspect; o[5] = f; o[10] = (far + near) / (near - far); o[11] = -1;
-        o[14] = (2 * far * near) / (near - far);
-        return o;
-      }
-      function m4translate(x, y, z) { const o = m4id(); o[12] = x; o[13] = y; o[14] = z; return o; }
-      function m4scale(x, y, z) { const o = m4id(); o[0] = x; o[5] = y; o[10] = z; return o; }
-      function m4rotY(a) { const o = m4id(), c = Math.cos(a), s = Math.sin(a); o[0] = c; o[2] = -s; o[8] = s; o[10] = c; return o; }
-      function m4rotX(a) { const o = m4id(), c = Math.cos(a), s = Math.sin(a); o[5] = c; o[6] = s; o[9] = -s; o[10] = c; return o; }
-      function m4normalFromModel(m) {
-        // rigid transforms only (rotate + uniform-ish scale) → transpose of
-        // the 3x3 upper-left inverse; here it's just the 3x3 itself since
-        // our boxes only ever carry rotation + translation + axis scale
-        return m;
-      }
-
-      // ── box geometry (24 verts, per-face normals) ──
-      const boxPos = [], boxNrm = [], boxIdx = [];
-      const FACES = [
-        { n: [0,0,1],  v: [[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]] },
-        { n: [0,0,-1], v: [[1,-1,-1],[-1,-1,-1],[-1,1,-1],[1,1,-1]] },
-        { n: [0,1,0],  v: [[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]] },
-        { n: [0,-1,0], v: [[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]] },
-        { n: [1,0,0],  v: [[1,-1,1],[1,-1,-1],[1,1,-1],[1,1,1]] },
-        { n: [-1,0,0], v: [[-1,-1,-1],[-1,-1,1],[-1,1,1],[-1,1,-1]] }
-      ];
-      FACES.forEach((f, fi) => {
-        const base = fi * 4;
-        f.v.forEach(v => { boxPos.push(...v); boxNrm.push(...f.n); });
-        boxIdx.push(base, base+1, base+2, base, base+2, base+3);
-      });
-
-      const boxVAO = gl.createVertexArray(); gl.bindVertexArray(boxVAO);
-      const posBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxPos), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-      const nrmBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, nrmBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxNrm), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
-      const idxBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(boxIdx), gl.STATIC_DRAW);
-
-      function compile(type, src) {
-        const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
-        return s;
-      }
-      const boxVert = `#version 300 es
-in vec3 position; in vec3 normal;
-uniform mat4 uModel, uView, uProj;
-out vec3 vNormal; out vec3 vWorld; out float vViewZ;
-void main(){
-  vec4 wp = uModel * vec4(position, 1.0);
-  vWorld = wp.xyz;
-  vNormal = mat3(uModel) * normal;
-  vec4 vp = uView * wp;
-  vViewZ = -vp.z;
-  gl_Position = uProj * vp;
-}`;
-      const boxFrag = `#version 300 es
-precision highp float;
-in vec3 vNormal; in vec3 vWorld; in float vViewZ;
-uniform vec3 uColor; uniform vec3 uKeyDir; uniform vec3 uCamPos; uniform float uSeed;
-uniform vec3 uFogColor; uniform float uFogNear, uFogFar;
-out vec4 o;
-float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
-void main(){
-  vec3 N = normalize(vNormal);
-  vec3 V = normalize(uCamPos - vWorld);
-  vec3 H = normalize(uKeyDir + V);
-  float key = max(dot(N, uKeyDir), 0.0);
-  float ao = 0.80 + 0.20 * (N.y * 0.5 + 0.5);
-  float ambient = (0.40 + 0.08 * N.y) * ao;
-  float spec = pow(max(dot(N, H), 0.0), 22.0) * 0.30;
-  float grain = hash(floor(vWorld.xz * 6.0 + uSeed)) * 0.045 - 0.0225;
-  vec3 base = mix(uColor, vec3(dot(uColor, vec3(0.299,0.587,0.114))), 0.14);
-  vec3 lit = base * (ambient + key * 0.58) + vec3(grain) + vec3(spec);
-  float fresnel = pow(1.0 - max(dot(N, V), 0.0), 2.4);
-  lit += fresnel * 0.16 * vec3(0.75, 0.85, 1.0);
-  float fog = smoothstep(uFogNear, uFogFar, vViewZ);
-  lit = mix(lit, uFogColor, fog * 0.55);
-  o = vec4(lit, 1.0);
-}`;
-      const boxProg = gl.createProgram();
-      gl.attachShader(boxProg, compile(gl.VERTEX_SHADER, boxVert));
-      gl.attachShader(boxProg, compile(gl.FRAGMENT_SHADER, boxFrag));
-      gl.bindAttribLocation(boxProg, 0, "position");
-      gl.bindAttribLocation(boxProg, 1, "normal");
-      gl.linkProgram(boxProg);
-      if (!gl.getProgramParameter(boxProg, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(boxProg));
-      const boxU = {};
-      ["uModel","uView","uProj","uColor","uKeyDir","uCamPos","uSeed","uFogColor","uFogNear","uFogFar"].forEach(n => { boxU[n] = gl.getUniformLocation(boxProg, n); });
-
-      // ── soft ground-contact shadow (fake, no shadow mapping needed) ──
-      const shadowVAO = gl.createVertexArray(); gl.bindVertexArray(shadowVAO);
-      const shadowBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, shadowBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-      const shadowVert = `#version 300 es
-in vec2 position;
-uniform mat4 uView, uProj; uniform vec3 uCenter; uniform vec2 uRadius;
-out vec2 vUv;
-void main(){
-  vUv = position;
-  vec3 wp = uCenter + vec3(position.x * uRadius.x, 0.0, position.y * uRadius.y);
-  gl_Position = uProj * uView * vec4(wp, 1.0);
-}`;
-      const shadowFrag = `#version 300 es
-precision highp float;
-in vec2 vUv; out vec4 o;
-void main(){
-  float a = smoothstep(1.0, 0.0, length(vUv)) * 0.42;
-  o = vec4(0.0, 0.0, 0.0, a);
-}`;
-      const shadowProg = gl.createProgram();
-      gl.attachShader(shadowProg, compile(gl.VERTEX_SHADER, shadowVert));
-      gl.attachShader(shadowProg, compile(gl.FRAGMENT_SHADER, shadowFrag));
-      gl.bindAttribLocation(shadowProg, 0, "position");
-      gl.linkProgram(shadowProg);
-      if (!gl.getProgramParameter(shadowProg, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(shadowProg));
-      const shadowU = {};
-      ["uView","uProj","uCenter","uRadius"].forEach(n => { shadowU[n] = gl.getUniformLocation(shadowProg, n); });
-
-      // ── crate stack layout: a small pallet pyramid, RAPO accent colors ──
-      const COLORS = [
-        [0.008, 0.114, 0.286],  // navy  #021D49
-        [0.882, 0.149, 0.110],  // red   #E1261C
-        [0.388, 0.400, 0.945],  // indigo
-        [0.086, 0.639, 0.290],  // green
-        [0.851, 0.467, 0.024],  // amber
-      ];
-      const crates = [];
-      const layout = [
-        { x: -1.15, y: -0.9, z: 0,    s: 0.62, c: 0 },
-        { x:  0.05, y: -0.9, z: 0.15, s: 0.68, c: 1 },
-        { x:  1.25, y: -0.9, z: -0.1, s: 0.60, c: 2 },
-        { x: -0.55, y: 0.05, z: 0.05, s: 0.58, c: 3 },
-        { x:  0.65, y: 0.10, z: -0.05,s: 0.56, c: 4 },
-        { x:  0.05, y: 1.05, z: 0,    s: 0.50, c: 0 },
-      ];
-      layout.forEach((L, i) => crates.push({
-        base: [L.x, L.y, L.z], scale: L.s, color: COLORS[L.c],
-        bob: Math.random() * Math.PI * 2, spin: (Math.random() - 0.5) * 0.15
-      }));
-
-      // ── dust motes (gl.POINTS, additive) ──
-      const DUST_N = 90;
-      const dustPos = new Float32Array(DUST_N * 3);
-      const dustSeed = new Float32Array(DUST_N * 2);
-      for (let i = 0; i < DUST_N; i++) {
-        dustPos[i*3]   = (Math.random() - 0.5) * 6;
-        dustPos[i*3+1] = (Math.random() - 0.5) * 4;
-        dustPos[i*3+2] = (Math.random() - 0.5) * 4 - 1;
-        dustSeed[i*2]   = Math.random() * Math.PI * 2;
-        dustSeed[i*2+1] = 0.3 + Math.random() * 0.9;
-      }
-      const dustVAO = gl.createVertexArray(); gl.bindVertexArray(dustVAO);
-      const dustPosBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, dustPosBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, dustPos, gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-      const dustSeedBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, dustSeedBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, dustSeed, gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
-
-      const dustVert = `#version 300 es
-in vec3 position; in vec2 seed;
-uniform mat4 uView, uProj; uniform float uT;
-out float vAlpha;
-void main(){
-  vec3 p = position;
-  p.x += sin(uT * seed.y * 0.4 + seed.x) * 0.35;
-  p.y += mod(uT * seed.y * 0.12 + seed.x, 4.0) - 2.0;
-  vec4 mv = uView * vec4(p, 1.0);
-  gl_PointSize = 90.0 / max(-mv.z, 0.4);
-  vAlpha = 0.35 + 0.35 * sin(uT * seed.y + seed.x * 3.0);
-  gl_Position = uProj * mv;
-}`;
-      const dustFrag = `#version 300 es
-precision highp float;
-in float vAlpha;
-out vec4 o;
-void main(){
-  vec2 d = gl_PointCoord - 0.5;
-  float a = smoothstep(0.5, 0.0, length(d)) * vAlpha;
-  o = vec4(vec3(0.92, 0.95, 1.0), a * 0.55);
-}`;
-      const dustProg = gl.createProgram();
-      gl.attachShader(dustProg, compile(gl.VERTEX_SHADER, dustVert));
-      gl.attachShader(dustProg, compile(gl.FRAGMENT_SHADER, dustFrag));
-      gl.bindAttribLocation(dustProg, 0, "position");
-      gl.bindAttribLocation(dustProg, 1, "seed");
-      gl.linkProgram(dustProg);
-      if (!gl.getProgramParameter(dustProg, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(dustProg));
-      const dustU = {};
-      ["uView","uProj","uT"].forEach(n => { dustU[n] = gl.getUniformLocation(dustProg, n); });
-
-      let W = 0, H = 0, BW = 0, BH = 0;
-      function resize() {
-        const rect = canvas.getBoundingClientRect();
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        W = Math.max(2, Math.round(rect.width * dpr));
-        H = Math.max(2, Math.round(rect.height * dpr));
-        canvas.width = W; canvas.height = H;
-        BW = Math.max(2, Math.round(W / 2)); BH = Math.max(2, Math.round(H / 2));
-        sizeRT(T_scene, W, H, true);
-        sizeRT(T_bloomA, BW, BH, false);
-        sizeRT(T_bloomB, BW, BH, false);
-      }
-      new ResizeObserver(resize).observe(canvas);
-      resize();
+      if (reduceMotion) return;
 
       let px = 0, py = 0, tpx = 0, tpy = 0;
-      canvas.parentElement.addEventListener("pointermove", e => {
-        const r = canvas.getBoundingClientRect();
+      visual.addEventListener("pointermove", e => {
+        const r = visual.getBoundingClientRect();
         tpx = ((e.clientX - r.left) / r.width) * 2 - 1;
         tpy = ((e.clientY - r.top) / r.height) * 2 - 1;
       });
-      canvas.parentElement.addEventListener("pointerleave", () => { tpx = 0; tpy = 0; });
+      visual.addEventListener("pointerleave", () => { tpx = 0; tpy = 0; });
 
-      gl.enable(gl.DEPTH_TEST);
-      gl.enable(gl.CULL_FACE);
-      gl.clearColor(0, 0, 0, 0);
-
-      const FOG_COLOR = [0.01, 0.05, 0.12];
-      let t0 = performance.now();
-      let ready = false;
-      let autoDrift = 0;
-      function frame(now) {
-        const t = (now - t0) / 1000;
+      function frame() {
         px += (tpx - px) * 0.06; py += (tpy - py) * 0.06;
-        if (!reduceMotion) autoDrift = Math.sin(t * 0.09) * 0.12;
-
-        const aspect = W / H;
-        const proj = m4persp(0.62, aspect, 0.1, 20);
-        const camRotY = -px * 0.35 + autoDrift, camRotX = py * 0.14;
-        let view = m4translate(0, -0.1, -6.2);
-        view = m4mul(view, m4rotX(camRotX));
-        view = m4mul(view, m4rotY(camRotY));
-        const camPos = [0, 0.1, 6.2];
-
-        // ── pass 1: draw the scene (crates + soft contact shadow + dust) offscreen ──
-        gl.bindFramebuffer(gl.FRAMEBUFFER, T_scene.fbo);
-        gl.viewport(0, 0, W, H);
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-        gl.enable(gl.DEPTH_TEST);
-        gl.depthMask(true);
-        gl.disable(gl.BLEND);
-        gl.useProgram(boxProg);
-        gl.bindVertexArray(boxVAO);
-        gl.uniformMatrix4fv(boxU.uProj, false, proj);
-        gl.uniformMatrix4fv(boxU.uView, false, view);
-        gl.uniform3f(boxU.uKeyDir, 0.4, 0.75, 0.5);
-        gl.uniform3f(boxU.uCamPos, camPos[0], camPos[1], camPos[2]);
-        gl.uniform3f(boxU.uFogColor, FOG_COLOR[0], FOG_COLOR[1], FOG_COLOR[2]);
-        gl.uniform1f(boxU.uFogNear, 5.6);
-        gl.uniform1f(boxU.uFogFar, 7.6);
-        crates.forEach((c, i) => {
-          const bob = reduceMotion ? 0 : Math.sin(t * 0.6 + c.bob) * 0.04;
-          const spin = reduceMotion ? 0 : t * c.spin;
-          let m = m4translate(c.base[0], c.base[1] + bob, c.base[2]);
-          m = m4mul(m, m4rotY(spin));
-          m = m4mul(m, m4scale(c.scale, c.scale, c.scale));
-          gl.uniformMatrix4fv(boxU.uModel, false, m);
-          gl.uniform3f(boxU.uColor, c.color[0], c.color[1], c.color[2]);
-          gl.uniform1f(boxU.uSeed, i * 7.3);
-          gl.drawElements(gl.TRIANGLES, boxIdx.length, gl.UNSIGNED_SHORT, 0);
-        });
-
-        gl.enable(gl.BLEND);
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-        gl.depthMask(false);
-        gl.useProgram(shadowProg);
-        gl.bindVertexArray(shadowVAO);
-        gl.uniformMatrix4fv(shadowU.uProj, false, proj);
-        gl.uniformMatrix4fv(shadowU.uView, false, view);
-        gl.uniform3f(shadowU.uCenter, 0.05, -1.55, 0.0);
-        gl.uniform2f(shadowU.uRadius, 1.75, 1.05);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-        if (!reduceMotion) {
-          gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-          gl.useProgram(dustProg);
-          gl.bindVertexArray(dustVAO);
-          gl.uniformMatrix4fv(dustU.uProj, false, proj);
-          gl.uniformMatrix4fv(dustU.uView, false, view);
-          gl.uniform1f(dustU.uT, t);
-          gl.drawArrays(gl.POINTS, 0, DUST_N);
-        }
-        gl.depthMask(true);
-        gl.disable(gl.DEPTH_TEST);
-
-        // ── pass 2: bloom (extract bright + 2x soft blur) ──
-        gl.disable(gl.BLEND);
-        gl.bindVertexArray(fsqVAO);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, T_bloomA.fbo);
-        gl.viewport(0, 0, BW, BH);
-        gl.useProgram(bloomExtract.p);
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_scene.tex);
-        gl.uniform1i(bloomExtract.u.uTex, 0);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, T_bloomB.fbo);
-        gl.useProgram(boxBlur.p);
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_bloomA.tex);
-        gl.uniform1i(boxBlur.u.uTex, 0);
-        gl.uniform2f(boxBlur.u.uTexel, 1 / BW, 1 / BH);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, T_bloomA.fbo);
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_bloomB.tex);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-        // ── pass 3: composite to screen (bloom add + vignette + grain + grade) ──
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.viewport(0, 0, W, H);
-        gl.useProgram(composite.p);
-        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_scene.tex);
-        gl.uniform1i(composite.u.uScene, 0);
-        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, T_bloomA.tex);
-        gl.uniform1i(composite.u.uBloom, 1);
-        gl.uniform1f(composite.u.uT, t);
-        gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-        if (!ready) { ready = true; canvas.classList.add("is-ready"); }
+        photo.style.transform = `translate(${(-px * 14).toFixed(2)}px, ${(-py * 10).toFixed(2)}px) scale(1.08)`;
         requestAnimationFrame(frame);
       }
       requestAnimationFrame(frame);
