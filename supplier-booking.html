@@ -9,7 +9,13 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;900&display=swap" rel="stylesheet">
   <style>
-    body { font-family: "Sarabun", sans-serif; }
+    body { font-family: "Sarabun", sans-serif; position:relative; }
+    body::before{content:'';position:fixed;inset:0;background-image:url('assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg');
+      background-size:cover;background-position:center;filter:brightness(.5) contrast(1.12) saturate(.7);z-index:0}
+    body::after{content:'';position:fixed;inset:0;
+      background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,.5) 100%),
+        linear-gradient(160deg,rgba(2,29,73,.55) 0%,rgba(2,10,30,.15) 45%,rgba(2,29,73,.6) 100%);z-index:0}
+    body > *{position:relative;z-index:1}
     .ceva-blue { color: #002f6c; }
     .ceva-red  { color: #E1261C; }
     .bg-ceva-blue { background-color: #002f6c; }

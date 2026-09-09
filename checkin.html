@@ -9,7 +9,13 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;900&display=swap" rel="stylesheet">
   <style>
-    body { font-family:"Sarabun",sans-serif; }
+    body { font-family:"Sarabun",sans-serif; position:relative; }
+    body::before{content:'';position:fixed;inset:0;background-image:url('assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg');
+      background-size:cover;background-position:center;filter:brightness(.45) contrast(1.12) saturate(.7);z-index:0}
+    body::after{content:'';position:fixed;inset:0;
+      background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,.55) 100%),
+        linear-gradient(160deg,rgba(2,29,73,.55) 0%,rgba(2,10,30,.15) 45%,rgba(2,29,73,.6) 100%);z-index:0}
+    body > *{position:relative;z-index:1}
     @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
     .fade-up { animation:fadeUp 0.4s ease forwards; }
     @keyframes spin { to{transform:rotate(360deg)} }
@@ -36,8 +42,10 @@
   <!-- Header -->
   <header class="flex items-center justify-between px-5 py-4 bg-black/30 backdrop-blur-sm border-b border-white/10">
     <div class="flex items-center gap-3">
-      <div class="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-        <span class="text-blue-900 font-black text-sm">C</span>
+      <div class="w-8 h-8 bg-white rounded-lg flex items-center justify-center overflow-hidden p-0.5">
+        <img src="assets/ceva-logo-clean.png" alt="CEVA" class="w-full h-full object-contain"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+        <span class="text-blue-900 font-black text-sm" style="display:none">C</span>
       </div>
       <div>
         <div class="text-white font-bold text-sm leading-tight">CEVA Logistics</div>

@@ -22,10 +22,19 @@
       --sky:#0284c7;--border:#e2e8f0;--light:#f8fafc;--radius:14px
     }
     body{font-family:'Sarabun',sans-serif;background:var(--navy);min-height:100dvh;
-      display:flex;flex-direction:column;color:#1e293b}
+      display:flex;flex-direction:column;color:#1e293b;position:relative}
+    body::before{content:'';position:fixed;inset:0;background-image:url('assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg');
+      background-size:cover;background-position:center;filter:brightness(.5) contrast(1.12) saturate(.7);z-index:0}
+    body::after{content:'';position:fixed;inset:0;
+      background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,.5) 100%),
+        linear-gradient(160deg,rgba(2,29,73,.55) 0%,rgba(2,10,30,.15) 45%,rgba(2,29,73,.6) 100%);z-index:0}
+    body > div{position:relative;z-index:1}
     /* HEADER */
     .hdr{padding:1rem 1.25rem .75rem;display:flex;align-items:center;gap:.75rem;
       border-bottom:1px solid rgba(255,255,255,.12)}
+    .hdr-logo{width:34px;height:34px;background:#fff;border-radius:9px;display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;overflow:hidden;padding:3px}
+    .hdr-logo img{width:100%;height:100%;object-fit:contain;display:block}
     .hdr-icon{width:38px;height:38px;background:var(--red);border-radius:10px;
       display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0}
     .hdr-title{color:#fff;font-weight:700;font-size:1rem;line-height:1.2}
@@ -161,6 +170,7 @@
 <body>
 
 <div class="hdr">
+  <div class="hdr-logo"><img src="assets/ceva-logo-clean.png" alt="CEVA" onerror="this.style.display='none'"></div>
   <div class="hdr-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg></div>
   <div>
     <div class="hdr-title">เบิกสินค้า (Withdraw)</div>

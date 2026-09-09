@@ -14,7 +14,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 
   <style>
-    body { font-family:'Sarabun',sans-serif; background:#f8fafc; }
+    body { font-family:'Sarabun',sans-serif; background:#f8fafc; position:relative; }
+    body::before{content:'';position:fixed;inset:0;background-image:url('assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg');
+      background-size:cover;background-position:center;filter:brightness(.5) contrast(1.12) saturate(.7);z-index:0}
+    body::after{content:'';position:fixed;inset:0;
+      background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,.5) 100%),
+        linear-gradient(160deg,rgba(2,29,73,.55) 0%,rgba(2,10,30,.15) 45%,rgba(2,29,73,.6) 100%);z-index:0}
+    #root{position:relative;z-index:1}
     .sh::-webkit-scrollbar{display:none} .sh{-ms-overflow-style:none;scrollbar-width:none}
     .ds::-webkit-scrollbar{width:5px;height:5px} .ds::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:10px}
     @keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}} .fi{animation:fi .25s ease}
@@ -1007,7 +1013,11 @@ function App() {
       <header className="bg-slate-900 text-white flex flex-col md:flex-row items-center justify-between px-5 py-3 shrink-0 shadow-lg border-b border-slate-800 gap-3">
         <div className="flex items-center gap-3">
           <a href="index.html" className="w-9 h-9 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center font-bold transition-colors" aria-label="กลับ"><Icon name="arrowLeft" size={16}/></a>
-          <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center font-black text-xl shadow-lg">S</div>
+          <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-lg overflow-hidden p-1">
+            <img src="assets/ceva-logo-clean.png" alt="CEVA" className="w-full h-full object-contain"
+                 onError={(e)=>{e.target.style.display='none'; e.target.nextSibling.style.display='flex';}}/>
+            <span className="font-black text-xl text-indigo-600" style={{display:'none'}}>S</span>
+          </div>
           <div>
             <h1 className="font-bold text-lg leading-tight">Smart Dock Pro</h1>
             <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
