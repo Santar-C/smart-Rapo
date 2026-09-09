@@ -81,11 +81,11 @@
 
 <div class="wrap">
   <div class="panel">
-    <div class="p-head">🔴 ต้องสั่งซื้อด่วน <span class="p-cnt" id="c-urgent">0</span></div>
+    <div class="p-head"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#dc2626;flex-shrink:0;vertical-align:-1px"></span> ต้องสั่งซื้อด่วน <span class="p-cnt" id="c-urgent">0</span></div>
     <div class="p-body" id="urgent"></div>
   </div>
   <div class="panel">
-    <div class="p-head">⏳ ใกล้ถึงจุดสั่ง (7 วัน) <span class="p-cnt" id="c-soon">0</span></div>
+    <div class="p-head"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg> ใกล้ถึงจุดสั่ง (7 วัน) <span class="p-cnt" id="c-soon">0</span></div>
     <div class="p-body" id="soon"></div>
   </div>
 </div>
@@ -188,19 +188,19 @@ function render(){
 
   document.getElementById('kpi').innerHTML =
     kpiBox(PRODUCTS.length,'SKU ทั้งหมด','#60a5fa') +
-    kpiBox(cnt.ok+cnt.over,'✅ ปกติ','#34d399') +
-    kpiBox(cnt.reorder,'🔔 ควรสั่ง','#eab308') +
-    kpiBox(cnt.low+cnt.out,'⚠️ วิกฤต/หมด','#ef4444') +
-    kpiBox(essRisk,'⭐ Essential เสี่ยง','#fbbf24');
+    kpiBox(cnt.ok+cnt.over,'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> ปกติ','#34d399') +
+    kpiBox(cnt.reorder,'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg> ควรสั่ง','#eab308') +
+    kpiBox(cnt.low+cnt.out,'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> วิกฤต/หมด','#ef4444') +
+    kpiBox(essRisk,'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.12 2.12 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.12 2.12 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.12 2.12 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.12 2.12 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.12 2.12 0 0 0 1.597-1.16z"/></svg> Essential เสี่ยง','#fbbf24');
 
   document.getElementById('c-urgent').textContent = urgent.length;
   document.getElementById('c-soon').textContent   = soon.length;
   document.getElementById('urgent').innerHTML = urgent.length
     ? urgent.map(function(p){return rowHtml(p,'u');}).join('')
-    : '<div class="empty">✅ ไม่มีรายการเร่งด่วน</div>';
+    : '<div class="empty"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> ไม่มีรายการเร่งด่วน</div>';
   document.getElementById('soon').innerHTML = soon.length
     ? soon.map(function(p){return rowHtml(p,'s');}).join('')
-    : '<div class="empty">✅ ทุกรายการมีของเพียงพอ</div>';
+    : '<div class="empty"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> ทุกรายการมีของเพียงพอ</div>';
 }
 
 function kpiBox(n,l,c){

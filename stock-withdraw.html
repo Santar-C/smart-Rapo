@@ -27,7 +27,7 @@
     .hdr{padding:1rem 1.25rem .75rem;display:flex;align-items:center;gap:.75rem;
       border-bottom:1px solid rgba(255,255,255,.12)}
     .hdr-icon{width:38px;height:38px;background:var(--red);border-radius:10px;
-      display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+      display:flex;align-items:center;justify-content:center;color:white;flex-shrink:0}
     .hdr-title{color:#fff;font-weight:700;font-size:1rem;line-height:1.2}
     .hdr-sub{color:rgba(255,255,255,.55);font-size:.72rem}
     /* MAIN CARD */
@@ -56,7 +56,7 @@
       outline:none;background:#f8fafc;transition:border-color .2s}
     .search-input:focus{border-color:var(--navy);background:#fff}
     .search-icon{position:absolute;left:.8rem;top:50%;transform:translateY(-50%);
-      color:#94a3b8;font-size:1rem}
+      color:#94a3b8;display:flex}
     /* PRODUCT LIST */
     .prod-list{display:flex;flex-direction:column;gap:.45rem;max-height:340px;overflow-y:auto;
       padding-right:.25rem}
@@ -71,10 +71,10 @@
       box-shadow:0 0 0 3px rgba(0,32,72,.1)}
     .prod-item.out{opacity:.45;cursor:not-allowed}
     .prod-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;
-      justify-content:center;font-size:1.1rem;flex-shrink:0}
-    .prod-icon.A{background:#dcfce7}
-    .prod-icon.B{background:#dbeafe}
-    .prod-icon.C{background:#fef3c7}
+      justify-content:center;font-weight:800;font-size:.95rem;flex-shrink:0}
+    .prod-icon.A{background:#dcfce7;color:#16a34a}
+    .prod-icon.B{background:#dbeafe;color:#2563eb}
+    .prod-icon.C{background:#fef3c7;color:#d97706}
     .prod-name{font-weight:700;font-size:.9rem;color:#1e293b;line-height:1.2}
     .prod-meta{font-size:.72rem;color:#64748b;margin-top:.1rem}
     .prod-qty{margin-left:auto;text-align:right;flex-shrink:0}
@@ -128,7 +128,7 @@
     /* SUCCESS SCREEN */
     .success-screen{display:none;flex-direction:column;align-items:center;
       justify-content:center;flex:1;padding:2rem;text-align:center;gap:1rem}
-    .success-icon{font-size:5rem;animation:pop .4s ease}
+    .success-icon{color:#4ade80;animation:pop .4s ease;display:flex;align-items:center;justify-content:center}
     @keyframes pop{0%{transform:scale(.5);opacity:0}100%{transform:scale(1);opacity:1}}
     .success-title{color:#fff;font-size:1.4rem;font-weight:900}
     .success-detail{color:rgba(255,255,255,.7);font-size:.9rem;line-height:1.6}
@@ -161,7 +161,7 @@
 <body>
 
 <div class="hdr">
-  <div class="hdr-icon">📤</div>
+  <div class="hdr-icon"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg></div>
   <div>
     <div class="hdr-title">เบิกสินค้า (Withdraw)</div>
     <div class="hdr-sub">RAPO · Consumable Stock System</div>
@@ -189,14 +189,14 @@
   <div class="card" id="sec-product">
     <div class="field-label">หมวดสินค้า</div>
     <div class="cat-tabs" id="cat-tabs">
-      <div class="cat-tab active" data-cat="ALL" onclick="setCat('ALL')">🔍 ทั้งหมด</div>
+      <div class="cat-tab active" data-cat="ALL" onclick="setCat('ALL')" style="display:inline-flex;align-items:center;gap:0.3rem;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> ทั้งหมด</div>
       <div class="cat-tab" data-cat="A" onclick="setCat('A')">A · Stationary Office</div>
       <div class="cat-tab" data-cat="B" onclick="setCat('B')">B · Consumable Office</div>
       <div class="cat-tab" data-cat="C" onclick="setCat('C')">C · Consumable Warehouse</div>
     </div>
 
     <div class="search-wrap" style="margin:.75rem 0 .6rem">
-      <span class="search-icon">🔍</span>
+      <span class="search-icon"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></span>
       <input type="search" class="search-input" id="prod-search"
         placeholder="พิมพ์ชื่อสินค้าหรือ SKU..." oninput="renderProducts()">
     </div>
@@ -239,8 +239,8 @@
       <div class="field-label">สรุปรายการเบิก</div>
       <div id="confirm-detail"></div>
     </div>
-    <button class="submit-btn" id="submit-btn" onclick="doSubmit()">
-      ✅ ยืนยันเบิกสินค้า
+    <button class="submit-btn" id="submit-btn" onclick="doSubmit()" style="display:inline-flex;align-items:center;justify-content:center;gap:0.4rem;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg> ยืนยันเบิกสินค้า
     </button>
   </div>
 
@@ -248,11 +248,11 @@
 
 <!-- SUCCESS -->
 <div class="success-screen" id="screen-success">
-  <div class="success-icon">✅</div>
+  <div class="success-icon"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></div>
   <div class="success-title">เบิกสำเร็จ!</div>
   <div class="success-card" id="success-detail"></div>
   <div class="success-detail" id="success-stock-after"></div>
-  <button class="new-btn" onclick="resetForm()">📤 เบิกรายการใหม่</button>
+  <button class="new-btn" onclick="resetForm()" style="display:inline-flex;align-items:center;gap:0.4rem;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> เบิกรายการใหม่</button>
 </div>
 
 <div id="toast"></div>
@@ -292,7 +292,7 @@ const QUICK_NAMES = [
   'Supervisor','VAS','Admin','IT',
 ];
 
-const CAT_ICON = {A:'📎', B:'📋', C:'📦'};
+const CAT_ICON = {A:'A', B:'B', C:'C'};
 const CAT_LABEL = {A:'Stationary Office', B:'Consumable Office', C:'Consumable Warehouse'};
 
 // ══════════════════════════════════════════
@@ -313,7 +313,7 @@ function loadProducts(){
     renderProducts();
   }, err => {
     document.getElementById('screen-loading').innerHTML =
-      `<div style="color:#fca5a5;font-size:.9rem">❌ โหลดข้อมูลไม่ได้: ${err.message}</div>`;
+      `<div style="color:#fca5a5;font-size:.9rem;display:flex;align-items:center;gap:0.4rem;"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg> โหลดข้อมูลไม่ได้: ${err.message}</div>`;
   });
 }
 
@@ -347,7 +347,7 @@ function renderProducts(){
     const out = q <= 0;
     const low = q > 0 && q <= (p.safety_stock ?? 0);
     const qCls = out ? 'prod-qty-out' : low ? 'prod-qty-low' : 'prod-qty-ok';
-    const icon = CAT_ICON[p.category] ?? '📦';
+    const icon = CAT_ICON[p.category] ?? 'C';
     const catCls = p.category ?? 'C';
     return `<div class="prod-item ${sel?'selected':''} ${out?'out':''}"
       onclick="${out ? '' : `selectProduct('${p.id}')`}"
@@ -429,7 +429,7 @@ function onQtyChange(){
   const warn = document.getElementById('qty-warn');
   if(qty > max){
     warn.style.display = 'block';
-    warn.textContent   = `⚠️ จำนวนเกินสต็อก (มีแค่ ${max} ${selectedProd?.unit??''})`;
+    warn.textContent   = `จำนวนเกินสต็อก (มีแค่ ${max} ${selectedProd?.unit??''})`;
   } else {
     warn.style.display = 'none';
   }
@@ -499,19 +499,19 @@ function showConfirm(){
 // ══════════════════════════════════════════
 async function doSubmit(){
   if(!selectedProd || !selectedName){
-    toast('⚠️ กรุณาเลือกสินค้าและระบุชื่อผู้เบิก');
+    toast('กรุณาเลือกสินค้าและระบุชื่อผู้เบิก');
     return;
   }
   const qty  = parseInt(document.getElementById('qty-input').value) || 0;
   const note = document.getElementById('note-input').value.trim();
   const max  = selectedProd.qty ?? 0;
   if(qty < 1 || qty > max){
-    toast(`❌ จำนวนไม่ถูกต้อง (มีแค่ ${max} ${selectedProd.unit??''})`);
+    toast(`จำนวนไม่ถูกต้อง (มีแค่ ${max} ${selectedProd.unit??''})`);
     return;
   }
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
-  btn.textContent = '⏳ กำลังบันทึก...';
+  btn.textContent = 'กำลังบันทึก...';
   const newQty = max - qty;
   const now    = firebase.firestore.FieldValue.serverTimestamp();
   try {
@@ -539,9 +539,9 @@ async function doSubmit(){
     // แสดงหน้า success
     showSuccess(qty, newQty, note);
   } catch(e){
-    toast('❌ บันทึกไม่ได้: ' + e.message);
+    toast('บันทึกไม่ได้: ' + e.message);
     btn.disabled = false;
-    btn.textContent = '✅ ยืนยันเบิกสินค้า';
+    btn.textContent = 'ยืนยันเบิกสินค้า';
   }
 }
 
@@ -559,8 +559,8 @@ function showSuccess(qty, newQty, note){
     <div class="success-row"><span>ผู้เบิก</span><span><b>${selectedName}</b></span></div>
     ${note?`<div class="success-row"><span>หมายเหตุ</span><span>${note}</span></div>`:''}`;
   document.getElementById('success-stock-after').innerHTML =
-    newQty <= 0 ? '⚠️ สต็อกหมดแล้ว — Admin ควรสั่งซื้อเพิ่ม' :
-    low         ? '⚠️ สต็อกต่ำกว่า Safety Stock — ควรแจ้งสั่งซื้อเร็วๆนี้' : '';
+    newQty <= 0 ? '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> สต็อกหมดแล้ว — Admin ควรสั่งซื้อเพิ่ม' :
+    low         ? '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> สต็อกต่ำกว่า Safety Stock — ควรแจ้งสั่งซื้อเร็วๆนี้' : '';
 }
 
 // ══════════════════════════════════════════
@@ -582,7 +582,7 @@ function resetForm(){
   document.getElementById('screen-success').style.display = 'none';
   document.getElementById('screen-main').style.display    = 'flex';
   document.getElementById('submit-btn').disabled = false;
-  document.getElementById('submit-btn').textContent = '✅ ยืนยันเบิกสินค้า';
+  document.getElementById('submit-btn').textContent = 'ยืนยันเบิกสินค้า';
   window.scrollTo({top:0,behavior:'smooth'});
 }
 

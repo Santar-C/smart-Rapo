@@ -62,10 +62,10 @@
           <div class="flex justify-between text-sm"><span class="text-slate-500">Reference No.</span><span class="font-bold text-blue-700" id="ref-no">—</span></div>
           <div class="flex justify-between text-sm"><span class="text-slate-500">Company</span><span class="font-bold" id="ref-company">—</span></div>
           <div class="flex justify-between text-sm"><span class="text-slate-500">Requested Date</span><span class="font-bold" id="ref-date">—</span></div>
-          <div class="flex justify-between text-sm"><span class="text-slate-500">Status</span><span class="font-bold text-amber-600">⏳ Pending Confirmation</span></div>
+          <div class="flex justify-between text-sm"><span class="text-slate-500">Status</span><span class="font-bold text-amber-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Pending Confirmation</span></div>
         </div>
         <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 text-sm text-blue-700 mb-6">
-          📧 A confirmation email will be sent to <b id="ref-email">—</b> once CEVA approves your booking.
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> A confirmation email will be sent to <b id="ref-email">—</b> once CEVA approves your booking.
         </div>
         <button onclick="resetForm()" class="bg-ceva-blue hover:bg-blue-900 text-white px-8 py-3 rounded-xl font-bold transition-colors">
           Submit Another Booking
@@ -169,10 +169,10 @@
               <label class="block text-xs font-bold text-slate-600 mb-1.5 uppercase tracking-wide">Job Type <span class="text-red-500">*</span></label>
               <div class="grid grid-cols-2 gap-2">
                 <label class="flex items-center gap-2 border-2 border-slate-200 rounded-xl px-4 py-3 cursor-pointer hover:border-blue-400 transition-all" id="lbl-in">
-                  <input type="radio" name="jobtype" value="IN" checked class="accent-blue-700"> <span class="text-sm font-bold text-blue-700">📥 Inbound</span>
+                  <input type="radio" name="jobtype" value="IN" checked class="accent-blue-700"> <span class="text-sm font-bold text-blue-700"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> Inbound</span>
                 </label>
                 <label class="flex items-center gap-2 border-2 border-slate-200 rounded-xl px-4 py-3 cursor-pointer hover:border-orange-400 transition-all" id="lbl-out">
-                  <input type="radio" name="jobtype" value="OUT" class="accent-orange-600"> <span class="text-sm font-bold text-orange-600">📤 Outbound</span>
+                  <input type="radio" name="jobtype" value="OUT" class="accent-orange-600"> <span class="text-sm font-bold text-orange-600"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> Outbound</span>
                 </label>
               </div>
             </div>
@@ -324,14 +324,14 @@
     // Validate
     errEl.classList.add("hidden");
     if (!company||!contact||!email||!plate||!vehicle||!date||!start||!end) {
-      errEl.textContent = "⚠️ Please fill in all required fields marked with *.";
+      errEl.textContent = "Please fill in all required fields marked with *.";
       errEl.classList.remove("hidden"); return;
     }
     if (!email.includes("@")) {
-      errEl.textContent = "⚠️ Please enter a valid email address."; errEl.classList.remove("hidden"); return;
+      errEl.textContent = "Please enter a valid email address."; errEl.classList.remove("hidden"); return;
     }
     if (start >= end) {
-      errEl.textContent = "⚠️ Estimated finish time must be after arrival time."; errEl.classList.remove("hidden"); return;
+      errEl.textContent = "Estimated finish time must be after arrival time."; errEl.classList.remove("hidden"); return;
     }
 
     var btn = document.getElementById("btn-submit");
@@ -376,7 +376,7 @@
         btn.disabled = false;
         btn.innerHTML = "<svg class=\"w-5 h-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M12 4v16m8-8H4\"/></svg> Submit Dock Booking Request";
         if (err) {
-          errEl.textContent = "❌ Submission failed: " + err.message; errEl.classList.remove("hidden"); return;
+          errEl.textContent = "Submission failed: " + err.message; errEl.classList.remove("hidden"); return;
         }
         // Send mock emails
         sendEmailNotification("supplier_received", booking);

@@ -29,7 +29,7 @@
 
   <!-- เพิ่ม User ใหม่ -->
   <div class="card">
-    <div class="card-title">➕ เพิ่มผู้ใช้งานใหม่</div>
+    <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> เพิ่มผู้ใช้งานใหม่</div>
     <div class="alert alert-info" style="font-size:0.85rem; margin-bottom:1rem;">
       ระบบจะสร้าง Account ใหม่ด้วย Email + Password ที่กำหนด<br>
       ผู้ใช้สามารถเปลี่ยน Password ได้ภายหลัง
@@ -56,16 +56,17 @@
       </div>
     </div>
     <div id="create-error" class="alert alert-error" style="display:none; margin-bottom:0.75rem;"></div>
-    <button class="btn btn-primary" id="btn-create-user">➕ สร้างผู้ใช้งาน</button>
-    <div id="create-loading" style="display:none; margin-top:0.5rem; color:var(--gray); font-size:0.85rem;">
-      <span>⏳ กำลังสร้าง Account...</span>
+    <button class="btn btn-primary" id="btn-create-user" style="display:inline-flex;align-items:center;gap:0.4rem;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg> สร้างผู้ใช้งาน</button>
+    <div id="create-loading" style="display:none; margin-top:0.5rem; color:var(--gray); font-size:0.85rem; align-items:center; gap:0.5rem;">
+      <span class="spinner" style="width:14px;height:14px;border-width:2px;"></span>
+      <span>กำลังสร้าง Account...</span>
     </div>
   </div>
 
   <!-- รายชื่อ User -->
   <div class="card" style="padding:0; overflow:hidden;">
     <div style="padding:0.85rem 1.25rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-      <div class="card-title" style="margin-bottom:0;">👥 รายชื่อผู้ใช้งานทั้งหมด</div>
+      <div class="card-title" style="margin-bottom:0;display:flex;align-items:center;gap:0.5rem;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> รายชื่อผู้ใช้งานทั้งหมด</div>
       <div class="search-bar" style="margin:0; width:200px;">
         <input type="text" id="user-search" placeholder="ค้นหา..." autocomplete="off" style="padding:0.45rem 0.75rem 0.45rem 2rem; font-size:0.85rem;">
       </div>
@@ -98,8 +99,8 @@
 <div id="modal-reset" style="display:none" class="modal-backdrop">
   <div class="modal">
     <div class="modal-header">
-      <h3>🔑 ตั้งรหัสผ่านใหม่</h3>
-      <button class="modal-close" id="btn-close-reset">✕</button>
+      <h3 style="display:flex;align-items:center;gap:0.5rem;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg> ตั้งรหัสผ่านใหม่</h3>
+      <button class="modal-close" id="btn-close-reset" aria-label="ปิด"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
     </div>
     <div class="modal-body">
       <div style="margin-bottom:1rem; color:var(--gray); font-size:0.9rem;">
@@ -113,7 +114,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" id="btn-cancel-reset">ยกเลิก</button>
-      <button class="btn btn-primary" id="btn-confirm-reset">🔑 บันทึกรหัสผ่าน</button>
+      <button class="btn btn-primary" id="btn-confirm-reset" style="display:inline-flex;align-items:center;gap:0.4rem;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg> บันทึกรหัสผ่าน</button>
     </div>
   </div>
 </div>
@@ -123,6 +124,7 @@
 <script type="module">
   import { auth, db } from "./firebase-config.js";
   import { requireAdmin } from "./auth.js";
+  import { icon } from "./icons.js";
   import {
     collection, doc, getDocs, setDoc, updateDoc, deleteDoc,
     query, orderBy, onSnapshot, serverTimestamp
@@ -165,9 +167,9 @@
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">
-      <a class="topbar-back" href="index.html">←</a>
+      <a class="topbar-back" href="index.html" aria-label="กลับ">${icon("arrow_left", { size: 20 })}</a>
       <div style="flex:1">
-        <div class="topbar-title">👥 จัดการผู้ใช้งาน</div>
+        <div class="topbar-title" style="display:flex;align-items:center;gap:0.5rem;">${icon("users", { size: 20 })} จัดการผู้ใช้งาน</div>
         <div class="topbar-sub">User Management (Admin Only)</div>
       </div>
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
@@ -189,8 +191,8 @@
     document.getElementById("users-table-wrap").style.display    = "block";
   }, err => {
     document.getElementById("users-loading").innerHTML =
-      `<span style="color:var(--red);">❌ โหลดรายชื่อผู้ใช้งานไม่สำเร็จ: ${err.message}</span>`;
-    toast(`❌ โหลดรายชื่อไม่สำเร็จ: ${err.code || err.message}`, "err", 5000);
+      `<span style="color:var(--red);display:inline-flex;align-items:center;gap:0.4rem;">${icon("x_circle", { size: 16 })} โหลดรายชื่อผู้ใช้งานไม่สำเร็จ: ${err.message}</span>`;
+    toast(`โหลดรายชื่อไม่สำเร็จ: ${err.code || err.message}`, "err", 5000);
   });
 
   function updateStats() {
@@ -247,12 +249,12 @@
         <td>
           ${!isMe ? `
             <button onclick="openReset('${u.uid}','${(u.name||u.email).replace(/'/g,"\\'")}')"
-              class="btn btn-outline btn-sm">🔑 Reset</button>` : "—"}
+              class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:0.3rem;">${icon("key", { size: 14 })} Reset</button>` : "—"}
         </td>
         <td>
           ${!isMe ? `
             <button onclick="deleteUserAccount('${u.uid}','${(u.name||u.email).replace(/'/g,"\\'")}','${u.email||""}')"
-              class="btn btn-red btn-sm">🗑️</button>` : "—"}
+              class="btn btn-red btn-sm" style="display:inline-flex;align-items:center;">${icon("trash", { size: 14 })}</button>` : "—"}
         </td>
       </tr>`;
     }).join("");
@@ -270,16 +272,16 @@
     errEl.style.display="none";
 
     if (!name || !email || !pass) {
-      errEl.textContent="⚠️ กรุณากรอกข้อมูลให้ครบ";
+      errEl.textContent="กรุณากรอกข้อมูลให้ครบ";
       errEl.style.display="block"; return;
     }
     if (pass.length < 6) {
-      errEl.textContent="⚠️ รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร";
+      errEl.textContent="รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร";
       errEl.style.display="block"; return;
     }
 
     document.getElementById("btn-create-user").disabled=true;
-    document.getElementById("create-loading").style.display="block";
+    document.getElementById("create-loading").style.display="flex";
 
     let cred;
     try {
@@ -305,17 +307,17 @@
       // Logout secondary app ทันที
       await secondaryAuth.signOut();
 
-      toast(`✅ สร้าง Account "${name}" เรียบร้อย`, "ok");
+      toast(`สร้าง Account "${name}" เรียบร้อย`, "ok");
       ["new-name","new-email","new-password"].forEach(id => document.getElementById(id).value="");
       document.getElementById("new-role").value="user";
 
     } catch(e) {
       const msgs = {
-        "auth/email-already-in-use": "❌ Email นี้ถูกใช้งานแล้ว",
-        "auth/invalid-email":        "❌ Email ไม่ถูกต้อง",
-        "auth/weak-password":        "❌ รหัสผ่านอ่อนเกินไป"
+        "auth/email-already-in-use": "Email นี้ถูกใช้งานแล้ว",
+        "auth/invalid-email":        "Email ไม่ถูกต้อง",
+        "auth/weak-password":        "รหัสผ่านอ่อนเกินไป"
       };
-      errEl.textContent = msgs[e.code] || `❌ เกิดข้อผิดพลาด: ${e.message}`;
+      errEl.textContent = msgs[e.code] || `เกิดข้อผิดพลาด: ${e.message}`;
       errEl.style.display="block";
     } finally {
       document.getElementById("btn-create-user").disabled=false;
@@ -327,9 +329,9 @@
   window.changeRole = async (uid, newRole) => {
     try {
       await updateDoc(doc(db,"users",uid), { role: newRole });
-      toast(`✅ อัปเดต Role เป็น "${newRole}" แล้ว`, "ok");
+      toast(`อัปเดต Role เป็น "${newRole}" แล้ว`, "ok");
     } catch (e) {
-      toast(`❌ เปลี่ยน Role ไม่สำเร็จ: ${e.code || e.message}`, "err", 5000);
+      toast(`เปลี่ยน Role ไม่สำเร็จ: ${e.code || e.message}`, "err", 5000);
       renderUsers(); // คืนค่า dropdown กลับตามข้อมูลจริง (การเปลี่ยนล้มเหลว)
     }
   };
@@ -354,7 +356,7 @@
     errEl.style.display="none";
 
     if (!newPass || newPass.length < 6) {
-      errEl.textContent="⚠️ รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร";
+      errEl.textContent="รหัสผ่านต้องอย่างน้อย 6 ตัวอักษร";
       errEl.style.display="block"; return;
     }
 
@@ -368,7 +370,7 @@
       const userDoc = allUsers.find(u => u.uid === resetTargetUid);
       if (userDoc?.email) {
         await sendPasswordResetEmail(auth, userDoc.email);
-        toast(`📧 ส่งอีเมล Reset Password ไปที่ ${userDoc.email} แล้ว`, "ok", 4000);
+        toast(`ส่งอีเมล Reset Password ไปที่ ${userDoc.email} แล้ว`, "ok", 4000);
         document.getElementById("modal-reset").style.display="none";
       } else {
         // บันทึก password reset request ใน Firestore
@@ -376,11 +378,11 @@
           password_reset_requested: true,
           password_reset_at: serverTimestamp()
         });
-        toast("✅ บันทึก Reset Request แล้ว", "ok");
+        toast("บันทึก Reset Request แล้ว", "ok");
         document.getElementById("modal-reset").style.display="none";
       }
     } catch(e) {
-      errEl.textContent = `❌ เกิดข้อผิดพลาด: ${e.message}`;
+      errEl.textContent = `เกิดข้อผิดพลาด: ${e.message}`;
       errEl.style.display="block";
     }
   });
@@ -390,9 +392,9 @@
     if (!confirm(`ลบผู้ใช้ "${name}" แน่ใจหรือไม่?\n\nจะลบเฉพาะข้อมูล Profile ใน Firestore\nถ้าต้องการลบ Account จาก Firebase Auth ต้องทำใน Firebase Console`)) return;
     try {
       await deleteDoc(doc(db,"users",uid));
-      toast(`🗑️ ลบข้อมูล ${name} แล้ว`);
+      toast(`ลบข้อมูล ${name} แล้ว`, "ok");
     } catch (e) {
-      toast(`❌ ลบไม่สำเร็จ: ${e.code || e.message}`, "err", 5000);
+      toast(`ลบไม่สำเร็จ: ${e.code || e.message}`, "err", 5000);
     }
   };
 </script>
