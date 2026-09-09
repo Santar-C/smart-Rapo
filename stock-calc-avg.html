@@ -9,8 +9,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Arial,sans-serif;background:#002048;min-height:100dvh;
+  body{position:relative;font-family:Arial,sans-serif;background:#002048;min-height:100dvh;
     display:flex;align-items:center;justify-content:center;padding:1.5rem}
+  body::before{content:'';position:fixed;inset:0;background-image:url('assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg');
+    background-size:cover;background-position:center;filter:brightness(.5) contrast(1.12) saturate(.7);z-index:0}
+  body::after{content:'';position:fixed;inset:0;
+    background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,.5) 100%),
+      linear-gradient(160deg,rgba(2,29,73,.55) 0%,rgba(2,10,30,.15) 45%,rgba(2,29,73,.6) 100%);z-index:0}
+  body > *{position:relative;z-index:1}
   .card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:600px;
     box-shadow:0 20px 60px rgba(0,0,0,.4)}
   h2{font-size:1.05rem;font-weight:900;color:#002048;margin-bottom:1rem;

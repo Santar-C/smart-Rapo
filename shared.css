@@ -22,14 +22,35 @@
 
 body {
   font-family: 'Sarabun', sans-serif;
-  background: var(--light);
+  background: #021D49;
   color: #1e293b;
   min-height: 100dvh;
+  position: relative;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url('assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg');
+  background-size: cover;
+  background-position: center;
+  filter: brightness(.5) contrast(1.12) saturate(.7);
+  z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,.5) 100%),
+    linear-gradient(160deg, rgba(2,29,73,.55) 0%, rgba(2,10,30,.15) 45%, rgba(2,29,73,.6) 100%);
+  z-index: 0;
 }
 
 /* ── Top Navigation Bar ──────────────────────────────────── */
 .topbar {
-  background: var(--blue);
+  background: rgba(2,29,73,.55);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid rgba(255,255,255,.12);
   color: white;
   padding: 0.75rem 1.25rem;
   display: flex;
@@ -38,8 +59,19 @@ body {
   position: sticky;
   top: 0;
   z-index: 100;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 24px rgba(0,0,0,.25);
 }
+.page-body { position: relative; z-index: 1; }
+.topbar-logo {
+  width: 34px; height: 34px;
+  background: white;
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 3px;
+}
+.topbar-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .topbar-back {
   background: rgba(255,255,255,0.15);
   border: none;
@@ -365,11 +397,15 @@ tbody tr:hover { background: #f8fafc; }
 }
 .search-bar input:focus { border-color: var(--indigo); }
 .search-bar::before {
-  content: "🔍";
+  content: "";
   position: absolute;
   left: 0.75rem;
   top: 50%;
+  width: 15px;
+  height: 15px;
   transform: translateY(-50%);
-  font-size: 0.9rem;
   pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
 }

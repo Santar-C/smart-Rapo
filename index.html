@@ -328,9 +328,30 @@
     #dashboard-page { display: none; }
     #dashboard-page {
       min-height: 100dvh;
-      background: linear-gradient(135deg, #021D49 0%, #1e3a8a 50%, #312e81 100%);
-      background-attachment: fixed;
+      position: relative;
+      background: #021D49;
     }
+    #dashboard-page::before {
+      content: '';
+      position: absolute; inset: 0;
+      min-height: 100dvh;
+      background-image: url('assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      filter: brightness(.5) contrast(1.12) saturate(.7);
+      z-index: 0;
+    }
+    #dashboard-page::after {
+      content: '';
+      position: absolute; inset: 0;
+      min-height: 100dvh;
+      background:
+        radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,.5) 100%),
+        linear-gradient(160deg, rgba(2,29,73,.55) 0%, rgba(2,10,30,.15) 45%, rgba(2,29,73,.6) 100%);
+      z-index: 0;
+    }
+    .dash-header, .dash-body { position: relative; z-index: 1; }
     .dash-header {
       background: rgba(2,29,73,.55);
       backdrop-filter: blur(14px) saturate(140%);
@@ -364,7 +385,10 @@
       color: var(--blue);
       font-size: 1rem;
       flex-shrink: 0;
+      overflow: hidden;
+      padding: 4px;
     }
+    .dash-header-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .dash-header-title {
       font-size: 1.1rem;
       font-weight: 700;
@@ -630,7 +654,11 @@
   <div id="dashboard-page">
     <header class="dash-header">
       <div class="dash-header-left">
-        <div class="dash-header-logo">R</div>
+        <div class="dash-header-logo">
+          <img src="assets/ceva-logo-clean.png" alt="CEVA Logistics"
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+          <span style="display:none;align-items:center;justify-content:center;width:100%;height:100%;font-weight:700;color:var(--blue)">R</span>
+        </div>
         <div>
           <div class="dash-header-title">RAPO System</div>
           <div class="dash-header-subtitle" id="header-date">—</div>
@@ -1237,11 +1265,11 @@ void main(){
         const P = {
           valFreq: 0.50, valAmp: 0.55, dens: 2.40, densVar: 2.20, densFreq: 0.32,
           wobAmp: 0.12, wobFreq: 1.60, lift: 0.05, refract: 0.18, edge: 0.04,
-          width: 0.46, disp: 0.30, skew: 1.50, fineAmp: 0.0, fineFreq: 9.0,
+          width: 0.46, disp: 0.09, skew: 1.50, fineAmp: 0.0, fineFreq: 9.0,
           gamma: 1.00, gain: 1.90, octGain: 0.32, litLo: -0.26, litHi: 0.10, dim: 0.44
         };
         const PKEYS = Object.keys(P);
-        const E = { base: 0.20, hot: 0.82, chromA: 0.42, chromS: 0.030, speed: 0.070, top: 0.35, press: 0.85, ripple: 1.60 };
+        const E = { base: 0.20, hot: 0.82, chromA: 0.14, chromS: 0.030, speed: 0.070, top: 0.35, press: 0.85, ripple: 1.60 };
         const EKEYS = Object.keys(E);
         const C = { glow: 1.95, glowR: 1.30, glowIn: 0.30, occl: 0.62, soften: 0.24, punch: 1.50 };
         const R = {
