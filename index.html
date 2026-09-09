@@ -40,10 +40,27 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 3rem;
-      background: linear-gradient(135deg, #021D49 0%, #1e3a8a 50%, #312e81 100%);
+      background: #021D49;
       padding: 1.5rem;
       isolation: isolate;
+      overflow: hidden;
+    }
+    #login-page::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: url('assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg');
+      background-size: cover;
+      background-position: center;
+      filter: brightness(.55) contrast(1.14) saturate(.7);
+      z-index: -2;
+    }
+    #login-page::after {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,.55) 100%),
+        linear-gradient(160deg, rgba(2,29,73,.55) 0%, rgba(2,10,30,.15) 45%, rgba(2,29,73,.6) 100%);
+      z-index: -1;
     }
 
     /* ── Brand dock (floating proximity-magnify nav bar) ──
@@ -139,50 +156,6 @@
       .rapo-dock-word:last-child { display: none; }
     }
 
-    /* ── Login Visual (real warehouse photo, cinematic grade + parallax) ── */
-    .login-visual {
-      display: none;
-      position: relative;
-      flex: 1;
-      max-width: 460px;
-      height: 460px;
-      border-radius: 20px;
-      overflow: hidden;
-      box-shadow: 0 24px 60px rgba(0,0,0,.4);
-    }
-    @media (min-width: 901px) {
-      .login-visual { display: block; }
-    }
-    .login-visual .wh-photo {
-      position: absolute;
-      inset: -5%;
-      width: 110%;
-      height: 110%;
-      object-fit: cover;
-      filter: brightness(.62) contrast(1.14) saturate(.7);
-      opacity: 0;
-      transition: opacity 1s ease;
-      will-change: transform;
-    }
-    .login-visual .wh-photo.is-ready { opacity: 1; }
-    .login-visual::after {
-      content: '';
-      position: absolute; inset: 0;
-      background:
-        radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,.58) 100%),
-        linear-gradient(160deg, rgba(2,29,73,.5) 0%, rgba(2,10,30,.12) 45%, rgba(2,29,73,.58) 100%);
-      pointer-events: none;
-    }
-    .login-visual-caption {
-      position: absolute;
-      left: 0; right: 0; bottom: 0.5rem;
-      text-align: center;
-      pointer-events: none;
-      color: rgba(255,255,255,0.55);
-      font-size: 0.78rem;
-      font-weight: 400;
-      z-index: 1;
-    }
     .login-card {
       background: var(--white);
       border-radius: 20px;
@@ -623,10 +596,6 @@
         <div class="rapo-dock-item rapo-dock-word">RAPO System</div>
         <div class="rapo-dock-item rapo-dock-word">Stock · Medicine · Smart Dock</div>
       </div>
-    </div>
-    <div class="login-visual" aria-hidden="true">
-      <img class="wh-photo" id="wh-photo" src="assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg" alt="">
-      <div class="login-visual-caption">RAPO System — Stock · Medicine · Smart Dock</div>
     </div>
     <div class="login-card">
       <div class="login-logo">
@@ -1563,37 +1532,6 @@ void main(){
       document.querySelectorAll("[data-liquid-metal]").forEach(mountLiquidMetal);
     }
 
-    // ── Warehouse scene (procedural crate stack, vanilla WebGL2) ──
-    // No three.js, no build step — a small hand-rolled 3D scene in the same
-    // spirit as the reference hero: crates instead of the moss root, dust
-    // motes instead of pollen, pointer parallax, a soft fade-in reveal.
-    initLoginPhotoParallax();
-    function initLoginPhotoParallax() {
-      const visual = document.querySelector(".login-visual");
-      const photo = document.getElementById("wh-photo");
-      if (!visual || !photo) return;
-      const markReady = () => photo.classList.add("is-ready");
-      photo.addEventListener("load", markReady);
-      if (photo.complete && photo.naturalWidth) markReady();
-
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (reduceMotion) return;
-
-      let px = 0, py = 0, tpx = 0, tpy = 0;
-      visual.addEventListener("pointermove", e => {
-        const r = visual.getBoundingClientRect();
-        tpx = ((e.clientX - r.left) / r.width) * 2 - 1;
-        tpy = ((e.clientY - r.top) / r.height) * 2 - 1;
-      });
-      visual.addEventListener("pointerleave", () => { tpx = 0; tpy = 0; });
-
-      function frame() {
-        px += (tpx - px) * 0.06; py += (tpy - py) * 0.06;
-        photo.style.transform = `translate(${(-px * 14).toFixed(2)}px, ${(-py * 10).toFixed(2)}px) scale(1.08)`;
-        requestAnimationFrame(frame);
-      }
-      requestAnimationFrame(frame);
-    }
   </script>
 </body>
 </html>
