@@ -342,8 +342,15 @@
 
     /* ── DASHBOARD PAGE ──────────────────────────── */
     #dashboard-page { display: none; }
+    #dashboard-page {
+      min-height: 100dvh;
+      background: linear-gradient(135deg, #021D49 0%, #1e3a8a 50%, #312e81 100%);
+      background-attachment: fixed;
+    }
     .dash-header {
-      background: var(--blue);
+      background: rgba(2,29,73,.55);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
       color: white;
       padding: 1rem 1.5rem;
       display: flex;
@@ -353,7 +360,8 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 4px 24px rgba(0,0,0,.25);
     }
     .dash-header-left {
       display: flex;
@@ -389,7 +397,8 @@
       flex-shrink: 0;
     }
     .user-badge {
-      background: rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,.18);
       padding: 0.35rem 0.75rem;
       border-radius: 20px;
       font-size: 0.8rem;
@@ -427,7 +436,7 @@
     .dash-greeting h2 {
       font-size: 1.4rem;
       font-weight: 700;
-      color: var(--blue);
+      color: white;
       display: flex;
       align-items: center;
       gap: 0.5rem;
@@ -435,7 +444,7 @@
     .dash-greeting h2 svg { color: var(--amber); flex-shrink: 0; }
     .dash-greeting p {
       font-size: 0.9rem;
-      color: var(--gray);
+      color: rgba(255,255,255,.65);
       margin-top: 0.2rem;
     }
     /* Menu Reel (การ์ดเมนูหมุนวนบนวงรี แทน grid เดิม) */
@@ -463,30 +472,35 @@
       width: 38px;
       height: 38px;
       border-radius: 50%;
-      border: 1.5px solid var(--border);
-      background: white;
-      box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(255,255,255,.12);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 4px 16px rgba(0,0,0,.2);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 1.2rem;
       line-height: 1;
-      color: var(--blue);
+      color: white;
       cursor: pointer;
       z-index: 1200;
+      transition: background .2s;
     }
-    .menu-nav-btn:hover { background: var(--light); }
+    .menu-nav-btn:hover { background: rgba(255,255,255,.22); }
     .menu-nav-prev { left: -6px; }
     .menu-nav-next { right: -6px; }
     .menu-card {
       position: absolute;
       left: 50%;
       top: 50%;
-      background: white;
+      background: rgba(255,255,255,.94);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       border-radius: var(--radius);
       padding: 1.25rem 0.85rem;
-      box-shadow: var(--shadow);
-      border: 1.5px solid var(--border);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      border: 1px solid rgba(255,255,255,.5);
       text-decoration: none;
       color: inherit;
       display: flex;
@@ -508,7 +522,7 @@
       border-radius: 0 0 var(--radius) var(--radius);
     }
     .menu-card:hover {
-      box-shadow: 0 12px 36px rgba(0,0,0,0.12);
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
       border-color: transparent;
     }
     .menu-card .card-icon { display: flex; color: var(--card-color, var(--blue)); }
