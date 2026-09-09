@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Consumables Stock Board — RAPO</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Sarabun',sans-serif;background:#020c1b;color:#e2e8f0;min-height:100dvh;overflow:hidden}
+  .top{background:linear-gradient(90deg,#001630,#002048);padding:.6rem 1.4rem;
+    display:flex;align-items:center;gap:1rem;border-bottom:2px solid #0f3460}
+  .logo{width:40px;height:40px;border-radius:9px;background:#E6100D;display:flex;
+    align-items:center;justify-content:center;font-weight:900;font-size:1.2rem;color:#fff}
+  .t-title{font-size:1.35rem;font-weight:900;letter-spacing:.02em}
+  .t-title span{color:#60a5fa}
+  .t-sub{font-size:.72rem;color:#64748b;display:flex;align-items:center;gap:.4rem;margin-top:1px}
+  #sdot{width:8px;height:8px;border-radius:50%;background:#ef4444;display:inline-block}
+  #sdot.on{background:#34d399}
+  .clock{margin-left:auto;text-align:right}
+  .c-time{font-size:2rem;font-weight:900;color:#34d399;line-height:1;font-variant-numeric:tabular-nums}
+  .c-date{font-size:.72rem;color:#64748b;margin-top:2px}
+
+  .kpi{display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;padding:.7rem 1.4rem}
+  .k{background:#071a2f;border:1px solid #0f3460;border-radius:12px;padding:.6rem .85rem;
+    border-left-width:4px}
+  .k-n{font-size:1.9rem;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+  .k-l{font-size:.7rem;color:#64748b;margin-top:.2rem;font-weight:700}
+
+  .wrap{display:grid;grid-template-columns:1.35fr 1fr;gap:.7rem;padding:0 1.4rem 1rem;
+    height:calc(100dvh - 148px)}
+  .panel{background:#04121f;border:1px solid #0f3460;border-radius:14px;
+    display:flex;flex-direction:column;overflow:hidden}
+  .p-head{padding:.55rem 1rem;background:#071a2f;border-bottom:1px solid #0f3460;
+    display:flex;align-items:center;gap:.5rem;font-size:.9rem;font-weight:800;flex-shrink:0}
+  .p-cnt{margin-left:auto;background:#0f3460;padding:.1rem .6rem;border-radius:999px;
+    font-size:.78rem;font-weight:900}
+  .p-body{flex:1;overflow-y:auto;padding:.5rem}
+  .p-body::-webkit-scrollbar{width:6px}
+  .p-body::-webkit-scrollbar-thumb{background:#0f3460;border-radius:3px}
+
+  .row{display:flex;align-items:center;gap:.6rem;padding:.5rem .7rem;border-radius:10px;
+    margin-bottom:.35rem;border-left:4px solid}
+  .r-abc{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;
+    justify-content:center;font-size:.72rem;font-weight:900;flex-shrink:0}
+  .r-main{flex:1;min-width:0}
+  .r-name{font-size:.92rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .r-meta{font-size:.68rem;color:#64748b;margin-top:1px}
+  .r-qty{text-align:right;flex-shrink:0}
+  .r-num{font-size:1.15rem;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+  .r-unit{font-size:.62rem;color:#64748b}
+  .r-days{flex-shrink:0;text-align:center;min-width:58px;padding:.2rem .4rem;border-radius:8px;
+    font-size:.78rem;font-weight:900}
+  .r-order{flex-shrink:0;background:#7f1d1d;color:#fff;padding:.25rem .6rem;border-radius:8px;
+    font-size:.85rem;font-weight:900;min-width:56px;text-align:center}
+
+  .empty{padding:2.5rem 1rem;text-align:center;color:#1e3a5f;font-size:.9rem;font-weight:700}
+  .ess{background:#fbbf24;color:#000;padding:0 .3rem;border-radius:4px;font-size:.6rem;font-weight:900;margin-left:.3rem}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+  .blink{animation:pulse 1.4s ease-in-out infinite}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="logo">R</div>
+  <div>
+    <div class="t-title">CONSUMABLES <span>STOCK BOARD</span></div>
+    <div class="t-sub"><span id="sdot"></span><span id="stxt">กำลังเชื่อมต่อ…</span> · RAPO THA088</div>
+  </div>
+  <div class="clock">
+    <div class="c-time" id="clk">--:--:--</div>
+    <div class="c-date" id="dt"></div>
+  </div>
+</div>
+
+<div class="kpi" id="kpi"></div>
+
+<div class="wrap">
+  <div class="panel">
+    <div class="p-head"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#dc2626;flex-shrink:0;vertical-align:-1px"></span> ต้องสั่งซื้อด่วน <span class="p-cnt" id="c-urgent">0</span></div>
+    <div class="p-body" id="urgent"></div>
+  </div>
+  <div class="panel">
+    <div class="p-head"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg> ใกล้ถึงจุดสั่ง (7 วัน) <span class="p-cnt" id="c-soon">0</span></div>
+    <div class="p-body" id="soon"></div>
+  </div>
+</div>
+
+<script>
+var FB={apiKey:"AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",authDomain:"rapo-system.firebaseapp.com",
+projectId:"rapo-system",storageBucket:"rapo-system.firebasestorage.app",
+messagingSenderId:"87090183469",appId:"1:87090183469:web:eafb1ded183755f329a7a4"};
+firebase.initializeApp(FB);
+var auth=firebase.auth(), db=firebase.firestore();
+var PRODUCTS=[], LOGS=[];
+
+// ── clock ──
+function tick(){
+  var n=new Date();
+  document.getElementById('clk').textContent=n.toLocaleTimeString('th-TH',{hour12:false});
+  document.getElementById('dt').textContent=n.toLocaleDateString('th-TH',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+tick(); setInterval(tick,1000);
+
+// ── calc (สูตรเดียวกับ stock.html) ──
+function avgDaily(p){ return (p.avg_monthly||0)/30; }
+function calcSafety(p){ return Math.ceil((p.avg_monthly||0)*0.2); }
+function calcMin(p){ return p.min_stock>0?p.min_stock:Math.ceil(calcSafety(p)+avgDaily(p)*(p.lead_time_days||15)); }
+function calcMax(p){ return p.max_stock>0?p.max_stock:Math.ceil(calcMin(p)+avgDaily(p)*(p.review_period||30)); }
+function calcOrderQty(p){
+  var gap=calcMax(p)-(p.qty||0), moq=Math.max(1,p.moq||1);
+  return gap<=0?0:Math.ceil(gap/moq)*moq;
+}
+function coverage(p){
+  var d=avgDaily(p), q=p.qty||0;
+  if(q<=0) return 0;
+  if(d<=0) return null;
+  return Math.floor(q/d);
+}
+function status(p){
+  var q=p.qty||0;
+  if(q<=0) return 'out';
+  if(q<=calcSafety(p)) return 'low';
+  if(q<=calcMin(p))    return 'reorder';
+  if(q>calcMax(p))     return 'over';
+  return 'ok';
+}
+function abcOf(p){ return p._abc||'C'; }
+
+function computeABC(list){
+  var s=list.filter(function(p){return (p.avg_monthly||0)>0;})
+            .sort(function(a,b){return (b.avg_monthly||0)-(a.avg_monthly||0);});
+  var tot=s.reduce(function(x,p){return x+(p.avg_monthly||0);},0), cum=0;
+  s.forEach(function(p){
+    cum+=(p.avg_monthly||0);
+    var pct=tot?cum/tot:1;
+    p._abc = pct<=0.8?'A':(pct<=0.95?'B':'C');
+  });
+  list.forEach(function(p){ if(!p._abc) p._abc='C'; });
+}
+
+var ABC_STYLE={A:{bg:'#7f1d1d',c:'#fca5a5'},B:{bg:'#78350f',c:'#fbbf24'},C:{bg:'#064e3b',c:'#6ee7b7'}};
+
+function rowHtml(p, kind){
+  var st=status(p), cv=coverage(p), oq=calcOrderQty(p), a=ABC_STYLE[abcOf(p)];
+  var col = st==='out'?'#ef4444': st==='low'?'#f97316': st==='reorder'?'#eab308':'#38bdf8';
+  var bg  = st==='out'?'rgba(239,68,68,.09)': st==='low'?'rgba(249,115,22,.08)':'rgba(234,179,8,.06)';
+  var dcol= cv===0?'#ef4444': (cv!==null&&cv<=7)?'#f97316':'#38bdf8';
+  var ess = p.is_essential?'<span class="ess">ESS</span>':'';
+  return '<div class="row'+(st==='out'?' blink':'')+'" style="background:'+bg+';border-left-color:'+col+'">'
+    + '<div class="r-abc" style="background:'+a.bg+';color:'+a.c+'">'+abcOf(p)+'</div>'
+    + '<div class="r-main"><div class="r-name">'+(p.name||'')+ess+'</div>'
+    + '<div class="r-meta">'+(p.sku||'')+' · '+(p.location||'—')+'</div></div>'
+    + '<div class="r-qty"><div class="r-num" style="color:'+col+'">'+(p.qty||0)+'</div>'
+    + '<div class="r-unit">'+(p.unit||'')+'</div></div>'
+    + '<div class="r-days" style="background:rgba(255,255,255,.05);color:'+dcol+'">'
+    + (cv===null?'—':cv+'<span style="font-size:.6rem;opacity:.7">ว</span>')+'</div>'
+    + (oq>0?'<div class="r-order">'+oq+'</div>':'<div style="width:56px"></div>')
+    + '</div>';
+}
+
+function render(){
+  computeABC(PRODUCTS);
+
+  var urgent = PRODUCTS.filter(function(p){ return ['out','low','reorder'].indexOf(status(p))>=0; });
+  var soon   = PRODUCTS.filter(function(p){
+    if(['out','low','reorder'].indexOf(status(p))>=0) return false;
+    var cv=coverage(p); return cv!==null && cv<=14;
+  });
+
+  var order={out:0,low:1,reorder:2};
+  urgent.sort(function(a,b){
+    var d=order[status(a)]-order[status(b)]; if(d) return d;
+    return abcOf(a).localeCompare(abcOf(b));
+  });
+  soon.sort(function(a,b){ return (coverage(a)||0)-(coverage(b)||0); });
+
+  var cnt={out:0,low:0,reorder:0,ok:0,over:0};
+  PRODUCTS.forEach(function(p){ cnt[status(p)]++; });
+  var totalOrder = urgent.reduce(function(s,p){ return s+calcOrderQty(p); },0);
+  var essRisk = PRODUCTS.filter(function(p){
+    return p.is_essential && ['out','low','reorder'].indexOf(status(p))>=0;
+  }).length;
+
+  document.getElementById('kpi').innerHTML =
+    kpiBox(PRODUCTS.length,'SKU ทั้งหมด','#60a5fa') +
+    kpiBox(cnt.ok+cnt.over,'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> ปกติ','#34d399') +
+    kpiBox(cnt.reorder,'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg> ควรสั่ง','#eab308') +
+    kpiBox(cnt.low+cnt.out,'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> วิกฤต/หมด','#ef4444') +
+    kpiBox(essRisk,'<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.12 2.12 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.12 2.12 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.12 2.12 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.12 2.12 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.12 2.12 0 0 0 1.597-1.16z"/></svg> Essential เสี่ยง','#fbbf24');
+
+  document.getElementById('c-urgent').textContent = urgent.length;
+  document.getElementById('c-soon').textContent   = soon.length;
+  document.getElementById('urgent').innerHTML = urgent.length
+    ? urgent.map(function(p){return rowHtml(p,'u');}).join('')
+    : '<div class="empty"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> ไม่มีรายการเร่งด่วน</div>';
+  document.getElementById('soon').innerHTML = soon.length
+    ? soon.map(function(p){return rowHtml(p,'s');}).join('')
+    : '<div class="empty"><svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg> ทุกรายการมีของเพียงพอ</div>';
+}
+
+function kpiBox(n,l,c){
+  return '<div class="k" style="border-left-color:'+c+'"><div class="k-n" style="color:'+c+'">'+n+'</div><div class="k-l">'+l+'</div></div>';
+}
+
+// ── data ──
+auth.signInAnonymously().catch(function(e){
+  document.getElementById('stxt').textContent='เชื่อมต่อไม่ได้: '+e.message;
+});
+
+auth.onAuthStateChanged(function(u){
+  if(!u) return;
+  db.collection('stock_products').limit(500).onSnapshot(function(s){
+    PRODUCTS = s.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+    document.getElementById('sdot').className='on';
+    document.getElementById('stxt').textContent='ออนไลน์ · Realtime';
+    render();
+  }, function(e){
+    document.getElementById('stxt').textContent='Error: '+e.message;
+  });
+});
+
+// auto scroll panels
+setInterval(function(){
+  ['urgent','soon'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el.scrollHeight<=el.clientHeight) return;
+    el.scrollTop = (el.scrollTop+el.clientHeight >= el.scrollHeight-4) ? 0 : el.scrollTop+1;
+  });
+}, 60);
+</script>
+</body>
+</html>
