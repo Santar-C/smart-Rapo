@@ -1560,10 +1560,98 @@ void main(){
     function initWarehouseScene() {
       const canvas = document.getElementById("wh-scene");
       if (!canvas) return;
-      const gl = canvas.getContext("webgl2", { alpha: true, antialias: true });
+      const gl = canvas.getContext("webgl2", { alpha: true, antialias: true, premultipliedAlpha: false });
       if (!gl) return;
 
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      // ── fullscreen-triangle helper (shared by post-process passes) ──
+      const fsqVAO = gl.createVertexArray(); gl.bindVertexArray(fsqVAO);
+      const fsqBuf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, fsqBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+      function makeRT() {
+        const tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        const fbo = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+        return { tex, fbo, w: 0, h: 0 };
+      }
+      function sizeRT(t, w, h, withDepth) {
+        if (t.w === w && t.h === h) return;
+        t.w = w; t.h = h;
+        gl.bindTexture(gl.TEXTURE_2D, t.tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        if (withDepth) {
+          if (!t.depth) t.depth = gl.createRenderbuffer();
+          gl.bindRenderbuffer(gl.RENDERBUFFER, t.depth);
+          gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, w, h);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+          gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, t.depth);
+        }
+      }
+      const T_scene = makeRT(), T_bloomA = makeRT(), T_bloomB = makeRT();
+
+      function fsCompile(fs) {
+        const vsrc = `#version 300 es
+in vec2 position; out vec2 vUv;
+void main(){ vUv = position * 0.5 + 0.5; gl_Position = vec4(position, 0.0, 1.0); }`;
+        const p = gl.createProgram();
+        const vs = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vs, vsrc); gl.compileShader(vs);
+        const f = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(f, fs); gl.compileShader(f);
+        if (!gl.getShaderParameter(f, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(f));
+        gl.attachShader(p, vs); gl.attachShader(p, f);
+        gl.bindAttribLocation(p, 0, "position");
+        gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(p));
+        const u = {};
+        const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+        for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); u[info.name] = gl.getUniformLocation(p, info.name); }
+        return { p, u };
+      }
+      // bright-pass extract + box blur (bloom), reused two ways for a soft glow
+      const bloomExtract = fsCompile(`#version 300 es
+precision highp float;
+in vec2 vUv; uniform sampler2D uTex; out vec4 o;
+void main(){
+  vec3 c = texture(uTex, vUv).rgb;
+  float l = dot(c, vec3(0.299, 0.587, 0.114));
+  o = vec4(c * smoothstep(0.55, 0.95, l), 1.0);
+}`);
+      const boxBlur = fsCompile(`#version 300 es
+precision highp float;
+in vec2 vUv; uniform sampler2D uTex; uniform vec2 uTexel; out vec4 o;
+void main(){
+  vec3 s = vec3(0.0);
+  for (int x = -2; x <= 2; x++) for (int y = -2; y <= 2; y++)
+    s += texture(uTex, vUv + uTexel * vec2(float(x), float(y))).rgb;
+  o = vec4(s / 25.0, 1.0);
+}`);
+      // final composite: bloom add + soft vignette + film grain + gentle cool-shadow grade
+      const composite = fsCompile(`#version 300 es
+precision highp float;
+in vec2 vUv; uniform sampler2D uScene, uBloom; uniform float uT; out vec4 o;
+float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+void main(){
+  vec4 scene = texture(uScene, vUv);
+  vec3 bloom = texture(uBloom, vUv).rgb;
+  vec3 c = scene.rgb + bloom * 0.55;
+  vec2 d = vUv - 0.5;
+  float vig = smoothstep(0.9, 0.28, length(d) * 1.15);
+  c *= mix(0.72, 1.0, vig);
+  c = mix(c, c * vec3(0.92, 0.97, 1.06), 0.28); // cool shadow tint
+  c = pow(max(c, 0.0), vec3(0.94)); // gentle filmic lift
+  float grain = (hash(vUv * vec2(1300.0, 900.0) + uT) - 0.5) * 0.035;
+  c += grain;
+  o = vec4(c, scene.a);
+}`);
 
       // ── tiny mat4 helpers (no dependency) ──
       function m4id() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
@@ -1628,27 +1716,38 @@ void main(){
       const boxVert = `#version 300 es
 in vec3 position; in vec3 normal;
 uniform mat4 uModel, uView, uProj;
-out vec3 vNormal; out vec3 vWorld;
+out vec3 vNormal; out vec3 vWorld; out float vViewZ;
 void main(){
   vec4 wp = uModel * vec4(position, 1.0);
   vWorld = wp.xyz;
   vNormal = mat3(uModel) * normal;
-  gl_Position = uProj * uView * wp;
+  vec4 vp = uView * wp;
+  vViewZ = -vp.z;
+  gl_Position = uProj * vp;
 }`;
       const boxFrag = `#version 300 es
 precision highp float;
-in vec3 vNormal; in vec3 vWorld;
-uniform vec3 uColor; uniform vec3 uKeyDir; uniform float uSeed;
+in vec3 vNormal; in vec3 vWorld; in float vViewZ;
+uniform vec3 uColor; uniform vec3 uKeyDir; uniform vec3 uCamPos; uniform float uSeed;
+uniform vec3 uFogColor; uniform float uFogNear, uFogFar;
 out vec4 o;
 float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
 void main(){
   vec3 N = normalize(vNormal);
+  vec3 V = normalize(uCamPos - vWorld);
+  vec3 H = normalize(uKeyDir + V);
   float key = max(dot(N, uKeyDir), 0.0);
-  float ambient = 0.42 + 0.08 * N.y;
-  float grain = hash(floor(vWorld.xz * 6.0 + uSeed)) * 0.10 - 0.05;
-  vec3 lit = uColor * (ambient + key * 0.62) + vec3(grain);
-  float rim = pow(1.0 - max(dot(N, vec3(0.0, 0.0, 1.0)), 0.0), 3.0) * 0.10;
-  o = vec4(lit + rim, 1.0);
+  float ao = 0.80 + 0.20 * (N.y * 0.5 + 0.5);
+  float ambient = (0.40 + 0.08 * N.y) * ao;
+  float spec = pow(max(dot(N, H), 0.0), 22.0) * 0.30;
+  float grain = hash(floor(vWorld.xz * 6.0 + uSeed)) * 0.045 - 0.0225;
+  vec3 base = mix(uColor, vec3(dot(uColor, vec3(0.299,0.587,0.114))), 0.14);
+  vec3 lit = base * (ambient + key * 0.58) + vec3(grain) + vec3(spec);
+  float fresnel = pow(1.0 - max(dot(N, V), 0.0), 2.4);
+  lit += fresnel * 0.16 * vec3(0.75, 0.85, 1.0);
+  float fog = smoothstep(uFogNear, uFogFar, vViewZ);
+  lit = mix(lit, uFogColor, fog * 0.55);
+  o = vec4(lit, 1.0);
 }`;
       const boxProg = gl.createProgram();
       gl.attachShader(boxProg, compile(gl.VERTEX_SHADER, boxVert));
@@ -1658,7 +1757,38 @@ void main(){
       gl.linkProgram(boxProg);
       if (!gl.getProgramParameter(boxProg, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(boxProg));
       const boxU = {};
-      ["uModel","uView","uProj","uColor","uKeyDir","uSeed"].forEach(n => { boxU[n] = gl.getUniformLocation(boxProg, n); });
+      ["uModel","uView","uProj","uColor","uKeyDir","uCamPos","uSeed","uFogColor","uFogNear","uFogFar"].forEach(n => { boxU[n] = gl.getUniformLocation(boxProg, n); });
+
+      // ── soft ground-contact shadow (fake, no shadow mapping needed) ──
+      const shadowVAO = gl.createVertexArray(); gl.bindVertexArray(shadowVAO);
+      const shadowBuf = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, shadowBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, 1,1, -1,-1, 1,1, -1,1]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      const shadowVert = `#version 300 es
+in vec2 position;
+uniform mat4 uView, uProj; uniform vec3 uCenter; uniform vec2 uRadius;
+out vec2 vUv;
+void main(){
+  vUv = position;
+  vec3 wp = uCenter + vec3(position.x * uRadius.x, 0.0, position.y * uRadius.y);
+  gl_Position = uProj * uView * vec4(wp, 1.0);
+}`;
+      const shadowFrag = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+void main(){
+  float a = smoothstep(1.0, 0.0, length(vUv)) * 0.42;
+  o = vec4(0.0, 0.0, 0.0, a);
+}`;
+      const shadowProg = gl.createProgram();
+      gl.attachShader(shadowProg, compile(gl.VERTEX_SHADER, shadowVert));
+      gl.attachShader(shadowProg, compile(gl.FRAGMENT_SHADER, shadowFrag));
+      gl.bindAttribLocation(shadowProg, 0, "position");
+      gl.linkProgram(shadowProg);
+      if (!gl.getProgramParameter(shadowProg, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(shadowProg));
+      const shadowU = {};
+      ["uView","uProj","uCenter","uRadius"].forEach(n => { shadowU[n] = gl.getUniformLocation(shadowProg, n); });
 
       // ── crate stack layout: a small pallet pyramid, RAPO accent colors ──
       const COLORS = [
@@ -1735,13 +1865,17 @@ void main(){
       const dustU = {};
       ["uView","uProj","uT"].forEach(n => { dustU[n] = gl.getUniformLocation(dustProg, n); });
 
-      let W = 0, H = 0;
+      let W = 0, H = 0, BW = 0, BH = 0;
       function resize() {
         const rect = canvas.getBoundingClientRect();
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         W = Math.max(2, Math.round(rect.width * dpr));
         H = Math.max(2, Math.round(rect.height * dpr));
         canvas.width = W; canvas.height = H;
+        BW = Math.max(2, Math.round(W / 2)); BH = Math.max(2, Math.round(H / 2));
+        sizeRT(T_scene, W, H, true);
+        sizeRT(T_bloomA, BW, BH, false);
+        sizeRT(T_bloomB, BW, BH, false);
       }
       new ResizeObserver(resize).observe(canvas);
       resize();
@@ -1758,29 +1892,41 @@ void main(){
       gl.enable(gl.CULL_FACE);
       gl.clearColor(0, 0, 0, 0);
 
+      const FOG_COLOR = [0.01, 0.05, 0.12];
       let t0 = performance.now();
       let ready = false;
+      let autoDrift = 0;
       function frame(now) {
         const t = (now - t0) / 1000;
         px += (tpx - px) * 0.06; py += (tpy - py) * 0.06;
-
-        gl.viewport(0, 0, W, H);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        if (!reduceMotion) autoDrift = Math.sin(t * 0.09) * 0.12;
 
         const aspect = W / H;
         const proj = m4persp(0.62, aspect, 0.1, 20);
-        const camRotY = -px * 0.35, camRotX = py * 0.14;
+        const camRotY = -px * 0.35 + autoDrift, camRotX = py * 0.14;
         let view = m4translate(0, -0.1, -6.2);
         view = m4mul(view, m4rotX(camRotX));
         view = m4mul(view, m4rotY(camRotY));
+        const camPos = [0, 0.1, 6.2];
+
+        // ── pass 1: draw the scene (crates + soft contact shadow + dust) offscreen ──
+        gl.bindFramebuffer(gl.FRAMEBUFFER, T_scene.fbo);
+        gl.viewport(0, 0, W, H);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         gl.enable(gl.DEPTH_TEST);
+        gl.depthMask(true);
         gl.disable(gl.BLEND);
         gl.useProgram(boxProg);
         gl.bindVertexArray(boxVAO);
         gl.uniformMatrix4fv(boxU.uProj, false, proj);
         gl.uniformMatrix4fv(boxU.uView, false, view);
         gl.uniform3f(boxU.uKeyDir, 0.4, 0.75, 0.5);
+        gl.uniform3f(boxU.uCamPos, camPos[0], camPos[1], camPos[2]);
+        gl.uniform3f(boxU.uFogColor, FOG_COLOR[0], FOG_COLOR[1], FOG_COLOR[2]);
+        gl.uniform1f(boxU.uFogNear, 5.6);
+        gl.uniform1f(boxU.uFogFar, 7.6);
         crates.forEach((c, i) => {
           const bob = reduceMotion ? 0 : Math.sin(t * 0.6 + c.bob) * 0.04;
           const spin = reduceMotion ? 0 : t * c.spin;
@@ -1793,18 +1939,60 @@ void main(){
           gl.drawElements(gl.TRIANGLES, boxIdx.length, gl.UNSIGNED_SHORT, 0);
         });
 
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.depthMask(false);
+        gl.useProgram(shadowProg);
+        gl.bindVertexArray(shadowVAO);
+        gl.uniformMatrix4fv(shadowU.uProj, false, proj);
+        gl.uniformMatrix4fv(shadowU.uView, false, view);
+        gl.uniform3f(shadowU.uCenter, 0.05, -1.55, 0.0);
+        gl.uniform2f(shadowU.uRadius, 1.75, 1.05);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
         if (!reduceMotion) {
-          gl.enable(gl.BLEND);
           gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-          gl.depthMask(false);
           gl.useProgram(dustProg);
           gl.bindVertexArray(dustVAO);
           gl.uniformMatrix4fv(dustU.uProj, false, proj);
           gl.uniformMatrix4fv(dustU.uView, false, view);
           gl.uniform1f(dustU.uT, t);
           gl.drawArrays(gl.POINTS, 0, DUST_N);
-          gl.depthMask(true);
         }
+        gl.depthMask(true);
+        gl.disable(gl.DEPTH_TEST);
+
+        // ── pass 2: bloom (extract bright + 2x soft blur) ──
+        gl.disable(gl.BLEND);
+        gl.bindVertexArray(fsqVAO);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, T_bloomA.fbo);
+        gl.viewport(0, 0, BW, BH);
+        gl.useProgram(bloomExtract.p);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_scene.tex);
+        gl.uniform1i(bloomExtract.u.uTex, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, T_bloomB.fbo);
+        gl.useProgram(boxBlur.p);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_bloomA.tex);
+        gl.uniform1i(boxBlur.u.uTex, 0);
+        gl.uniform2f(boxBlur.u.uTexel, 1 / BW, 1 / BH);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, T_bloomA.fbo);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_bloomB.tex);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+
+        // ── pass 3: composite to screen (bloom add + vignette + grain + grade) ──
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, W, H);
+        gl.useProgram(composite.p);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, T_scene.tex);
+        gl.uniform1i(composite.u.uScene, 0);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, T_bloomA.tex);
+        gl.uniform1i(composite.u.uBloom, 1);
+        gl.uniform1f(composite.u.uT, t);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
 
         if (!ready) { ready = true; canvas.classList.add("is-ready"); }
         requestAnimationFrame(frame);
