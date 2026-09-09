@@ -40,10 +40,27 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 3rem;
-      background: linear-gradient(135deg, #021D49 0%, #1e3a8a 50%, #312e81 100%);
+      background: #021D49;
       padding: 1.5rem;
       isolation: isolate;
+      overflow: hidden;
+    }
+    #login-page::before {
+      content: '';
+      position: absolute; inset: 0;
+      background-image: url('assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg');
+      background-size: cover;
+      background-position: center;
+      filter: brightness(.55) contrast(1.14) saturate(.7);
+      z-index: -2;
+    }
+    #login-page::after {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,.55) 100%),
+        linear-gradient(160deg, rgba(2,29,73,.55) 0%, rgba(2,10,30,.15) 45%, rgba(2,29,73,.6) 100%);
+      z-index: -1;
     }
 
     /* ── Brand dock (floating proximity-magnify nav bar) ──
@@ -139,39 +156,6 @@
       .rapo-dock-word:last-child { display: none; }
     }
 
-    /* ── Login Visual (procedural crate-stack 3D scene) ──
-       A vanilla WebGL2 scene: no three.js, no build step, matching the rest
-       of this codebase. Stacked crates in the RAPO accent colors, drifting
-       dust motes, gentle pointer parallax. */
-    .login-visual {
-      display: none;
-      position: relative;
-      flex: 1;
-      max-width: 460px;
-      height: 460px;
-    }
-    @media (min-width: 901px) {
-      .login-visual { display: block; }
-    }
-    .login-visual canvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-      opacity: 0;
-      transition: opacity .8s ease;
-    }
-    .login-visual canvas.is-ready { opacity: 1; }
-    .login-visual-caption {
-      position: absolute;
-      left: 0; right: 0; bottom: 0.5rem;
-      text-align: center;
-      pointer-events: none;
-      color: rgba(255,255,255,0.55);
-      font-size: 0.78rem;
-      font-weight: 400;
-    }
     .login-card {
       background: var(--white);
       border-radius: 20px;
@@ -342,8 +326,15 @@
 
     /* ── DASHBOARD PAGE ──────────────────────────── */
     #dashboard-page { display: none; }
+    #dashboard-page {
+      min-height: 100dvh;
+      background: linear-gradient(135deg, #021D49 0%, #1e3a8a 50%, #312e81 100%);
+      background-attachment: fixed;
+    }
     .dash-header {
-      background: var(--blue);
+      background: rgba(2,29,73,.55);
+      backdrop-filter: blur(14px) saturate(140%);
+      -webkit-backdrop-filter: blur(14px) saturate(140%);
       color: white;
       padding: 1rem 1.5rem;
       display: flex;
@@ -353,7 +344,8 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      border-bottom: 1px solid rgba(255,255,255,.12);
+      box-shadow: 0 4px 24px rgba(0,0,0,.25);
     }
     .dash-header-left {
       display: flex;
@@ -389,7 +381,8 @@
       flex-shrink: 0;
     }
     .user-badge {
-      background: rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,.18);
       padding: 0.35rem 0.75rem;
       border-radius: 20px;
       font-size: 0.8rem;
@@ -427,7 +420,7 @@
     .dash-greeting h2 {
       font-size: 1.4rem;
       font-weight: 700;
-      color: var(--blue);
+      color: white;
       display: flex;
       align-items: center;
       gap: 0.5rem;
@@ -435,7 +428,7 @@
     .dash-greeting h2 svg { color: var(--amber); flex-shrink: 0; }
     .dash-greeting p {
       font-size: 0.9rem;
-      color: var(--gray);
+      color: rgba(255,255,255,.65);
       margin-top: 0.2rem;
     }
     /* Menu Reel (การ์ดเมนูหมุนวนบนวงรี แทน grid เดิม) */
@@ -463,30 +456,35 @@
       width: 38px;
       height: 38px;
       border-radius: 50%;
-      border: 1.5px solid var(--border);
-      background: white;
-      box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(255,255,255,.12);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 4px 16px rgba(0,0,0,.2);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 1.2rem;
       line-height: 1;
-      color: var(--blue);
+      color: white;
       cursor: pointer;
       z-index: 1200;
+      transition: background .2s;
     }
-    .menu-nav-btn:hover { background: var(--light); }
+    .menu-nav-btn:hover { background: rgba(255,255,255,.22); }
     .menu-nav-prev { left: -6px; }
     .menu-nav-next { right: -6px; }
     .menu-card {
       position: absolute;
       left: 50%;
       top: 50%;
-      background: white;
+      background: rgba(255,255,255,.94);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       border-radius: var(--radius);
       padding: 1.25rem 0.85rem;
-      box-shadow: var(--shadow);
-      border: 1.5px solid var(--border);
+      box-shadow: 0 10px 30px rgba(0,0,0,.25);
+      border: 1px solid rgba(255,255,255,.5);
       text-decoration: none;
       color: inherit;
       display: flex;
@@ -508,7 +506,7 @@
       border-radius: 0 0 var(--radius) var(--radius);
     }
     .menu-card:hover {
-      box-shadow: 0 12px 36px rgba(0,0,0,0.12);
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
       border-color: transparent;
     }
     .menu-card .card-icon { display: flex; color: var(--card-color, var(--blue)); }
@@ -598,10 +596,6 @@
         <div class="rapo-dock-item rapo-dock-word">RAPO System</div>
         <div class="rapo-dock-item rapo-dock-word">Stock · Medicine · Smart Dock</div>
       </div>
-    </div>
-    <div class="login-visual" aria-hidden="true">
-      <canvas id="wh-scene"></canvas>
-      <div class="login-visual-caption">RAPO System — Stock · Medicine · Smart Dock</div>
     </div>
     <div class="login-card">
       <div class="login-logo">
@@ -1538,265 +1532,6 @@ void main(){
       document.querySelectorAll("[data-liquid-metal]").forEach(mountLiquidMetal);
     }
 
-    // ── Warehouse scene (procedural crate stack, vanilla WebGL2) ──
-    // No three.js, no build step — a small hand-rolled 3D scene in the same
-    // spirit as the reference hero: crates instead of the moss root, dust
-    // motes instead of pollen, pointer parallax, a soft fade-in reveal.
-    initWarehouseScene();
-    function initWarehouseScene() {
-      const canvas = document.getElementById("wh-scene");
-      if (!canvas) return;
-      const gl = canvas.getContext("webgl2", { alpha: true, antialias: true });
-      if (!gl) return;
-
-      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-      // ── tiny mat4 helpers (no dependency) ──
-      function m4id() { return new Float32Array([1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]); }
-      function m4mul(a, b) {
-        const o = new Float32Array(16);
-        for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) {
-          o[c * 4 + r] = a[0*4+r]*b[c*4+0] + a[1*4+r]*b[c*4+1] + a[2*4+r]*b[c*4+2] + a[3*4+r]*b[c*4+3];
-        }
-        return o;
-      }
-      function m4persp(fovy, aspect, near, far) {
-        const f = 1 / Math.tan(fovy / 2), o = new Float32Array(16);
-        o[0] = f / aspect; o[5] = f; o[10] = (far + near) / (near - far); o[11] = -1;
-        o[14] = (2 * far * near) / (near - far);
-        return o;
-      }
-      function m4translate(x, y, z) { const o = m4id(); o[12] = x; o[13] = y; o[14] = z; return o; }
-      function m4scale(x, y, z) { const o = m4id(); o[0] = x; o[5] = y; o[10] = z; return o; }
-      function m4rotY(a) { const o = m4id(), c = Math.cos(a), s = Math.sin(a); o[0] = c; o[2] = -s; o[8] = s; o[10] = c; return o; }
-      function m4rotX(a) { const o = m4id(), c = Math.cos(a), s = Math.sin(a); o[5] = c; o[6] = s; o[9] = -s; o[10] = c; return o; }
-      function m4normalFromModel(m) {
-        // rigid transforms only (rotate + uniform-ish scale) → transpose of
-        // the 3x3 upper-left inverse; here it's just the 3x3 itself since
-        // our boxes only ever carry rotation + translation + axis scale
-        return m;
-      }
-
-      // ── box geometry (24 verts, per-face normals) ──
-      const boxPos = [], boxNrm = [], boxIdx = [];
-      const FACES = [
-        { n: [0,0,1],  v: [[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]] },
-        { n: [0,0,-1], v: [[1,-1,-1],[-1,-1,-1],[-1,1,-1],[1,1,-1]] },
-        { n: [0,1,0],  v: [[-1,1,1],[1,1,1],[1,1,-1],[-1,1,-1]] },
-        { n: [0,-1,0], v: [[-1,-1,-1],[1,-1,-1],[1,-1,1],[-1,-1,1]] },
-        { n: [1,0,0],  v: [[1,-1,1],[1,-1,-1],[1,1,-1],[1,1,1]] },
-        { n: [-1,0,0], v: [[-1,-1,-1],[-1,-1,1],[-1,1,1],[-1,1,-1]] }
-      ];
-      FACES.forEach((f, fi) => {
-        const base = fi * 4;
-        f.v.forEach(v => { boxPos.push(...v); boxNrm.push(...f.n); });
-        boxIdx.push(base, base+1, base+2, base, base+2, base+3);
-      });
-
-      const boxVAO = gl.createVertexArray(); gl.bindVertexArray(boxVAO);
-      const posBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxPos), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-      const nrmBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, nrmBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(boxNrm), gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 0, 0);
-      const idxBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, idxBuf);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(boxIdx), gl.STATIC_DRAW);
-
-      function compile(type, src) {
-        const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
-        return s;
-      }
-      const boxVert = `#version 300 es
-in vec3 position; in vec3 normal;
-uniform mat4 uModel, uView, uProj;
-out vec3 vNormal; out vec3 vWorld;
-void main(){
-  vec4 wp = uModel * vec4(position, 1.0);
-  vWorld = wp.xyz;
-  vNormal = mat3(uModel) * normal;
-  gl_Position = uProj * uView * wp;
-}`;
-      const boxFrag = `#version 300 es
-precision highp float;
-in vec3 vNormal; in vec3 vWorld;
-uniform vec3 uColor; uniform vec3 uKeyDir; uniform float uSeed;
-out vec4 o;
-float hash(vec2 p){ return fract(sin(dot(p, vec2(41.3, 289.1))) * 43758.5453); }
-void main(){
-  vec3 N = normalize(vNormal);
-  float key = max(dot(N, uKeyDir), 0.0);
-  float ambient = 0.42 + 0.08 * N.y;
-  float grain = hash(floor(vWorld.xz * 6.0 + uSeed)) * 0.10 - 0.05;
-  vec3 lit = uColor * (ambient + key * 0.62) + vec3(grain);
-  float rim = pow(1.0 - max(dot(N, vec3(0.0, 0.0, 1.0)), 0.0), 3.0) * 0.10;
-  o = vec4(lit + rim, 1.0);
-}`;
-      const boxProg = gl.createProgram();
-      gl.attachShader(boxProg, compile(gl.VERTEX_SHADER, boxVert));
-      gl.attachShader(boxProg, compile(gl.FRAGMENT_SHADER, boxFrag));
-      gl.bindAttribLocation(boxProg, 0, "position");
-      gl.bindAttribLocation(boxProg, 1, "normal");
-      gl.linkProgram(boxProg);
-      if (!gl.getProgramParameter(boxProg, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(boxProg));
-      const boxU = {};
-      ["uModel","uView","uProj","uColor","uKeyDir","uSeed"].forEach(n => { boxU[n] = gl.getUniformLocation(boxProg, n); });
-
-      // ── crate stack layout: a small pallet pyramid, RAPO accent colors ──
-      const COLORS = [
-        [0.008, 0.114, 0.286],  // navy  #021D49
-        [0.882, 0.149, 0.110],  // red   #E1261C
-        [0.388, 0.400, 0.945],  // indigo
-        [0.086, 0.639, 0.290],  // green
-        [0.851, 0.467, 0.024],  // amber
-      ];
-      const crates = [];
-      const layout = [
-        { x: -1.15, y: -0.9, z: 0,    s: 0.62, c: 0 },
-        { x:  0.05, y: -0.9, z: 0.15, s: 0.68, c: 1 },
-        { x:  1.25, y: -0.9, z: -0.1, s: 0.60, c: 2 },
-        { x: -0.55, y: 0.05, z: 0.05, s: 0.58, c: 3 },
-        { x:  0.65, y: 0.10, z: -0.05,s: 0.56, c: 4 },
-        { x:  0.05, y: 1.05, z: 0,    s: 0.50, c: 0 },
-      ];
-      layout.forEach((L, i) => crates.push({
-        base: [L.x, L.y, L.z], scale: L.s, color: COLORS[L.c],
-        bob: Math.random() * Math.PI * 2, spin: (Math.random() - 0.5) * 0.15
-      }));
-
-      // ── dust motes (gl.POINTS, additive) ──
-      const DUST_N = 90;
-      const dustPos = new Float32Array(DUST_N * 3);
-      const dustSeed = new Float32Array(DUST_N * 2);
-      for (let i = 0; i < DUST_N; i++) {
-        dustPos[i*3]   = (Math.random() - 0.5) * 6;
-        dustPos[i*3+1] = (Math.random() - 0.5) * 4;
-        dustPos[i*3+2] = (Math.random() - 0.5) * 4 - 1;
-        dustSeed[i*2]   = Math.random() * Math.PI * 2;
-        dustSeed[i*2+1] = 0.3 + Math.random() * 0.9;
-      }
-      const dustVAO = gl.createVertexArray(); gl.bindVertexArray(dustVAO);
-      const dustPosBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, dustPosBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, dustPos, gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-      const dustSeedBuf = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, dustSeedBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, dustSeed, gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 0, 0);
-
-      const dustVert = `#version 300 es
-in vec3 position; in vec2 seed;
-uniform mat4 uView, uProj; uniform float uT;
-out float vAlpha;
-void main(){
-  vec3 p = position;
-  p.x += sin(uT * seed.y * 0.4 + seed.x) * 0.35;
-  p.y += mod(uT * seed.y * 0.12 + seed.x, 4.0) - 2.0;
-  vec4 mv = uView * vec4(p, 1.0);
-  gl_PointSize = 90.0 / max(-mv.z, 0.4);
-  vAlpha = 0.35 + 0.35 * sin(uT * seed.y + seed.x * 3.0);
-  gl_Position = uProj * mv;
-}`;
-      const dustFrag = `#version 300 es
-precision highp float;
-in float vAlpha;
-out vec4 o;
-void main(){
-  vec2 d = gl_PointCoord - 0.5;
-  float a = smoothstep(0.5, 0.0, length(d)) * vAlpha;
-  o = vec4(vec3(0.92, 0.95, 1.0), a * 0.55);
-}`;
-      const dustProg = gl.createProgram();
-      gl.attachShader(dustProg, compile(gl.VERTEX_SHADER, dustVert));
-      gl.attachShader(dustProg, compile(gl.FRAGMENT_SHADER, dustFrag));
-      gl.bindAttribLocation(dustProg, 0, "position");
-      gl.bindAttribLocation(dustProg, 1, "seed");
-      gl.linkProgram(dustProg);
-      if (!gl.getProgramParameter(dustProg, gl.LINK_STATUS)) console.error(gl.getProgramInfoLog(dustProg));
-      const dustU = {};
-      ["uView","uProj","uT"].forEach(n => { dustU[n] = gl.getUniformLocation(dustProg, n); });
-
-      let W = 0, H = 0;
-      function resize() {
-        const rect = canvas.getBoundingClientRect();
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        W = Math.max(2, Math.round(rect.width * dpr));
-        H = Math.max(2, Math.round(rect.height * dpr));
-        canvas.width = W; canvas.height = H;
-      }
-      new ResizeObserver(resize).observe(canvas);
-      resize();
-
-      let px = 0, py = 0, tpx = 0, tpy = 0;
-      canvas.parentElement.addEventListener("pointermove", e => {
-        const r = canvas.getBoundingClientRect();
-        tpx = ((e.clientX - r.left) / r.width) * 2 - 1;
-        tpy = ((e.clientY - r.top) / r.height) * 2 - 1;
-      });
-      canvas.parentElement.addEventListener("pointerleave", () => { tpx = 0; tpy = 0; });
-
-      gl.enable(gl.DEPTH_TEST);
-      gl.enable(gl.CULL_FACE);
-      gl.clearColor(0, 0, 0, 0);
-
-      let t0 = performance.now();
-      let ready = false;
-      function frame(now) {
-        const t = (now - t0) / 1000;
-        px += (tpx - px) * 0.06; py += (tpy - py) * 0.06;
-
-        gl.viewport(0, 0, W, H);
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-        const aspect = W / H;
-        const proj = m4persp(0.62, aspect, 0.1, 20);
-        const camRotY = -px * 0.35, camRotX = py * 0.14;
-        let view = m4translate(0, -0.1, -6.2);
-        view = m4mul(view, m4rotX(camRotX));
-        view = m4mul(view, m4rotY(camRotY));
-
-        gl.enable(gl.DEPTH_TEST);
-        gl.disable(gl.BLEND);
-        gl.useProgram(boxProg);
-        gl.bindVertexArray(boxVAO);
-        gl.uniformMatrix4fv(boxU.uProj, false, proj);
-        gl.uniformMatrix4fv(boxU.uView, false, view);
-        gl.uniform3f(boxU.uKeyDir, 0.4, 0.75, 0.5);
-        crates.forEach((c, i) => {
-          const bob = reduceMotion ? 0 : Math.sin(t * 0.6 + c.bob) * 0.04;
-          const spin = reduceMotion ? 0 : t * c.spin;
-          let m = m4translate(c.base[0], c.base[1] + bob, c.base[2]);
-          m = m4mul(m, m4rotY(spin));
-          m = m4mul(m, m4scale(c.scale, c.scale, c.scale));
-          gl.uniformMatrix4fv(boxU.uModel, false, m);
-          gl.uniform3f(boxU.uColor, c.color[0], c.color[1], c.color[2]);
-          gl.uniform1f(boxU.uSeed, i * 7.3);
-          gl.drawElements(gl.TRIANGLES, boxIdx.length, gl.UNSIGNED_SHORT, 0);
-        });
-
-        if (!reduceMotion) {
-          gl.enable(gl.BLEND);
-          gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-          gl.depthMask(false);
-          gl.useProgram(dustProg);
-          gl.bindVertexArray(dustVAO);
-          gl.uniformMatrix4fv(dustU.uProj, false, proj);
-          gl.uniformMatrix4fv(dustU.uView, false, view);
-          gl.uniform1f(dustU.uT, t);
-          gl.drawArrays(gl.POINTS, 0, DUST_N);
-          gl.depthMask(true);
-        }
-
-        if (!ready) { ready = true; canvas.classList.add("is-ready"); }
-        requestAnimationFrame(frame);
-      }
-      requestAnimationFrame(frame);
-    }
   </script>
 </body>
 </html>
