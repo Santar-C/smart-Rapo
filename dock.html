@@ -123,7 +123,7 @@ const TODAY   = ()=>new Date().toISOString().split('T')[0];
 const TIMENOW = ()=>new Date().toLocaleTimeString('th-TH',{hour12:false,hour:'2-digit',minute:'2-digit'});
 const safe = v=>{ if(!v)return[]; if(Array.isArray(v))return v.filter(Boolean); return Object.values(v).filter(Boolean); };
 
-const STATUSES  = ['Pending','Arrived','Loading','WaitingDoc','Departing','Completed'];
+const STATUSES  = ['Pending','Arrived','Loading','WaitingDoc','Completed'];
 const STAT_LBL  = {Pending:'รอเข้าท่า',Arrived:'1.รถมาถึง',Loading:'2.โหลดงาน',WaitingDoc:'3.รอเอกสาร',Completed:'4.เสร็จสิ้น'};
 const STAT_CLS  = {
   Pending:'bg-slate-100 text-slate-600 border-slate-300',
@@ -349,7 +349,53 @@ const StatusBadge = ({booking, onCycle})=>(
 // ════════════════════════════════════════════════════════════
 // SETTINGS VIEW — จัดการ Vendor / Origin / Destination lists
 // ════════════════════════════════════════════════════════════
-const SettingsView = ({settings})=>{
+const DockManager = ({bays, isAdmin, onAddBay, onRenameBay, onDeleteBay})=>{
+  const [newName, setNewName] = React.useState('');
+  const [editing, setEditing] = React.useState(null); // dock name being renamed
+  const [editVal, setEditVal] = React.useState('');
+  return (
+    <div className="bg-white border border-emerald-100 rounded-2xl p-4 shadow-sm">
+      <div className="text-xs font-black text-emerald-700 uppercase tracking-wider mb-3 flex items-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-emerald-500"/> จัดการ Dock
+        <span className="ml-auto text-slate-400 font-normal normal-case">{bays.length} ช่อง</span>
+      </div>
+      <div className="space-y-1.5 mb-3 max-h-64 overflow-y-auto pr-1">
+        {bays.map(d=>(
+          <div key={d.name} className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+            {editing===d.name ? (
+              <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
+                onKeyDown={e=>{
+                  if(e.key==='Enter'){ onRenameBay(d.name,editVal); setEditing(null); }
+                  if(e.key==='Escape'){ setEditing(null); }
+                }}
+                onBlur={()=>{ onRenameBay(d.name,editVal); setEditing(null); }}
+                className="flex-1 border border-indigo-300 rounded px-2 py-1 text-sm outline-none"/>
+            ) : (
+              <span className="flex-1 text-sm font-medium text-slate-700">{d.name}</span>
+            )}
+            <span className="text-[10px] text-slate-400">{d.status}</span>
+            {isAdmin && editing!==d.name && (
+              <button onClick={()=>{setEditing(d.name);setEditVal(d.name);}} className="text-slate-300 hover:text-indigo-500 shrink-0"><Icon name="edit" size={13}/></button>
+            )}
+            {isAdmin && <button onClick={()=>onDeleteBay(d.name)} className="text-red-300 hover:text-red-500 text-lg leading-none shrink-0">×</button>}
+          </div>
+        ))}
+        {!bays.length && <div className="text-slate-300 text-xs text-center py-3">ยังไม่มี Dock</div>}
+      </div>
+      {isAdmin && (
+        <div className="flex gap-2">
+          <input value={newName} onChange={e=>setNewName(e.target.value)}
+            onKeyDown={e=>{ if(e.key==='Enter'){ onAddBay(newName); setNewName(''); } }}
+            placeholder="ชื่อ Dock ใหม่... แล้ว Enter"
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-slate-400"/>
+          <button onClick={()=>{ onAddBay(newName); setNewName(''); }} className="bg-emerald-600 text-white px-3 py-2 rounded-lg text-xs font-bold hover:bg-emerald-700">+ เพิ่ม Dock</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const SettingsView = ({settings, bays, isAdmin, onAddBay, onRenameBay, onDeleteBay})=>{
   const [localSettings, setLocalSettings] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
@@ -424,6 +470,7 @@ const SettingsView = ({settings})=>{
         <ListEditor label="Vendor / บริษัท" listKey="vendors" color="indigo"/>
         <ListEditor label="Origin / CY Place" listKey="origins" color="sky"/>
         <ListEditor label="Destination / Return Container" listKey="destinations" color="purple"/>
+        <DockManager bays={bays||[]} isAdmin={isAdmin} onAddBay={onAddBay} onRenameBay={onRenameBay} onDeleteBay={onDeleteBay}/>
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
           กด ▲ เพื่อเรียงลำดับ · กด × เพื่อลบ · กด "บันทึกการตั้งค่า" เพื่อให้มีผลกับทุกเครื่องทันที
         </div>
@@ -662,9 +709,10 @@ const DockCardEmpty = ({dock, canDock, isAdmin, onToggle, onPrintQR})=>{
         <span>{dock.name}</span>
         {canDock && <span className="text-[9px] bg-white/70 px-1.5 py-0.5 rounded text-slate-500">คลิกเปลี่ยน</span>}
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-75">
+      <div className="flex-1 flex flex-col items-center justify-center gap-2 opacity-75 px-4 text-center">
         <span className={isBusy?"text-amber-500":"text-emerald-500"}><Icon name={isBusy?"alertTriangle":"checkCircle"} size={30}/></span>
         <span className="font-bold text-sm">{isBusy?(dock.status==='Maintenance'?'ซ่อมบำรุง':'ปิดชั่วคราว'):'ว่าง (Available)'}</span>
+        {isBusy && dock.note && <span className="text-[11px] text-amber-700 bg-amber-100/70 rounded-lg px-2 py-1 font-normal opacity-100">{dock.note}</span>}
       </div>
       {isAdmin && (
         <div className="px-4 pb-3 flex justify-center">
@@ -797,7 +845,15 @@ const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDele
                     <td className="p-4"><div className="font-bold">{b.date}</div><div className="text-indigo-600 font-bold text-[11px]">{b.startTime} - {b.endTime}</div></td>
                     <td className="p-4"><div className="font-bold text-indigo-700">{b.shipmentNo}</div><div className="text-slate-500 text-[11px]">{b.vendor}</div></td>
                     <td className="p-4 font-bold">{b.license}</td>
-                    <td className="p-4 font-bold text-indigo-600">{b.allocation}</td>
+                    <td className="p-4">
+                      <div className="font-bold text-indigo-600">{b.allocation}</div>
+                      {!!b.changeLog?.length && (
+                        <button onClick={()=>alert(b.changeLog.map(c=>`${c.at} (${c.by}) — เปลี่ยน${c.field==='allocation'?'ช่องจอด':c.field} จาก "${c.from}" เป็น "${c.to}"\nเหตุผล: ${c.reason}`).join('\n\n'))}
+                          className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-bold hover:bg-amber-100 transition-colors">
+                          <Icon name="alertTriangle" size={9} className="inline mr-0.5"/> มีการเปลี่ยนแปลง ({b.changeLog.length})
+                        </button>
+                      )}
+                    </td>
                     <td className="p-4 text-slate-600">{b.timeArrived||'—'}</td>
                     <td className="p-4 text-emerald-600 font-bold">{b.timeCompleted||'—'}</td>
                     <td className="p-4"><StatusBadge booking={b} onCycle={onCycle}/></td>
@@ -810,7 +866,15 @@ const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDele
                     <td className="p-4"><div className="font-bold">{b.date}</div><div className="text-indigo-600 font-bold text-[11px]">{b.startTime} - {b.endTime}</div></td>
                     <td className="p-4"><div className="font-bold text-indigo-700">{b.shipmentNo}</div><div className="text-slate-500 text-[11px]">{b.vendor}</div></td>
                     <td className="p-4"><div className="font-bold">{b.license}</div><div className="text-slate-500 text-[11px]">{b.vehicle}</div></td>
-                    <td className="p-4 font-bold text-indigo-600">{b.allocation}</td>
+                    <td className="p-4">
+                      <div className="font-bold text-indigo-600">{b.allocation}</div>
+                      {!!b.changeLog?.length && (
+                        <button onClick={()=>alert(b.changeLog.map(c=>`${c.at} (${c.by}) — เปลี่ยน${c.field==='allocation'?'ช่องจอด':c.field} จาก "${c.from}" เป็น "${c.to}"\nเหตุผล: ${c.reason}`).join('\n\n'))}
+                          className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-bold hover:bg-amber-100 transition-colors">
+                          <Icon name="alertTriangle" size={9} className="inline mr-0.5"/> เปลี่ยนแล้ว ({b.changeLog.length})
+                        </button>
+                      )}
+                    </td>
                     <td className="p-4"><StatusBadge booking={b} onCycle={onCycle}/></td>
                     <td className="p-4">
                       <div className="flex justify-center gap-2">
@@ -866,7 +930,7 @@ const getBlank = ()=>({
   allocation:'Waitlist', driverName:'',
   bookingNo:'', containerNo:'', sealNo:'', remark:'',
   origin:'CEVA WAREHOUSE', destination:'PAT WAREHOUSE',
-  target_dock:'',
+  target_dock:'', changeLog:[],
 });
 const BLANK = getBlank();
 
@@ -1006,7 +1070,38 @@ function App() {
     let next='Available';
     if(cur==='Available')next='Busy';
     else if(cur==='Busy')next=isAdmin?'Maintenance':'Available';
-    syncBays(bays.map(d=>d.name===name?{...d,status:next}:d));
+    let note='';
+    if(next==='Busy'||next==='Maintenance'){
+      note=prompt(`หมายเหตุ (ไม่บังคับ) — ${name} กำลังใช้ทำอะไรอยู่?`,'')||'';
+    }
+    syncBays(bays.map(d=>d.name===name?{...d,status:next,note}:d));
+  };
+  const handleAddBay=(name)=>{
+    if(!isAdmin) return;
+    const n=name.trim();
+    if(!n) return;
+    if(bays.some(d=>d.name===n)){ alert('มีชื่อ Dock นี้อยู่แล้ว'); return; }
+    syncBays([...bays,{name:n,status:'Available',note:''}]);
+  };
+  const handleDeleteBay=(name)=>{
+    if(!isAdmin) return;
+    const active=bookings.some(b=>b.allocation===name&&b.status!=='Completed');
+    if(active){ alert(`ลบไม่ได้ — ยังมีคิวที่ลงช่อง "${name}" อยู่ (ยังไม่เสร็จสิ้น)`); return; }
+    if(!confirm(`ลบ Dock "${name}" ?`)) return;
+    syncBays(bays.filter(d=>d.name!==name));
+  };
+  const handleRenameBay=(oldName,newName)=>{
+    if(!isAdmin) return;
+    const n=newName.trim();
+    if(!n||n===oldName) return;
+    if(bays.some(d=>d.name===n)){ alert('มีชื่อ Dock นี้อยู่แล้ว'); return; }
+    syncBays(bays.map(d=>d.name===oldName?{...d,name:n}:d));
+    const nb=bookings.map(b=>({
+      ...b,
+      allocation: b.allocation===oldName?n:b.allocation,
+      target_dock: b.target_dock===oldName?n:b.target_dock,
+    }));
+    syncBookings(nb);
   };
   const handleSubmit=()=>{
     if(!isPower)return;
@@ -1014,9 +1109,24 @@ function App() {
       alert('กรุณากรอกข้อมูลให้ครบ (เวลา, บริษัท, ทะเบียน)');return;
     }
     if(form.startTime>=form.endTime){alert('เวลาออกต้องมากกว่าเวลาเข้า');return;}
+
+    const original = editId ? bookings.find(b=>b.id===editId) : null;
+    let changeLog = form.changeLog||[];
+    // ── เปลี่ยนช่องจอดขณะแก้ไข ต้องระบุเหตุผล เก็บลง log เพื่อดูใน "รายงาน" ──
+    if(original && original.allocation!==form.allocation){
+      const reason = prompt(`เปลี่ยนช่องจอดจาก "${original.allocation}" เป็น "${form.allocation}"\nกรุณาระบุเหตุผลที่เปลี่ยนแปลง:`);
+      if(reason===null) return; // ยกเลิกการบันทึก
+      if(!reason.trim()){ alert('กรุณาระบุเหตุผลที่เปลี่ยนช่องจอด'); return; }
+      changeLog = [...changeLog, {
+        field:'allocation', from:original.allocation, to:form.allocation,
+        reason:reason.trim(), at:`${TODAY()} ${TIMENOW()}`, by:role
+      }];
+    }
+
     const newEntry={
       ...form,
-      status: editId ? (bookings.find(b=>b.id===editId)?.status||'Pending') : 'Pending',
+      changeLog,
+      status: editId ? (original?.status||'Pending') : 'Pending',
       id: editId || Date.now(),
       updatedAt: Date.now()
     };
@@ -1162,7 +1272,8 @@ function App() {
           {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
           {tab==='scan'     && <ScanView scanOn={scanOn} setScanOn={setScanOn} scanMsg={scanMsg}/>}
           {tab==='qr'       && <QRView bays={bays}/>}
-          {tab==='settings' && <SettingsView settings={settings}/>}
+          {tab==='settings' && <SettingsView settings={settings} bays={bays} isAdmin={isAdmin}
+            onAddBay={handleAddBay} onRenameBay={handleRenameBay} onDeleteBay={handleDeleteBay}/>}
         </div>
       </div>
     </div>
