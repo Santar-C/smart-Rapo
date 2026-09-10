@@ -70,23 +70,61 @@
     .chart-box.tall { height:260px; }
     .ct-donut { justify-content:flex-start; }
 
-    /* ── Process cards: colored accent + icon ─────────────── */
-    .proc-card { border-top:4px solid var(--accent, var(--indigo)); }
+    /* ── Process cards: colored accent + icon — everything here
+       drills into the raw records behind it, so it acts like a button ── */
+    .proc-card {
+      border-top:4px solid var(--accent, var(--indigo));
+      cursor:pointer; transition:transform .15s, box-shadow .15s;
+    }
+    .proc-card:hover { transform:translateY(-2px); box-shadow:0 10px 28px rgba(0,0,0,.12); }
     .proc-icon {
       width:32px; height:32px; border-radius:9px;
       display:flex; align-items:center; justify-content:center;
       background:var(--accent-soft, #eef2ff); color:var(--accent, var(--indigo));
       margin-bottom:.5rem;
     }
+    .ct-donut canvas { cursor:pointer; }
+
+    /* ── KPI delta pill (Total card, vs. yesterday) ─────────── */
+    .kpi-delta {
+      display:inline-flex; align-items:center; gap:.25rem;
+      padding:.15rem .55rem; border-radius:20px; font-size:.72rem; font-weight:700;
+      margin-left:.5rem; vertical-align:middle;
+    }
+    .kpi-delta.up   { background:rgba(74,222,128,.18); color:#4ade80; }
+    .kpi-delta.down { background:rgba(248,113,113,.18); color:#f87171; }
+    .kpi-delta.flat { background:rgba(255,255,255,.14); color:rgba(255,255,255,.7); }
+
+    /* ── Insight strip: real computed callouts, not decoration ── */
+    .insight-strip {
+      display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr));
+      gap:.85rem; margin-bottom:1.25rem;
+    }
+    .insight-card {
+      background:#fff; border:1.5px solid var(--border); border-radius:var(--radius);
+      box-shadow:var(--shadow); padding:.9rem 1.1rem;
+      display:flex; align-items:flex-start; gap:.7rem;
+    }
+    .insight-icon {
+      width:34px; height:34px; border-radius:9px; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+      background:#eef2ff; color:var(--indigo);
+    }
+    .insight-label { font-size:.7rem; font-weight:700; color:var(--gray); text-transform:uppercase; letter-spacing:.03em; }
+    .insight-value { font-size:.95rem; font-weight:700; color:var(--blue); margin-top:.15rem; line-height:1.3; }
+    .insight-sub { font-size:.74rem; color:var(--gray); margin-top:.1rem; }
 
     /* ── Secondary row: hourly chart + trend, side by side ──── */
     .dash-2col { display:grid; grid-template-columns: 1.4fr 1fr; gap:1rem; align-items:start; }
     @media (max-width:980px) { .dash-2col { grid-template-columns: 1fr; } }
     .dash-2col > .card { margin-bottom:0; }
+    #chart-hourly { cursor:pointer; }
 
-    /* ── User Performance: clickable rows ──────────────────── */
-    #user-perf-tbody tr[data-user] { cursor:pointer; }
-    #user-perf-tbody tr[data-user]:hover td:first-child { color:var(--indigo); text-decoration:underline; }
+    /* ── Clickable rows: User Performance + Trend (jump date) ── */
+    #user-perf-tbody tr[data-user],
+    #trend-tbody tr[data-date] { cursor:pointer; }
+    #user-perf-tbody tr[data-user]:hover td:first-child,
+    #trend-tbody tr[data-date]:hover td:first-child { color:var(--indigo); text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -130,10 +168,12 @@
       <div class="bento-card proc-card" id="bento-proc-Packing"></div>
       <div class="bento-card proc-card" id="bento-proc-Shipping"></div>
       <div class="bento-card ct-donut">
-        <div class="bento-label" style="margin-bottom:.5rem">สัดส่วนแต่ละ Process</div>
+        <div class="bento-label" style="margin-bottom:.5rem">สัดส่วนแต่ละ Process (กดเพื่อดูรายการ)</div>
         <div class="chart-box"><canvas id="chart-process-dist"></canvas></div>
       </div>
     </div>
+
+    <div class="insight-strip" id="insight-strip"></div>
 
     <div class="card">
       <div class="card-title">
@@ -156,7 +196,7 @@
       <div class="card">
         <div class="card-title">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          Activity ตามชั่วโมง
+          Activity ตามชั่วโมง (กดแท่งกราฟเพื่อดูรายการ)
         </div>
         <div class="chart-box tall"><canvas id="chart-hourly"></canvas></div>
         <div id="hourly-empty-msg" style="display:none;text-align:center;padding:1.5rem;color:var(--gray);font-size:.85rem">ไม่มีข้อมูลดิบสำหรับวันที่นี้</div>
@@ -166,7 +206,7 @@
       <div class="card">
         <div class="card-title">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></svg>
-          แนวโน้มย้อนหลัง
+          แนวโน้มย้อนหลัง (กดแถวเพื่อเปลี่ยนวันที่ดู)
         </div>
         <div class="table-wrap">
           <table>
@@ -345,6 +385,11 @@
   }
 
   function todayISO(){ return new Date().toISOString().slice(0,10); }
+  function shiftDateISO(iso, days) {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
 
   // ── Tab Switch ──────────────────────────────────────────────
   document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -565,7 +610,16 @@
       counts = data.counts || {};
       qtyByType = data.qty || {};
     } catch (e) { console.error(e); }
-    renderControlTower(counts, qtyByType);
+
+    let yesterdayTotal = null;
+    try {
+      const yDoc = await getDoc(doc(db, 'wms_daily_summary', shiftDateISO(date, -1)));
+      if (yDoc.exists()) {
+        const yc = yDoc.data().counts || {};
+        yesterdayTotal = TYPE_ORDER.reduce((s, t) => s + (yc[t] || 0), 0);
+      }
+    } catch (e) { console.error(e); }
+    renderControlTower(counts, qtyByType, yesterdayTotal);
 
     let rows = [];
     try {
@@ -576,14 +630,25 @@
     renderDashTable();
     renderUserPerformance();
     renderHourlyChart();
+    renderInsights();
   }
 
   // ── Control Tower (bento) — sourced from the persisted daily summary,
   //    so it stays correct even after raw rows are archived ───────────
-  function renderControlTower(counts, qtyByType) {
+  function deltaPillHtml(today, yesterday) {
+    if (yesterday === null || yesterday === undefined) return '';
+    if (yesterday === 0) return today > 0 ? `<span class="kpi-delta up">${icon('arrow_up',{size:11})}ใหม่</span>` : '';
+    const pct = Math.round(((today - yesterday) / yesterday) * 100);
+    if (pct === 0) return `<span class="kpi-delta flat">${icon('arrow_up_down',{size:11})}เท่าเมื่อวาน</span>`;
+    const cls = pct > 0 ? 'up' : 'down';
+    const arrow = pct > 0 ? 'arrow_up' : 'arrow_down';
+    return `<span class="kpi-delta ${cls}">${icon(arrow,{size:11})}${Math.abs(pct)}%</span>`;
+  }
+
+  function renderControlTower(counts, qtyByType, yesterdayTotal) {
     const totalCount = TYPE_ORDER.reduce((s, t) => s + (counts[t] || 0), 0);
     const totalQty = TYPE_ORDER.reduce((s, t) => s + (qtyByType[t] || 0), 0);
-    document.getElementById('bento-total-count').textContent = totalCount.toLocaleString('th-TH');
+    document.getElementById('bento-total-count').innerHTML = totalCount.toLocaleString('th-TH') + deltaPillHtml(totalCount, yesterdayTotal);
     document.getElementById('bento-total-qty').textContent = totalQty.toLocaleString('th-TH');
     const maxCount = Math.max(1, ...TYPE_ORDER.map(t => counts[t] || 0));
     document.getElementById('bento-mini-bars').innerHTML = TYPE_ORDER.map(t => {
@@ -623,9 +688,74 @@
       },
       options: {
         responsive: true, maintainAspectRatio: false, cutout: '62%',
+        onClick: (evt, elements) => {
+          if (!elements.length) return;
+          const type = TYPE_ORDER[elements[0].index];
+          openDetailModal(TYPE_LABEL[type] || type, currentRows.filter(r => r.type === type));
+        },
         plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11, family: 'Sarabun' } } } }
       }
     });
+  }
+
+  // ── Insight strip — computed callouts from the currently-stored raw
+  //    rows (same source as User Performance / Hourly chart, so it goes
+  //    empty after Export & Clear, same as those do) ──────────────────
+  function renderInsights() {
+    const strip = document.getElementById('insight-strip');
+    if (!currentRows.length) {
+      strip.innerHTML = `<div class="insight-card">
+        <div class="insight-icon">${icon('info',{size:18})}</div>
+        <div>
+          <div class="insight-label">Insight</div>
+          <div class="insight-value">ไม่มีข้อมูลดิบสำหรับวันที่นี้</div>
+          <div class="insight-sub">อาจถูก Export &amp; ล้างข้อมูลไปแล้ว — Control Tower ด้านบนยังถูกต้องเสมอ</div>
+        </div>
+      </div>`;
+      return;
+    }
+
+    const hourCounts = {};
+    currentRows.forEach(r => {
+      const h = (r.time || '').slice(0, 2);
+      if (/^\d{2}$/.test(h)) hourCounts[h] = (hourCounts[h] || 0) + 1;
+    });
+    const peakHour = Object.keys(hourCounts).sort((a, b) => hourCounts[b] - hourCounts[a])[0];
+
+    const typeCounts = {};
+    currentRows.forEach(r => { typeCounts[r.type] = (typeCounts[r.type] || 0) + 1; });
+    const busiestType = Object.keys(typeCounts).sort((a, b) => typeCounts[b] - typeCounts[a])[0];
+
+    const byUser = {};
+    currentRows.forEach(r => { if (r.user) (byUser[r.user] ||= []).push(r); });
+    const topUser = Object.keys(byUser).sort((a, b) => byUser[b].length - byUser[a].length)[0];
+    const topUserStats = topUser ? userStats(byUser[topUser]) : null;
+
+    strip.innerHTML = `
+      <div class="insight-card">
+        <div class="insight-icon">${icon('clock',{size:18})}</div>
+        <div>
+          <div class="insight-label">ช่วงเวลาที่ยุ่งที่สุด</div>
+          <div class="insight-value">${peakHour ? peakHour + ':00 น.' : '-'}</div>
+          <div class="insight-sub">${peakHour ? hourCounts[peakHour].toLocaleString('th-TH') + ' รายการในชั่วโมงนี้' : ''}</div>
+        </div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-icon" style="background:${PROC_COLOR_SOFT[busiestType] || '#eef2ff'};color:${PROC_COLOR[busiestType] || 'var(--indigo)'}">${busiestType ? procIcon(busiestType) : ''}</div>
+        <div>
+          <div class="insight-label">Process ที่งานเยอะที่สุด</div>
+          <div class="insight-value">${busiestType ? (TYPE_LABEL[busiestType] || busiestType) : '-'}</div>
+          <div class="insight-sub">${busiestType ? typeCounts[busiestType].toLocaleString('th-TH') + ' รายการ' : ''}</div>
+        </div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-icon">${icon('users',{size:18})}</div>
+        <div>
+          <div class="insight-label">พนักงานที่ทำรายการมากที่สุด</div>
+          <div class="insight-value">${topUser || '-'}</div>
+          <div class="insight-sub">${topUserStats ? topUserStats.total.toLocaleString('th-TH') + ' รายการ · อัตรา ' + topUserStats.rateLabel + '/ชม.' : ''}</div>
+        </div>
+      </div>`;
   }
 
   // ── User Performance (User × Process pivot) — from currently-stored
@@ -672,13 +802,17 @@
 
   document.getElementById('user-perf-tbody').addEventListener('click', e => {
     const tr = e.target.closest('tr[data-user]');
-    if (tr) openUserModal(tr.dataset.user);
+    if (tr) openDetailModal(tr.dataset.user, currentRows.filter(r => r.user === tr.dataset.user));
   });
 
-  function openUserModal(username) {
-    const rows = currentRows.filter(r => r.user === username).slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  // ── Generic drill-down modal — anything clickable on this dashboard
+  //    (a user row, a process card, a donut slice, an hourly bar) opens
+  //    this with whatever raw rows it represents ─────────────────────
+  function openDetailModal(title, rowsIn) {
+    if (!rowsIn.length) { toast('ไม่มีข้อมูลดิบสำหรับส่วนนี้ (อาจถูก Export ไปแล้ว)'); return; }
+    const rows = rowsIn.slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
     const s = userStats(rows);
-    document.getElementById('user-modal-title').textContent = username;
+    document.getElementById('user-modal-title').textContent = title;
     document.getElementById('user-modal-body').innerHTML = `
       <div class="stats-row" style="margin-bottom:1rem">
         <div class="stat-card"><div class="stat-value">${s.total}</div><div class="stat-label">รวมรายการ</div></div>
@@ -713,6 +847,23 @@
     if (e.target.id === 'user-modal-backdrop') closeUserModal();
   });
 
+  // ── Process cards drill down into that process's raw rows ─────────
+  document.querySelector('.control-tower').addEventListener('click', e => {
+    const card = e.target.closest('.proc-card');
+    if (!card) return;
+    const type = card.id.replace('bento-proc-', '');
+    openDetailModal(TYPE_LABEL[type] || type, currentRows.filter(r => r.type === type));
+  });
+
+  // ── Trend table rows jump the whole dashboard to that date ────────
+  document.getElementById('trend-tbody').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-date]');
+    if (!tr) return;
+    document.getElementById('dash-date').value = tr.dataset.date;
+    refreshDashboard();
+    document.querySelector('.control-tower').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
   // ── Hourly Activity chart — from currently-stored raw rows ────────
   function renderHourlyChart() {
     const grid = {};
@@ -743,6 +894,14 @@
       },
       options: {
         responsive: true, maintainAspectRatio: false,
+        onClick: (evt, elements) => {
+          if (!elements.length) return;
+          const { datasetIndex, index } = elements[0];
+          const type = TYPE_ORDER[datasetIndex];
+          const hour = activeHours[index];
+          const rows = currentRows.filter(r => r.type === type && (r.time || '').slice(0, 2) === hour);
+          openDetailModal(`${TYPE_LABEL[type] || type} · ${hour}:00 น.`, rows);
+        },
         scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
         plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11, family: 'Sarabun' } } } }
       }
@@ -793,7 +952,7 @@
       }
       tbody.innerHTML = days.map(d => {
         const c = d.counts || {};
-        return `<tr><td style="font-weight:700">${d.date}</td>${TYPE_ORDER.map(t => `<td>${c[t] || 0}</td>`).join('')}</tr>`;
+        return `<tr data-date="${d.date}"><td style="font-weight:700">${d.date}</td>${TYPE_ORDER.map(t => `<td>${c[t] || 0}</td>`).join('')}</tr>`;
       }).join('');
     } catch (e) { console.error(e); }
   }
