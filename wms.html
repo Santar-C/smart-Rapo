@@ -197,6 +197,14 @@
 
     <div class="card">
       <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+        Top SKU วันนี้ (กดแถวเพื่อดูรายการ)
+      </div>
+      <div id="top-sku-body"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
         วิเคราะห์คอขวด (กดแต่ละแถวเพื่อดู Tag ที่ค้างนานสุด)
       </div>
@@ -236,6 +244,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></svg>
           แนวโน้มย้อนหลัง (กดแถวเพื่อเปลี่ยนวันที่ดู)
         </div>
+        <div class="chart-box" style="height:150px;margin-bottom:.75rem"><canvas id="chart-trend"></canvas></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>วันที่</th><th>Receipt</th><th>Putaway</th><th>Picking</th><th>Packing</th><th>Shipping</th></tr></thead>
@@ -370,7 +379,7 @@
   function procIcon(type) {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PROC_ICON_PATH[type] || ''}</svg>`;
   }
-  let chartProcessDist = null, chartHourly = null;
+  let chartProcessDist = null, chartHourly = null, chartTrend = null;
   const FIELD_MAP = {
     Receipt:  { code:'Code', ref:'ASN/Pre-Advice ID', lineId:'Line ID', tagId:'Tag ID', sku:'SKU', skuDesc:'SKU Description', qty:'Qty', date:'Transaction Date', time:'Transaction Time', user:'User', pallet:'Pallet ID' },
     Putaway:  { code:'Code', ref:'Pre-Advice ID', lineId:'Line ID', tagId:'Tag ID', sku:'SKU', skuDesc:'SKU Description', qty:'Qty', date:'Date', time:'Time', user:'User', fromLoc:'From Location', toLoc:'To Location' },
@@ -659,7 +668,42 @@
     renderUserPerformance();
     renderHourlyChart();
     renderInsights();
+    renderTopSku();
     renderBottleneck();
+  }
+
+  // ── Top SKU leaderboard — from currently-stored raw rows ──────────
+  function renderTopSku() {
+    const el = document.getElementById('top-sku-body');
+    if (!currentRows.length) {
+      el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--gray);font-size:.85rem">ไม่มีข้อมูลดิบสำหรับวันที่นี้</div>`;
+      return;
+    }
+    const bySku = {};
+    currentRows.forEach(r => {
+      if (!r.sku) return;
+      (bySku[r.sku] ||= { sku: r.sku, desc: r.skuDesc || '', count: 0, qty: 0 });
+      bySku[r.sku].count++;
+      bySku[r.sku].qty += r.qty || 0;
+    });
+    const ranked = Object.values(bySku).sort((a, b) => b.qty - a.qty).slice(0, 10);
+    if (!ranked.length) {
+      el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--gray);font-size:.85rem">ไม่มี SKU ในข้อมูลวันนี้</div>`;
+      return;
+    }
+    el.innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>#</th><th>SKU</th><th>รายละเอียด</th><th>จำนวนรายการ</th><th>Qty รวม</th></tr></thead>
+      <tbody>${ranked.map((s, i) => `<tr data-sku="${s.sku.replace(/"/g, '&quot;')}" style="cursor:pointer">
+        <td>${i + 1}</td>
+        <td style="font-weight:700">${s.sku}</td>
+        <td>${s.desc || '-'}</td>
+        <td>${s.count}</td>
+        <td style="font-weight:700;color:var(--blue)">${s.qty.toLocaleString('th-TH')}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+    el.querySelectorAll('tr[data-sku]').forEach(tr => {
+      tr.addEventListener('click', () => openDetailModal(tr.dataset.sku, currentRows.filter(r => r.sku === tr.dataset.sku)));
+    });
   }
 
   // ── Control Tower (bento) — sourced from the persisted daily summary,
@@ -1072,14 +1116,37 @@
       const snap = await getDocs(query(collection(db, 'wms_daily_summary'), orderBy('date', 'desc'), limit(14)));
       const days = snap.docs.map(d => ({ date: d.id, ...d.data() }));
       const tbody = document.getElementById('trend-tbody');
+      const canvas = document.getElementById('chart-trend');
       if (!days.length) {
         tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--gray)">ยังไม่มีข้อมูลสรุป</td></tr>`;
+        if (chartTrend) { chartTrend.destroy(); chartTrend = null; }
         return;
       }
       tbody.innerHTML = days.map(d => {
         const c = d.counts || {};
         return `<tr data-date="${d.date}"><td style="font-weight:700">${d.date}</td>${TYPE_ORDER.map(t => `<td>${c[t] || 0}</td>`).join('')}</tr>`;
       }).join('');
+
+      if (canvas && typeof Chart !== 'undefined') {
+        const chrono = days.slice().reverse();
+        if (chartTrend) chartTrend.destroy();
+        chartTrend = new Chart(canvas, {
+          type: 'line',
+          data: {
+            labels: chrono.map(d => d.date.slice(5)),
+            datasets: TYPE_ORDER.map(t => ({
+              label: t, data: chrono.map(d => (d.counts || {})[t] || 0),
+              borderColor: PROC_COLOR[t], backgroundColor: PROC_COLOR[t],
+              tension: .3, pointRadius: 2, borderWidth: 2
+            }))
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'Sarabun' } } } }
+          }
+        });
+      }
     } catch (e) { console.error(e); }
   }
 
