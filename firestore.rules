@@ -130,5 +130,18 @@ service cloud.firestore {
       allow read:   if isAdmin();
       allow write:  if isAdmin();
     }
+
+    // ── WMS Activity Log (wms.html) ───────────────────────
+    // wms_activity: แถวดิบ Receipt/Putaway/Picking/Packing/Shipping
+    // อ่านได้ทุกคนที่ login แล้ว (แท็บแดชบอร์ด), เขียน/ลบ (นำเข้า/Export&ล้าง/กู้คืน) เฉพาะ admin
+    match /wms_activity/{rowId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+    // wms_daily_summary: สรุปยอดรายวัน เก็บถาวรแม้ล้างข้อมูลดิบไปแล้ว
+    match /wms_daily_summary/{dateId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
   }
 }
