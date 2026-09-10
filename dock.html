@@ -999,6 +999,28 @@ function App() {
     setForm(p=>p.shipmentNo!==auto?{...p,shipmentNo:auto}:p);
   },[form.date,form.jobType,bookings,editId]);
 
+  // ── Auto-ลงคิว Waitlist เข้า Dock ที่จองไว้ (target_dock) ทันทีที่ Dock ว่าง ──
+  React.useEffect(()=>{
+    const todayStr=TODAY();
+    const activeToday=bookings.filter(b=>b.date===todayStr&&b.status!=='Completed');
+    const waiting=activeToday.filter(b=>b.allocation==='Waitlist'&&b.target_dock)
+      .sort((a,b)=>(a.startTime||'').localeCompare(b.startTime||''));
+    if(!waiting.length) return;
+    const occupied=new Set(activeToday.filter(b=>b.allocation!=='Waitlist').map(b=>b.allocation));
+    let changed=false;
+    const nb=bookings.map(b=>({...b}));
+    for(const wb of waiting){
+      const dock=bays.find(d=>d.name===wb.target_dock);
+      if(dock&&dock.status==='Available'&&!occupied.has(dock.name)){
+        const idx=nb.findIndex(x=>x.id===wb.id);
+        nb[idx]={...nb[idx],allocation:dock.name};
+        occupied.add(dock.name);
+        changed=true;
+      }
+    }
+    if(changed) syncBookings(nb);
+  },[bookings,bays]);
+
   // ── Stop scanner when leaving scan tab ────────────────
   React.useEffect(()=>{ if(tab!=='scan') setScanOn(false); },[tab]);
 
