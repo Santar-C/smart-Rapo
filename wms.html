@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WMS Activity Log — RAPO</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#021D49">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <style>
+    .dash-chips { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.85rem; }
+    .dash-chip {
+      padding:.35rem .85rem; border-radius:20px; border:1.5px solid var(--border);
+      background:#fff; font-size:.78rem; font-family:'Sarabun',sans-serif; cursor:pointer;
+      font-weight:600; color:var(--gray); transition:all .2s;
+    }
+    .dash-chip:hover { border-color:var(--indigo); color:var(--indigo); }
+    .dash-chip.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+    .file-list-item {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:.5rem 0; border-bottom:1px solid var(--border); font-size:.85rem;
+    }
+    .file-list-item:last-child { border-bottom:none; }
+    .stat-card.small .stat-value { font-size:1.4rem; }
+    .archive-warning-box {
+      background:#fef2f2; border:1.5px solid #fecaca; border-radius:10px;
+      padding:.9rem 1rem; font-size:.85rem; color:#7f1d1d; line-height:1.7; margin-bottom:1rem;
+    }
+    #dash-tbody td, #trend-tbody td { font-size:.82rem; }
+    .date-row { display:flex; gap:.75rem; align-items:flex-end; flex-wrap:wrap; margin-bottom:1rem; }
+    .date-row .form-group { margin-bottom:0; min-width:170px; }
+  </style>
+</head>
+<body>
+
+<div id="topbar-placeholder"></div>
+<div class="page-body">
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="dashboard"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> แดชบอร์ด</button>
+    <button class="tab-btn" data-tab="import" id="tab-import-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> นำเข้าข้อมูล</button>
+    <button class="tab-btn" data-tab="archive" id="tab-archive-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg> คลังข้อมูล</button>
+  </div>
+
+  <!-- TAB: แดชบอร์ด -->
+  <div id="tab-dashboard">
+    <div class="date-row">
+      <div class="form-group" style="flex:1">
+        <label>วันที่ดูข้อมูล</label>
+        <input type="date" id="dash-date">
+      </div>
+      <button class="btn btn-outline btn-sm" id="btn-refresh-dash">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        รีเฟรช
+      </button>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card small"><div class="stat-value" id="stat-Receipt">–</div><div class="stat-label">Receipt</div></div>
+      <div class="stat-card small"><div class="stat-value" id="stat-Putaway">–</div><div class="stat-label">Putaway</div></div>
+      <div class="stat-card small"><div class="stat-value" id="stat-Picking">–</div><div class="stat-label">Picking</div></div>
+      <div class="stat-card small"><div class="stat-value" id="stat-Packing">–</div><div class="stat-label">Packing</div></div>
+      <div class="stat-card small"><div class="stat-value" id="stat-Shipping">–</div><div class="stat-label">Shipping</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+        รายการเคลื่อนไหว (<span id="dash-count">0</span> แถว)
+      </div>
+      <div class="search-bar">
+        <input type="text" id="dash-search" placeholder="ค้นหา SKU / Tag ID / เลขที่อ้างอิง / ชื่อพนักงาน">
+      </div>
+      <div class="dash-chips" id="dash-chips">
+        <button class="dash-chip active" data-type="all">ทั้งหมด</button>
+        <button class="dash-chip" data-type="Receipt">Receipt</button>
+        <button class="dash-chip" data-type="Putaway">Putaway</button>
+        <button class="dash-chip" data-type="Picking">Picking</button>
+        <button class="dash-chip" data-type="Packing">Packing</button>
+        <button class="dash-chip" data-type="Shipping">Shipping</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ประเภท</th><th>เวลา</th><th>SKU</th><th>รายละเอียด</th><th>Tag ID</th><th>Qty</th><th>เลขที่อ้างอิง</th><th>ผู้ทำรายการ</th></tr></thead>
+          <tbody id="dash-tbody"><tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--gray)">กำลังโหลด...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></svg>
+        แนวโน้มย้อนหลัง (สรุปยอดรายวัน — เก็บถาวรแม้ Export ข้อมูลดิบไปแล้ว)
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>วันที่</th><th>Receipt</th><th>Putaway</th><th>Picking</th><th>Packing</th><th>Shipping</th></tr></thead>
+          <tbody id="trend-tbody"><tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--gray)">กำลังโหลด...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: นำเข้าข้อมูล (Admin) -->
+  <div id="tab-import" style="display:none">
+    <div class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        นำเข้าไฟล์ WMS Activity (CSV)
+      </div>
+      <div class="alert alert-info">
+        เลือกไฟล์ CSV ที่ export จากระบบ WMS ได้พร้อมกันหลายไฟล์ (Receipt / Putaway / Picking / Packing / Shipping)
+        ระบบจะตรวจชนิดไฟล์จากชื่อไฟล์ให้อัตโนมัติ และนำเข้าซ้ำไฟล์เดิมได้โดยไม่เพิ่มข้อมูลซ้ำ
+      </div>
+      <div class="form-group">
+        <label>เลือกไฟล์ CSV (เลือกได้หลายไฟล์)</label>
+        <input type="file" id="csv-files" accept=".csv" multiple>
+      </div>
+      <div id="import-file-list"></div>
+      <button class="btn btn-primary btn-full" id="btn-import-csv" disabled style="margin-top:.85rem">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        นำเข้าข้อมูล
+      </button>
+      <div id="import-result" style="margin-top:1rem"></div>
+    </div>
+  </div>
+
+  <!-- TAB: คลังข้อมูล (Admin) -->
+  <div id="tab-archive" style="display:none">
+    <div class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+        สถานะข้อมูลดิบที่เก็บอยู่ตอนนี้
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-value" id="archive-count">–</div><div class="stat-label">รายการดิบ (แถว)</div></div>
+        <div class="stat-card"><div class="stat-value" id="archive-size">–</div><div class="stat-label">ขนาดข้อมูล (ประมาณ)</div></div>
+      </div>
+      <div class="archive-warning-box">
+        <b>Export แล้วข้อมูลดิบในระบบจะถูกลบทันที</b> — ไฟล์ .json จะถูกดาวน์โหลดลงเครื่องก่อน
+        กรุณาเก็บไฟล์นี้ไว้ให้ดี ถ้าต้องการดูข้อมูลย้อนหลังอีกครั้งให้ Import ไฟล์นี้กลับเข้ามาในระบบ<br>
+        (สรุปยอดรายวันในแท็บแดชบอร์ดจะยังคงอยู่ ไม่ถูกลบ แม้จะ Export ข้อมูลดิบไปแล้ว)
+      </div>
+      <button class="btn btn-red btn-full" id="btn-export-clear">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        Export ข้อมูลทั้งหมด แล้วล้างออกจากระบบ
+      </button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>
+        กู้คืนข้อมูลจากไฟล์ที่เคย Export
+      </div>
+      <div class="form-group">
+        <label>เลือกไฟล์ .json ที่ Export ไว้</label>
+        <input type="file" id="backup-file" accept=".json">
+      </div>
+      <button class="btn btn-indigo btn-full" id="btn-import-backup">
+        นำเข้าข้อมูลกลับเข้าระบบ
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast" style="position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(100px);background:#1e293b;color:white;padding:.75rem 1.5rem;border-radius:12px;font-size:.9rem;font-weight:600;z-index:9999;transition:transform .3s;box-shadow:0 8px 24px rgba(0,0,0,.2)"></div>
+
+<script type="module">
+  import { auth, db } from "./firebase-config.js";
+  import { requireAuth } from "./auth.js";
+  import { icon } from "./icons.js";
+  import {
+    collection, doc, getDoc, getDocs, setDoc, writeBatch,
+    query, where, orderBy, limit, increment, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const TYPE_ORDER = ['Receipt','Putaway','Picking','Packing','Shipping'];
+  const TYPE_LABEL = { Receipt:'รับเข้า (Receipt)', Putaway:'จัดเก็บ (Putaway)', Picking:'หยิบสินค้า (Picking)', Packing:'แพ็ค (Packing)', Shipping:'จัดส่ง (Shipping)' };
+  const TYPE_BADGE = { Receipt:'badge-blue', Putaway:'badge-purple', Picking:'badge-amber', Packing:'badge-teal', Shipping:'badge-green' };
+  const FIELD_MAP = {
+    Receipt:  { code:'Code', ref:'ASN/Pre-Advice ID', lineId:'Line ID', tagId:'Tag ID', sku:'SKU', skuDesc:'SKU Description', qty:'Qty', date:'Transaction Date', time:'Transaction Time', user:'User', pallet:'Pallet ID' },
+    Putaway:  { code:'Code', ref:'Pre-Advice ID', lineId:'Line ID', tagId:'Tag ID', sku:'SKU', skuDesc:'SKU Description', qty:'Qty', date:'Date', time:'Time', user:'User', fromLoc:'From Location', toLoc:'To Location' },
+    Picking:  { code:'Code', ref:'Order ID', lineId:'Line ID', tagId:'Tag ID', sku:'SKU', skuDesc:'SKU Description', qty:'Qty', date:'Date', time:'Time', user:'User', fromLoc:'From Location', container:'Container ID', pallet:'Pallet ID' },
+    Packing:  { code:'Code', ref:'Order ID', lineId:'Line ID', tagId:'Tag ID', sku:'SKU', skuDesc:'SKU Description', qty:'Qty', date:'Date', time:'Time', user:'User', container:'Container ID', pallet:'Pallet ID' },
+    Shipping: { code:'Code', ref:'WMS Reference', poRef:'Purchase Order', lineId:'Line ID', tagId:'Tag ID', sku:'SKU', skuDesc:'SKU Description', qty:'Qty', date:'Date', time:'Time', user:'User', customer:'Name', container:'Container', pallet:'Pallet' }
+  };
+  const MONTHS = { JAN:'01',FEB:'02',MAR:'03',APR:'04',MAY:'05',JUN:'06',JUL:'07',AUG:'08',SEP:'09',OCT:'10',NOV:'11',DEC:'12' };
+
+  let currentUser, currentProfile;
+  let currentRows = [];
+  let activeTypeFilter = 'all';
+  let dashDate = todayISO();
+
+  const { user, profile } = await requireAuth();
+  currentUser = user; currentProfile = profile;
+
+  document.getElementById("topbar-placeholder").innerHTML = `
+    <nav class="topbar">
+      <div class="topbar-logo"><img src="assets/ceva-logo-clean.png" alt="CEVA" onerror="this.style.display='none'"></div>
+      <a class="topbar-back" href="index.html" aria-label="กลับ"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></a>
+      <div style="flex:1">
+        <div class="topbar-title">${icon('boxes',{size:16})} WMS Activity Log</div>
+        <div class="topbar-sub">Receipt · Putaway · Picking · Packing · Shipping</div>
+      </div>
+      <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
+    </nav>`;
+
+  if (profile.role !== "admin") {
+    ["tab-import-btn","tab-archive-btn"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+  }
+
+  function toast(msg, d = 2500) {
+    const t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), d);
+  }
+
+  function todayISO(){ return new Date().toISOString().slice(0,10); }
+
+  // ── Tab Switch ──────────────────────────────────────────────
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      ["dashboard","import","archive"].forEach(t =>
+        document.getElementById(`tab-${t}`).style.display = t === tab ? "block" : "none"
+      );
+      if (tab === "archive") refreshArchiveStats();
+    });
+  });
+
+  // ── CSV parsing ─────────────────────────────────────────────
+  function parseCSVLine(line) {
+    const out = [];
+    let cur = '', inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (line[i+1] === '"') { cur += '"'; i++; }
+          else inQuotes = false;
+        } else cur += c;
+      } else {
+        if (c === '"') inQuotes = true;
+        else if (c === ',') { out.push(cur); cur = ''; }
+        else cur += c;
+      }
+    }
+    out.push(cur);
+    return out;
+  }
+
+  function parseCSV(text) {
+    const lines = text.split(/\r\n|\n/).filter(l => l.trim().length);
+    if (!lines.length) return [];
+    const headers = parseCSVLine(lines[0]).map(h => h.trim());
+    return lines.slice(1).map(line => {
+      const vals = parseCSVLine(line);
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = (vals[i] ?? '').trim());
+      return obj;
+    });
+  }
+
+  function parseWmsDate(s) {
+    const m = String(s||'').match(/^(\d{2})-([A-Za-z]{3})-(\d{4})$/);
+    if (!m) return s || '';
+    const mon = MONTHS[m[2].toUpperCase()];
+    if (!mon) return s;
+    return `${m[3]}-${mon}-${m[1]}`;
+  }
+
+  function detectType(filename) {
+    const f = filename.toUpperCase();
+    if (f.includes('RECEIPT')) return 'Receipt';
+    if (f.includes('PUTAWAY')) return 'Putaway';
+    if (f.includes('PICK'))    return 'Picking';
+    if (f.includes('PACK'))    return 'Packing';
+    if (f.includes('SHIP'))    return 'Shipping';
+    return null;
+  }
+
+  function buildRecord(type, rowObj) {
+    const map = FIELD_MAP[type];
+    const get = (k) => (rowObj[map[k]] ?? '').trim();
+    return {
+      type,
+      code: get('code') || type,
+      ref: get('ref') || get('poRef') || '',
+      lineId: get('lineId'),
+      tagId: get('tagId'),
+      sku: get('sku'),
+      skuDesc: get('skuDesc'),
+      qty: parseFloat(get('qty')) || 0,
+      date: parseWmsDate(get('date')),
+      time: get('time'),
+      user: get('user'),
+      fromLoc: get('fromLoc') || '',
+      toLoc: get('toLoc') || '',
+      container: get('container') || '',
+      pallet: get('pallet') || '',
+      customer: get('customer') || ''
+    };
+  }
+
+  function sanitizeId(s) { return String(s || '').replace(/[^a-zA-Z0-9]/g, '') || 'x'; }
+  function makeDocId(rec) {
+    return `${rec.type}_${sanitizeId(rec.tagId)}_${sanitizeId(rec.lineId)}_${rec.date}_${sanitizeId(rec.time)}`;
+  }
+
+  // ── Import: file list preview ──────────────────────────────
+  const csvInput = document.getElementById('csv-files');
+  const btnImportCsv = document.getElementById('btn-import-csv');
+  csvInput.addEventListener('change', () => {
+    const files = Array.from(csvInput.files || []);
+    btnImportCsv.disabled = !files.length;
+    const listEl = document.getElementById('import-file-list');
+    if (!files.length) { listEl.innerHTML = ''; return; }
+    listEl.innerHTML = files.map(f => {
+      const t = detectType(f.name);
+      return `<div class="file-list-item">
+        <span>${f.name}</span>
+        ${t ? `<span class="badge ${TYPE_BADGE[t]}">${TYPE_LABEL[t]}</span>` : `<span class="badge badge-gray">ไม่รู้จักไฟล์นี้</span>`}
+      </div>`;
+    }).join('');
+  });
+
+  btnImportCsv.addEventListener('click', async () => {
+    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    const files = Array.from(csvInput.files || []);
+    if (!files.length) { toast('กรุณาเลือกไฟล์ก่อน'); return; }
+    const resultEl = document.getElementById('import-result');
+    btnImportCsv.disabled = true;
+    resultEl.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div>กำลังนำเข้าข้อมูล...</div>`;
+    try {
+      const allRecords = [];
+      const unknownFiles = [];
+      for (const file of files) {
+        const type = detectType(file.name);
+        if (!type) { unknownFiles.push(file.name); continue; }
+        const text = await file.text();
+        parseCSV(text).forEach(r => allRecords.push(buildRecord(type, r)));
+      }
+      if (!allRecords.length) {
+        resultEl.innerHTML = `<div class="alert alert-error">ไม่พบข้อมูลที่นำเข้าได้${unknownFiles.length ? ' (ไม่รู้จักไฟล์: ' + unknownFiles.join(', ') + ')' : ''}</div>`;
+        btnImportCsv.disabled = false;
+        return;
+      }
+
+      const groups = {};
+      allRecords.forEach(rec => {
+        const k = `${rec.type}|${rec.date}`;
+        (groups[k] ||= []).push(rec);
+      });
+
+      let totalNew = 0;
+      const perType = {};
+
+      for (const key of Object.keys(groups)) {
+        const [type, date] = key.split('|');
+        const recs = groups[key];
+        const existSnap = await getDocs(query(
+          collection(db, 'wms_activity'), where('type', '==', type), where('date', '==', date)
+        ));
+        const existingIds = new Set(existSnap.docs.map(d => d.id));
+        let newCount = 0, newQty = 0;
+
+        for (let i = 0; i < recs.length; i += 400) {
+          const chunk = recs.slice(i, i + 400);
+          const batch = writeBatch(db);
+          chunk.forEach(rec => {
+            const id = makeDocId(rec);
+            if (!existingIds.has(id)) { newCount++; newQty += rec.qty; existingIds.add(id); }
+            batch.set(doc(db, 'wms_activity', id), {
+              ...rec, importedAt: serverTimestamp(), importedBy: currentProfile.name
+            });
+          });
+          await batch.commit();
+        }
+
+        if (newCount > 0) {
+          await setDoc(doc(db, 'wms_daily_summary', date), {
+            date,
+            counts: { [type]: increment(newCount) },
+            qty: { [type]: increment(newQty) },
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+        }
+
+        totalNew += newCount;
+        perType[type] = perType[type] || { total: 0, new: 0 };
+        perType[type].total += recs.length;
+        perType[type].new += newCount;
+      }
+
+      resultEl.innerHTML = `<div class="alert alert-success">${icon('check_circle',{size:16})} นำเข้าเรียบร้อย: ${allRecords.length} แถว (ใหม่ ${totalNew} แถว)</div>` +
+        `<div class="table-wrap"><table><thead><tr><th>ประเภท</th><th>ทั้งหมดในไฟล์</th><th>ใหม่</th></tr></thead><tbody>` +
+        TYPE_ORDER.filter(t => perType[t]).map(t => `<tr><td>${TYPE_LABEL[t]}</td><td>${perType[t].total}</td><td>${perType[t].new}</td></tr>`).join('') +
+        `</tbody></table></div>` +
+        (unknownFiles.length ? `<div class="alert alert-warning" style="margin-top:.75rem">ไม่รู้จักไฟล์: ${unknownFiles.join(', ')}</div>` : '');
+
+      csvInput.value = '';
+      document.getElementById('import-file-list').innerHTML = '';
+      await refreshDashboard();
+      await loadTrend();
+    } catch (e) {
+      console.error(e);
+      document.getElementById('import-result').innerHTML = `<div class="alert alert-error">เกิดข้อผิดพลาด: ${e.message}</div>`;
+    } finally {
+      btnImportCsv.disabled = false;
+    }
+  });
+
+  // ── Dashboard ───────────────────────────────────────────────
+  async function initDashboardDefaultDate() {
+    try {
+      const snap = await getDocs(query(collection(db, 'wms_activity'), orderBy('date', 'desc'), limit(1)));
+      if (!snap.empty) {
+        dashDate = snap.docs[0].data().date;
+      } else {
+        const sSnap = await getDocs(query(collection(db, 'wms_daily_summary'), orderBy('date', 'desc'), limit(1)));
+        if (!sSnap.empty) dashDate = sSnap.docs[0].id;
+      }
+    } catch (e) { console.error(e); }
+    document.getElementById('dash-date').value = dashDate;
+  }
+
+  async function refreshDashboard() {
+    const date = document.getElementById('dash-date').value || todayISO();
+    dashDate = date;
+    let counts = {};
+    try {
+      const sDoc = await getDoc(doc(db, 'wms_daily_summary', date));
+      counts = sDoc.exists() ? (sDoc.data().counts || {}) : {};
+    } catch (e) { console.error(e); }
+    TYPE_ORDER.forEach(t => { document.getElementById('stat-' + t).textContent = counts[t] || 0; });
+
+    let rows = [];
+    try {
+      const snap = await getDocs(query(collection(db, 'wms_activity'), where('date', '==', date)));
+      rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { console.error(e); }
+    currentRows = rows;
+    renderDashTable();
+  }
+
+  function renderDashTable() {
+    const q = (document.getElementById('dash-search').value || '').toLowerCase().trim();
+    let rows = currentRows;
+    if (activeTypeFilter !== 'all') rows = rows.filter(r => r.type === activeTypeFilter);
+    if (q) rows = rows.filter(r =>
+      (r.sku || '').toLowerCase().includes(q) ||
+      (r.tagId || '').toLowerCase().includes(q) ||
+      (r.ref || '').toLowerCase().includes(q) ||
+      (r.skuDesc || '').toLowerCase().includes(q) ||
+      (r.user || '').toLowerCase().includes(q)
+    );
+    rows = rows.slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    document.getElementById('dash-count').textContent = rows.length;
+    const tbody = document.getElementById('dash-tbody');
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--gray)">ไม่มีข้อมูล</td></tr>`;
+      return;
+    }
+    const shown = rows.slice(0, 300);
+    tbody.innerHTML = shown.map(r => `
+      <tr>
+        <td><span class="badge ${TYPE_BADGE[r.type]}">${r.type}</span></td>
+        <td>${r.time || '-'}</td>
+        <td style="font-weight:700">${r.sku || '-'}</td>
+        <td>${r.skuDesc || '-'}</td>
+        <td>${r.tagId || '-'}</td>
+        <td>${r.qty || 0}</td>
+        <td>${r.ref || '-'}</td>
+        <td>${r.user || '-'}</td>
+      </tr>`).join('') +
+      (rows.length > 300 ? `<tr><td colspan="8" style="text-align:center;padding:1rem;color:var(--gray)">...และอีก ${rows.length - 300} แถว (พิมพ์คำค้นหาเพื่อกรอง)</td></tr>` : '');
+  }
+
+  async function loadTrend() {
+    try {
+      const snap = await getDocs(query(collection(db, 'wms_daily_summary'), orderBy('date', 'desc'), limit(14)));
+      const days = snap.docs.map(d => ({ date: d.id, ...d.data() }));
+      const tbody = document.getElementById('trend-tbody');
+      if (!days.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:1.5rem;color:var(--gray)">ยังไม่มีข้อมูลสรุป</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = days.map(d => {
+        const c = d.counts || {};
+        return `<tr><td style="font-weight:700">${d.date}</td>${TYPE_ORDER.map(t => `<td>${c[t] || 0}</td>`).join('')}</tr>`;
+      }).join('');
+    } catch (e) { console.error(e); }
+  }
+
+  document.getElementById('dash-date').addEventListener('change', refreshDashboard);
+  document.getElementById('btn-refresh-dash').addEventListener('click', () => { refreshDashboard(); loadTrend(); });
+  document.getElementById('dash-search').addEventListener('input', renderDashTable);
+  document.querySelectorAll('.dash-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.dash-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      activeTypeFilter = chip.dataset.type;
+      renderDashTable();
+    });
+  });
+
+  // ── Archive: Export & Clear / Import backup ────────────────
+  async function refreshArchiveStats() {
+    try {
+      const snap = await getDocs(collection(db, 'wms_activity'));
+      const n = snap.size;
+      const approxBytes = snap.docs.reduce((s, d) => s + JSON.stringify(d.data()).length, 0);
+      document.getElementById('archive-count').textContent = n.toLocaleString('th-TH');
+      document.getElementById('archive-size').textContent = (approxBytes / 1024).toFixed(1) + ' KB';
+      document.getElementById('btn-export-clear').disabled = n === 0;
+    } catch (e) { console.error(e); }
+  }
+
+  document.getElementById('btn-export-clear').addEventListener('click', async () => {
+    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    const snap = await getDocs(collection(db, 'wms_activity'));
+    if (snap.empty) { toast('ไม่มีข้อมูลให้ Export'); return; }
+    if (!confirm(`Export ข้อมูลทั้งหมด ${snap.size} รายการ แล้วลบออกจากระบบทันที?\nกรุณาตรวจสอบว่าไฟล์ถูกดาวน์โหลดสำเร็จก่อนปิดหน้าต่างนี้`)) return;
+
+    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const exportData = {
+      exportedAt: new Date().toISOString(),
+      exportedBy: currentProfile.name,
+      count: rows.length,
+      rows: rows.map(r => ({ ...r, importedAt: r.importedAt?.toDate?.().toISOString?.() || null }))
+    };
+    const blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `wms_activity_export_${todayISO()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+
+    const ids = snap.docs.map(d => d.id);
+    for (let i = 0; i < ids.length; i += 400) {
+      const chunk = ids.slice(i, i + 400);
+      const batch = writeBatch(db);
+      chunk.forEach(id => batch.delete(doc(db, 'wms_activity', id)));
+      await batch.commit();
+    }
+    toast(`Export และล้างข้อมูล ${rows.length} รายการเรียบร้อย`, 4000);
+    refreshArchiveStats();
+    refreshDashboard();
+  });
+
+  document.getElementById('btn-import-backup').addEventListener('click', async () => {
+    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    const f = document.getElementById('backup-file').files[0];
+    if (!f) { toast('กรุณาเลือกไฟล์ Backup (.json)'); return; }
+    try {
+      const data = JSON.parse(await f.text());
+      const rows = data.rows || [];
+      if (!rows.length) { toast('ไฟล์นี้ไม่มีข้อมูล'); return; }
+      if (!confirm(`นำเข้าข้อมูล ${rows.length} รายการกลับเข้าระบบ?`)) return;
+      for (let i = 0; i < rows.length; i += 400) {
+        const chunk = rows.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(r => {
+          const { id, ...rest } = r;
+          batch.set(doc(db, 'wms_activity', id), rest);
+        });
+        await batch.commit();
+      }
+      toast(`กู้คืนข้อมูล ${rows.length} รายการเรียบร้อย`);
+      document.getElementById('backup-file').value = '';
+      refreshArchiveStats();
+      refreshDashboard();
+    } catch (e) {
+      console.error(e);
+      toast('ไฟล์ไม่ถูกต้องหรือเสียหาย: ' + e.message, 4000);
+    }
+  });
+
+  // ── Init ────────────────────────────────────────────────────
+  await initDashboardDefaultDate();
+  await refreshDashboard();
+  await loadTrend();
+</script>
+</body>
+</html>
