@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     .dash-chips { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.85rem; }
     .dash-chip {
@@ -217,6 +218,17 @@
 
     <div class="card">
       <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+        Picking KPI: เต็มพาเลท vs หยิบเศษ (กดแถวเพื่อดูรายการ)
+      </div>
+      <div id="pick-kpi-body"></div>
+      <div style="font-size:.72rem;color:var(--gray);margin-top:.6rem">
+        เต็มพาเลท = จำนวนที่หยิบหารด้วย Full Pallet Qty (Ratio 2, EA/PL จาก Master SKU) ลงตัวพอดี — ต้อง Import Master SKU ในแท็บ "นำเข้าข้อมูล" ก่อน ไม่งั้นจะขึ้น "ไม่มีข้อมูลมาตรฐาน" ทั้งหมด
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
         วิเคราะห์คอขวด (กดแต่ละแถวเพื่อดู Tag ที่ค้างนานสุด)
       </div>
@@ -314,6 +326,26 @@
       </button>
       <div id="import-result" style="margin-top:1rem"></div>
     </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+        นำเข้า Master SKU (Full Pallet Qty)
+      </div>
+      <div class="alert alert-info">
+        เลือกไฟล์ Master SKU (.xlsx) — ระบบจะอ่านชีต "Pack config" และใช้คอลัมน์ SKU, Ratio 1 (EA/CA), Ratio 2 (EA/PL)
+        เพื่อคำนวณ Picking KPI: หยิบเต็มพาเลท (qty ที่หยิบหารด้วย Ratio 2 ลงตัว) เทียบกับหยิบเศษ
+      </div>
+      <div class="form-group">
+        <label>เลือกไฟล์ Master SKU (.xlsx)</label>
+        <input type="file" id="sku-master-file" accept=".xlsx">
+      </div>
+      <button class="btn btn-indigo btn-full" id="btn-import-sku-master" disabled>
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        นำเข้า Master SKU
+      </button>
+      <div id="sku-master-result" style="margin-top:1rem"></div>
+    </div>
   </div>
 
   <!-- TAB: คลังข้อมูล (Admin) -->
@@ -373,7 +405,7 @@
   import { icon } from "./icons.js";
   import {
     collection, doc, getDoc, getDocs, setDoc, writeBatch,
-    query, where, orderBy, limit, increment, serverTimestamp
+    query, where, orderBy, limit, increment, serverTimestamp, documentId
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
@@ -636,6 +668,67 @@
     }
   });
 
+  // ── Master SKU import (Pick Full vs Pick เศษ KPI) ──────────────
+  const skuMasterFileInput = document.getElementById('sku-master-file');
+  const btnImportSkuMaster = document.getElementById('btn-import-sku-master');
+  skuMasterFileInput.addEventListener('change', () => {
+    btnImportSkuMaster.disabled = !skuMasterFileInput.files.length;
+  });
+
+  btnImportSkuMaster.addEventListener('click', async () => {
+    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    const file = skuMasterFileInput.files[0];
+    if (!file) { toast('กรุณาเลือกไฟล์ก่อน'); return; }
+    const resultEl = document.getElementById('sku-master-result');
+    btnImportSkuMaster.disabled = true;
+    resultEl.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div>กำลังอ่านไฟล์...</div>`;
+    try {
+      if (typeof XLSX === 'undefined') throw new Error('โหลดไลบรารีอ่านไฟล์ Excel ไม่สำเร็จ ลองรีเฟรชหน้าใหม่');
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheetName = wb.SheetNames.includes('Pack config') ? 'Pack config' : wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+      if (!rows.length) throw new Error('ไฟล์ไม่มีข้อมูล');
+      const header = rows[0].map(h => String(h || '').trim());
+      const idxSku = header.indexOf('SKU');
+      const idxRatio1 = header.indexOf('Ratio 1');
+      const idxRatio2 = header.indexOf('Ratio 2');
+      if (idxSku === -1 || idxRatio2 === -1) {
+        throw new Error(`ไม่พบคอลัมน์ SKU หรือ Ratio 2 ในชีต "${sheetName}" — ตรวจสอบว่าไฟล์มี header ตรงตามที่ระบบต้องการ`);
+      }
+
+      const skuRows = [];
+      for (let i = 1; i < rows.length; i++) {
+        const r = rows[i];
+        const sku = r[idxSku] != null ? String(r[idxSku]).trim() : '';
+        if (!sku) continue;
+        const r1 = idxRatio1 !== -1 && r[idxRatio1] != null ? Number(r[idxRatio1]) : null;
+        const r2 = r[idxRatio2] != null ? Number(r[idxRatio2]) : null;
+        skuRows.push({ sku, ratio1: (r1 !== null && isFinite(r1)) ? r1 : null, ratio2: (r2 !== null && isFinite(r2)) ? r2 : null });
+      }
+      if (!skuRows.length) throw new Error('ไม่พบแถวข้อมูล SKU ที่ใช้ได้ในไฟล์');
+
+      for (let i = 0; i < skuRows.length; i += 400) {
+        const chunk = skuRows.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(s => {
+          batch.set(doc(db, 'sku_master', s.sku), { ratio1: s.ratio1, ratio2: s.ratio2, updatedAt: serverTimestamp() }, { merge: true });
+        });
+        await batch.commit();
+      }
+
+      resultEl.innerHTML = `<div class="alert alert-success">${icon('check_circle', { size: 16 })} นำเข้า Master SKU เรียบร้อย: ${skuRows.length} SKU</div>`;
+      skuMasterFileInput.value = '';
+      renderPickKpi();
+    } catch (e) {
+      console.error(e);
+      resultEl.innerHTML = `<div class="alert alert-error">เกิดข้อผิดพลาด: ${e.message}</div>`;
+    } finally {
+      btnImportSkuMaster.disabled = false;
+    }
+  });
+
   // ── Dashboard ───────────────────────────────────────────────
   async function initDashboardDefaultDate() {
     try {
@@ -682,6 +775,7 @@
     renderHourlyChart();
     renderInsights();
     renderTopSku();
+    renderPickKpi();
     renderBottleneck();
 
     let dockBookingsToday = [];
@@ -1031,6 +1125,72 @@
     refreshDashboard();
     document.querySelector('.control-tower').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+
+  // ── Picking KPI: Full Pallet vs Partial — needs Master SKU imported
+  //    first (sku_master/{sku} = {ratio1, ratio2}); a Picking line counts
+  //    as Full when its qty divides evenly by the SKU's Ratio 2 (EA/PL),
+  //    otherwise Partial. SKUs with no Master SKU entry go to "unknown"
+  //    rather than being guessed into either bucket. ───────────────────
+  async function renderPickKpi() {
+    const el = document.getElementById('pick-kpi-body');
+    const pickingRows = currentRows.filter(r => r.type === 'Picking' && r.sku);
+    if (!pickingRows.length) {
+      el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--gray);font-size:.85rem">ไม่มีข้อมูล Picking ดิบสำหรับวันที่นี้</div>`;
+      return;
+    }
+    const skus = [...new Set(pickingRows.map(r => r.sku))];
+    const masterMap = {};
+    try {
+      for (let i = 0; i < skus.length; i += 30) {
+        const chunk = skus.slice(i, i + 30);
+        const snap = await getDocs(query(collection(db, 'sku_master'), where(documentId(), 'in', chunk)));
+        snap.docs.forEach(d => { masterMap[d.id] = d.data(); });
+      }
+    } catch (e) { console.error(e); }
+
+    const bySku = {};
+    let fullLines = 0, partialLines = 0, unknownLines = 0;
+    pickingRows.forEach(r => {
+      const master = masterMap[r.sku];
+      const ratio2 = master && master.ratio2;
+      const entry = (bySku[r.sku] ||= { sku: r.sku, desc: r.skuDesc || '', full: 0, partial: 0, unknown: 0, rows: [] });
+      entry.rows.push(r);
+      if (!ratio2 || ratio2 <= 0) {
+        entry.unknown++; unknownLines++;
+      } else if (r.qty > 0 && r.qty % ratio2 === 0) {
+        entry.full++; fullLines++;
+      } else {
+        entry.partial++; partialLines++;
+      }
+    });
+
+    const totalLines = fullLines + partialLines + unknownLines;
+    const fullPct = totalLines ? Math.round(fullLines / totalLines * 100) : 0;
+    const ranked = Object.values(bySku).sort((a, b) => b.partial - a.partial).slice(0, 12);
+
+    el.innerHTML = `
+      <div class="stats-row" style="margin-bottom:.75rem">
+        <div class="stat-card"><div class="stat-value" style="color:var(--green)">${fullLines}</div><div class="stat-label">รายการเต็มพาเลท</div></div>
+        <div class="stat-card"><div class="stat-value" style="color:var(--amber)">${partialLines}</div><div class="stat-label">รายการหยิบเศษ</div></div>
+        <div class="stat-card"><div class="stat-value">${unknownLines}</div><div class="stat-label">ไม่มีข้อมูลมาตรฐาน</div></div>
+        <div class="stat-card"><div class="stat-value">${fullPct}%</div><div class="stat-label">สัดส่วนเต็มพาเลท</div></div>
+      </div>
+      ${ranked.length ? `<div class="table-wrap"><table>
+        <thead><tr><th>SKU</th><th>รายละเอียด</th><th>เต็มพาเลท</th><th>หยิบเศษ</th><th>ไม่มีมาตรฐาน</th></tr></thead>
+        <tbody>${ranked.map(s => `<tr data-sku="${s.sku.replace(/"/g, '&quot;')}" style="cursor:pointer">
+          <td style="font-weight:700">${s.sku}</td>
+          <td>${s.desc || '-'}</td>
+          <td style="color:var(--green);font-weight:700">${s.full || '-'}</td>
+          <td style="color:var(--amber);font-weight:700">${s.partial || '-'}</td>
+          <td style="color:var(--gray)">${s.unknown || '-'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : ''}`;
+
+    el.querySelectorAll('tr[data-sku]').forEach(tr => {
+      const entry = bySku[tr.dataset.sku];
+      tr.addEventListener('click', () => openDetailModal(`${tr.dataset.sku} — Picking`, entry.rows));
+    });
+  }
 
   // ── Bottleneck analysis ─────────────────────────────────────────
   // Matches the same Tag ID across consecutive process stages (both are
