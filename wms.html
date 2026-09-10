@@ -30,6 +30,26 @@
     #dash-tbody td, #trend-tbody td { font-size:.82rem; }
     .date-row { display:flex; gap:.75rem; align-items:flex-end; flex-wrap:wrap; margin-bottom:1rem; }
     .date-row .form-group { margin-bottom:0; min-width:170px; }
+
+    /* ── Bento grid: WMS Control Tower ────────────────────── */
+    .bento-grid {
+      display:grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-auto-rows: minmax(100px, auto);
+      gap:.85rem;
+      margin-bottom:1.25rem;
+    }
+    .bento-card {
+      background:#fff; border:1.5px solid var(--border); border-radius:var(--radius);
+      box-shadow:var(--shadow); padding:1.1rem 1.25rem;
+      display:flex; flex-direction:column; justify-content:center;
+    }
+    .bento-card.span2 { grid-column: span 2; }
+    .bento-card.row2 { grid-row: span 2; justify-content:flex-start; }
+    @media (max-width:700px) { .bento-card.span2 { grid-column: span 1; } }
+    .bento-label { font-size:.72rem; font-weight:700; color:var(--gray); text-transform:uppercase; letter-spacing:.04em; }
+    .bento-value { font-size:1.9rem; font-weight:900; color:var(--blue); line-height:1.1; margin:.35rem 0; }
+    .bento-sub { font-size:.78rem; color:var(--gray); }
   </style>
 </head>
 <body>
@@ -56,12 +76,47 @@
       </button>
     </div>
 
-    <div class="stats-row">
-      <div class="stat-card small"><div class="stat-value" id="stat-Receipt">–</div><div class="stat-label">Receipt</div></div>
-      <div class="stat-card small"><div class="stat-value" id="stat-Putaway">–</div><div class="stat-label">Putaway</div></div>
-      <div class="stat-card small"><div class="stat-value" id="stat-Picking">–</div><div class="stat-label">Picking</div></div>
-      <div class="stat-card small"><div class="stat-value" id="stat-Packing">–</div><div class="stat-label">Packing</div></div>
-      <div class="stat-card small"><div class="stat-value" id="stat-Shipping">–</div><div class="stat-label">Shipping</div></div>
+    <div class="card-title" style="font-size:1rem">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+      WMS Control Tower
+    </div>
+    <div class="bento-grid" id="bento-grid">
+      <div class="bento-card span2 row2" id="bento-total">
+        <div class="bento-label">Total Activity วันนี้</div>
+        <div class="bento-value" id="bento-total-count">–</div>
+        <div class="bento-sub">Qty รวม <b id="bento-total-qty">–</b></div>
+        <div id="bento-mini-bars" style="margin-top:.7rem"></div>
+      </div>
+      <div class="bento-card" id="bento-proc-Receipt"></div>
+      <div class="bento-card" id="bento-proc-Putaway"></div>
+      <div class="bento-card" id="bento-proc-Picking"></div>
+      <div class="bento-card" id="bento-proc-Packing"></div>
+      <div class="bento-card" id="bento-proc-Shipping"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Performance รายคน (User × Process)
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>User</th><th>Receipt</th><th>Putaway</th><th>Picking</th><th>Packing</th><th>Shipping</th><th>รวม</th></tr></thead>
+          <tbody id="user-perf-tbody"><tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--gray)">กำลังโหลด...</td></tr></tbody>
+        </table>
+      </div>
+      <div style="font-size:.72rem;color:var(--gray);margin-top:.6rem">
+        อิงจากข้อมูลดิบที่เก็บอยู่ตอนนี้ในระบบ — ถ้า Export ข้อมูลดิบไปแล้วส่วนนี้จะว่าง (Control Tower ด้านบนยังถูกต้องเสมอเพราะอิงจากสรุปยอดถาวร)
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Activity Heatmap ตามชั่วโมง
+      </div>
+      <div id="hourly-heatmap"></div>
+      <div style="font-size:.72rem;color:var(--gray);margin-top:.6rem">อิงจากข้อมูลดิบที่เก็บอยู่ตอนนี้ในระบบเช่นกัน</div>
     </div>
 
     <div class="card">
@@ -434,12 +489,14 @@
   async function refreshDashboard() {
     const date = document.getElementById('dash-date').value || todayISO();
     dashDate = date;
-    let counts = {};
+    let counts = {}, qtyByType = {};
     try {
       const sDoc = await getDoc(doc(db, 'wms_daily_summary', date));
-      counts = sDoc.exists() ? (sDoc.data().counts || {}) : {};
+      const data = sDoc.exists() ? sDoc.data() : {};
+      counts = data.counts || {};
+      qtyByType = data.qty || {};
     } catch (e) { console.error(e); }
-    TYPE_ORDER.forEach(t => { document.getElementById('stat-' + t).textContent = counts[t] || 0; });
+    renderControlTower(counts, qtyByType);
 
     let rows = [];
     try {
@@ -448,6 +505,93 @@
     } catch (e) { console.error(e); }
     currentRows = rows;
     renderDashTable();
+    renderUserPerformance();
+    renderHourlyHeatmap();
+  }
+
+  // ── Control Tower (bento) — sourced from the persisted daily summary,
+  //    so it stays correct even after raw rows are archived ───────────
+  function renderControlTower(counts, qtyByType) {
+    const totalCount = TYPE_ORDER.reduce((s, t) => s + (counts[t] || 0), 0);
+    const totalQty = TYPE_ORDER.reduce((s, t) => s + (qtyByType[t] || 0), 0);
+    document.getElementById('bento-total-count').textContent = totalCount.toLocaleString('th-TH');
+    document.getElementById('bento-total-qty').textContent = totalQty.toLocaleString('th-TH');
+    const maxCount = Math.max(1, ...TYPE_ORDER.map(t => counts[t] || 0));
+    document.getElementById('bento-mini-bars').innerHTML = TYPE_ORDER.map(t => {
+      const c = counts[t] || 0;
+      const pct = Math.round((c / maxCount) * 100);
+      return `<div style="display:flex;align-items:center;gap:.5rem;margin-top:.35rem">
+        <span style="width:60px;font-size:.7rem;color:var(--gray)">${t}</span>
+        <div style="flex:1;height:6px;background:#e2e8f0;border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--indigo);border-radius:4px"></div>
+        </div>
+        <span style="font-size:.72rem;font-weight:700;color:var(--blue);width:28px;text-align:right">${c}</span>
+      </div>`;
+    }).join('');
+    TYPE_ORDER.forEach(t => {
+      const el = document.getElementById('bento-proc-' + t);
+      if (!el) return;
+      el.innerHTML = `
+        <div class="bento-label">${t}</div>
+        <div class="bento-value" style="font-size:1.5rem">${(counts[t] || 0).toLocaleString('th-TH')}</div>
+        <div class="bento-sub">Qty ${(qtyByType[t] || 0).toLocaleString('th-TH')}</div>`;
+    });
+  }
+
+  // ── User Performance (User × Process pivot) — from currently-stored
+  //    raw rows only; empty after the raw data has been archived ─────
+  function renderUserPerformance() {
+    const pivot = {};
+    currentRows.forEach(r => {
+      if (!r.user) return;
+      if (!pivot[r.user]) {
+        pivot[r.user] = { total: 0 };
+        TYPE_ORDER.forEach(t => { pivot[r.user][t] = 0; });
+      }
+      if (pivot[r.user][r.type] !== undefined) pivot[r.user][r.type]++;
+      pivot[r.user].total++;
+    });
+    const users = Object.keys(pivot).sort((a, b) => pivot[b].total - pivot[a].total);
+    const tbody = document.getElementById('user-perf-tbody');
+    if (!users.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--gray)">ไม่มีข้อมูลดิบสำหรับวันที่นี้</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = users.map(u => {
+      const p = pivot[u];
+      return `<tr><td style="font-weight:700">${u}</td>${TYPE_ORDER.map(t => `<td>${p[t] || 0}</td>`).join('')}<td style="font-weight:700;color:var(--blue)">${p.total}</td></tr>`;
+    }).join('');
+  }
+
+  // ── Hourly Activity Heatmap — from currently-stored raw rows ──────
+  function renderHourlyHeatmap() {
+    const grid = {};
+    TYPE_ORDER.forEach(t => { grid[t] = {}; });
+    let maxCount = 1;
+    currentRows.forEach(r => {
+      const h = (r.time || '').slice(0, 2);
+      if (!/^\d{2}$/.test(h) || !grid[r.type]) return;
+      grid[r.type][h] = (grid[r.type][h] || 0) + 1;
+      maxCount = Math.max(maxCount, grid[r.type][h]);
+    });
+    const allHours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+    const activeHours = allHours.filter(h => TYPE_ORDER.some(t => grid[t][h]));
+    const wrap = document.getElementById('hourly-heatmap');
+    if (!activeHours.length) {
+      wrap.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--gray);font-size:.85rem">ไม่มีข้อมูลดิบสำหรับวันที่นี้</div>`;
+      return;
+    }
+    const cellColor = n => n ? `rgba(99,102,241,${(0.15 + 0.75 * (n / maxCount)).toFixed(2)})` : '#f1f5f9';
+    wrap.innerHTML = `<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.72rem">
+      <thead><tr><th style="padding:.3rem .5rem;text-align:left"></th>${activeHours.map(h => `<th style="padding:.3rem .3rem;text-align:center;color:var(--gray);font-weight:600">${h}น.</th>`).join('')}</tr></thead>
+      <tbody>${TYPE_ORDER.map(t => `<tr>
+        <td style="padding:.3rem .5rem;font-weight:700;white-space:nowrap">${t}</td>
+        ${activeHours.map(h => {
+          const n = grid[t][h] || 0;
+          return `<td style="padding:2px" title="${t} ${h}:00 — ${n} รายการ"><div style="width:26px;height:26px;border-radius:5px;background:${cellColor(n)};display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:${n > maxCount * 0.5 ? '#fff' : '#475569'}">${n || ''}</div></td>`;
+        }).join('')}
+      </tr>`).join('')}</tbody>
+    </table></div>`;
   }
 
   function renderDashTable() {
