@@ -101,11 +101,12 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>User</th><th>Receipt</th><th>Putaway</th><th>Picking</th><th>Packing</th><th>Shipping</th><th>รวม</th></tr></thead>
-          <tbody id="user-perf-tbody"><tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--gray)">กำลังโหลด...</td></tr></tbody>
+          <thead><tr><th>User</th><th>Receipt</th><th>Putaway</th><th>Picking</th><th>Packing</th><th>Shipping</th><th>รวม</th><th>ช่วงเวลาทำงาน</th><th>อัตราจริง (รายการ/ชม.)</th></tr></thead>
+          <tbody id="user-perf-tbody"><tr><td colspan="9" style="text-align:center;padding:1.5rem;color:var(--gray)">กำลังโหลด...</td></tr></tbody>
         </table>
       </div>
       <div style="font-size:.72rem;color:var(--gray);margin-top:.6rem">
+        อัตราจริงคำนวณจาก (จำนวนรายการ) ÷ (ช่วงเวลาจริงตั้งแต่รายการแรกถึงรายการสุดท้ายที่บันทึกในระบบ) — ไม่ได้เทียบกับมาตรฐานใดๆ เพราะข้อมูลชุดนี้ไม่สามารถระบุได้ว่าแต่ละแถวคือ 1 พาเลทหรือ 1 กล่อง/ชิ้น จึงยังไม่ควรใช้เทียบ Productivity มาตรฐาน<br>
         อิงจากข้อมูลดิบที่เก็บอยู่ตอนนี้ในระบบ — ถ้า Export ข้อมูลดิบไปแล้วส่วนนี้จะว่าง (Control Tower ด้านบนยังถูกต้องเสมอเพราะอิงจากสรุปยอดถาวร)
       </div>
     </div>
@@ -540,26 +541,45 @@
 
   // ── User Performance (User × Process pivot) — from currently-stored
   //    raw rows only; empty after the raw data has been archived ─────
+  function timeToMinutes(t) {
+    const m = String(t || '').match(/^(\d{2}):(\d{2})/);
+    return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null;
+  }
+
   function renderUserPerformance() {
     const pivot = {};
     currentRows.forEach(r => {
       if (!r.user) return;
       if (!pivot[r.user]) {
-        pivot[r.user] = { total: 0 };
+        pivot[r.user] = { total: 0, minutes: [] };
         TYPE_ORDER.forEach(t => { pivot[r.user][t] = 0; });
       }
       if (pivot[r.user][r.type] !== undefined) pivot[r.user][r.type]++;
       pivot[r.user].total++;
+      const m = timeToMinutes(r.time);
+      if (m !== null) pivot[r.user].minutes.push(m);
     });
     const users = Object.keys(pivot).sort((a, b) => pivot[b].total - pivot[a].total);
     const tbody = document.getElementById('user-perf-tbody');
     if (!users.length) {
-      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:1.5rem;color:var(--gray)">ไม่มีข้อมูลดิบสำหรับวันที่นี้</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:1.5rem;color:var(--gray)">ไม่มีข้อมูลดิบสำหรับวันที่นี้</td></tr>`;
       return;
     }
     tbody.innerHTML = users.map(u => {
       const p = pivot[u];
-      return `<tr><td style="font-weight:700">${u}</td>${TYPE_ORDER.map(t => `<td>${p[t] || 0}</td>`).join('')}<td style="font-weight:700;color:var(--blue)">${p.total}</td></tr>`;
+      p.minutes.sort((a, b) => a - b);
+      let spanLabel = '-', rateLabel = '-';
+      if (p.minutes.length >= 2) {
+        const first = p.minutes[0], last = p.minutes[p.minutes.length - 1];
+        const elapsedH = (last - first) / 60;
+        const fmt = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+        spanLabel = `${fmt(first)}–${fmt(last)}`;
+        rateLabel = elapsedH > 0 ? (p.total / elapsedH).toFixed(1) : `${p.total} (< 1 นาที)`;
+      } else if (p.minutes.length === 1) {
+        const fmt = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+        spanLabel = fmt(p.minutes[0]);
+      }
+      return `<tr><td style="font-weight:700">${u}</td>${TYPE_ORDER.map(t => `<td>${p[t] || 0}</td>`).join('')}<td style="font-weight:700;color:var(--blue)">${p.total}</td><td style="white-space:nowrap;font-size:.78rem;color:var(--gray)">${spanLabel}</td><td style="font-weight:700">${rateLabel}</td></tr>`;
     }).join('');
   }
 
