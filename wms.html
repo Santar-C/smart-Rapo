@@ -125,6 +125,26 @@
     #trend-tbody tr[data-date] { cursor:pointer; }
     #user-perf-tbody tr[data-user]:hover td:first-child,
     #trend-tbody tr[data-date]:hover td:first-child { color:var(--indigo); text-decoration:underline; }
+
+    /* ── Bottleneck analysis ───────────────────────────────── */
+    .bottleneck-row {
+      display:grid; grid-template-columns:230px 1fr 130px; gap:.85rem; align-items:center;
+      padding:.55rem .5rem; border-radius:9px; cursor:pointer; transition:background .15s;
+    }
+    .bottleneck-row:hover { background:#f8fafc; }
+    .bottleneck-row.worst { background:#fef2f2; }
+    .bottleneck-label { font-size:.85rem; font-weight:600; color:#1e293b; }
+    .bottleneck-flag {
+      display:inline-block; background:var(--red); color:#fff; font-size:.64rem; font-weight:800;
+      padding:.12rem .5rem; border-radius:10px; margin-right:.45rem; vertical-align:middle;
+    }
+    .bottleneck-bar-wrap { height:10px; background:#e2e8f0; border-radius:5px; overflow:hidden; }
+    .bottleneck-bar { height:100%; border-radius:5px; }
+    .bottleneck-value { font-size:.85rem; font-weight:700; color:var(--blue); text-align:right; white-space:nowrap; }
+    @media (max-width:640px) {
+      .bottleneck-row { grid-template-columns:1fr; row-gap:.35rem; }
+      .bottleneck-value { text-align:left; }
+    }
   </style>
 </head>
 <body>
@@ -174,6 +194,14 @@
     </div>
 
     <div class="insight-strip" id="insight-strip"></div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        วิเคราะห์คอขวด (กดแต่ละแถวเพื่อดู Tag ที่ค้างนานสุด)
+      </div>
+      <div id="bottleneck-body"></div>
+    </div>
 
     <div class="card">
       <div class="card-title">
@@ -631,6 +659,7 @@
     renderUserPerformance();
     renderHourlyChart();
     renderInsights();
+    renderBottleneck();
   }
 
   // ── Control Tower (bento) — sourced from the persisted daily summary,
@@ -765,6 +794,11 @@
     return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null;
   }
   function fmtMinutes(m) { return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; }
+  function fmtDuration(min) {
+    const m = Math.round(min);
+    if (m < 60) return `${m} นาที`;
+    return `${Math.floor(m / 60)} ชม. ${m % 60} นาที`;
+  }
 
   function userStats(rows) {
     const total = rows.length;
@@ -863,6 +897,98 @@
     refreshDashboard();
     document.querySelector('.control-tower').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
+
+  // ── Bottleneck analysis ─────────────────────────────────────────
+  // Matches the same Tag ID across consecutive process stages (both are
+  // in FIELD_MAP for every type) and measures the time gap between a
+  // tag's first-seen timestamp in each stage. A day-scoped view only —
+  // a tag that crosses midnight between stages won't show a gap here,
+  // it'll just look like it never reached the next stage that day.
+  function computeBottlenecks(rows) {
+    const byTag = {};
+    rows.forEach(r => {
+      if (!r.tagId) return;
+      const t = timeToMinutes(r.time);
+      if (t === null) return;
+      const rec = (byTag[r.tagId] ||= {});
+      rec[r.type] = rec[r.type] === undefined ? t : Math.min(rec[r.type], t);
+    });
+
+    const transitions = [];
+    for (let i = 0; i < TYPE_ORDER.length - 1; i++) {
+      const from = TYPE_ORDER[i], to = TYPE_ORDER[i + 1];
+      const gaps = [];
+      Object.keys(byTag).forEach(tagId => {
+        const tFrom = byTag[tagId][from], tTo = byTag[tagId][to];
+        if (tFrom === undefined || tTo === undefined) return;
+        const gapMin = tTo - tFrom;
+        if (gapMin < 0) return;
+        gaps.push({ tagId, gapMin, fromTime: fmtMinutes(tFrom), toTime: fmtMinutes(tTo) });
+      });
+      gaps.sort((a, b) => b.gapMin - a.gapMin);
+      const n = gaps.length;
+      const avg = n ? gaps.reduce((s, g) => s + g.gapMin, 0) / n : null;
+      const byAsc = gaps.slice().sort((a, b) => a.gapMin - b.gapMin);
+      const median = n ? (n % 2 ? byAsc[(n - 1) / 2].gapMin : (byAsc[n / 2 - 1].gapMin + byAsc[n / 2].gapMin) / 2) : null;
+      transitions.push({ from, to, n, avg, median, gaps });
+    }
+    return transitions;
+  }
+
+  function renderBottleneck() {
+    const el = document.getElementById('bottleneck-body');
+    const withData = computeBottlenecks(currentRows).filter(t => t.n > 0);
+    if (!withData.length) {
+      el.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--gray);font-size:.85rem">
+        ไม่มี Tag ID ที่พบซ้ำข้ามหลาย Process ในวันนี้ จึงยังวิเคราะห์คอขวดไม่ได้ (ต้องมีข้อมูลดิบของ Tag เดียวกันครบตั้งแต่ 2 process ขึ้นไปในวันเดียวกัน)
+      </div>`;
+      return;
+    }
+    const ranked = withData.slice().sort((a, b) => b.avg - a.avg);
+    const maxAvg = Math.max(...ranked.map(t => t.avg));
+    el.innerHTML = `
+      <div style="font-size:.72rem;color:var(--gray);margin-bottom:.75rem">
+        วัดจากเวลาห่างระหว่างสอง Process ของ Tag ID เดียวกัน — ยิ่งค่าเฉลี่ยสูง ยิ่งเป็นจุดที่งานค้างนาน (เฉพาะ Tag ที่ขยับข้าม Process ภายในวันเดียวกัน)
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        ${ranked.map((t, i) => `
+          <div class="bottleneck-row${i === 0 ? ' worst' : ''}">
+            <div class="bottleneck-label">
+              ${i === 0 ? `<span class="bottleneck-flag">คอขวดสุด</span>` : ''}${TYPE_LABEL[t.from] || t.from} → ${TYPE_LABEL[t.to] || t.to}
+              <span style="color:var(--gray);font-weight:400">(n=${t.n})</span>
+            </div>
+            <div class="bottleneck-bar-wrap"><div class="bottleneck-bar" style="width:${Math.max(4, Math.round(t.avg / maxAvg * 100))}%;background:${i === 0 ? 'var(--red)' : PROC_COLOR[t.to]}"></div></div>
+            <div class="bottleneck-value">${fmtDuration(t.avg)}</div>
+          </div>`).join('')}
+      </div>`;
+    el.querySelectorAll('.bottleneck-row').forEach((rowEl, i) => {
+      rowEl.addEventListener('click', () => openBottleneckModal(ranked[i]));
+    });
+  }
+
+  function openBottleneckModal(t) {
+    const top = t.gaps.slice(0, 30);
+    document.getElementById('user-modal-title').textContent = `คอขวด: ${TYPE_LABEL[t.from] || t.from} → ${TYPE_LABEL[t.to] || t.to}`;
+    document.getElementById('user-modal-body').innerHTML = `
+      <div class="stats-row" style="margin-bottom:1rem">
+        <div class="stat-card"><div class="stat-value" style="font-size:1.2rem">${fmtDuration(t.avg)}</div><div class="stat-label">ค่าเฉลี่ย</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.2rem">${fmtDuration(t.median)}</div><div class="stat-label">Median</div></div>
+        <div class="stat-card"><div class="stat-value">${t.n}</div><div class="stat-label">จำนวน Tag ที่วัดได้</div></div>
+      </div>
+      <div style="font-size:.72rem;color:var(--gray);margin-bottom:.75rem">เรียงจาก Tag ที่ค้างนานที่สุดก่อน (แสดง ${top.length} จาก ${t.n} รายการ)</div>
+      <div class="table-wrap" style="max-height:360px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Tag ID</th><th>${TYPE_LABEL[t.from] || t.from}</th><th>${TYPE_LABEL[t.to] || t.to}</th><th>ระยะเวลาที่ค้าง</th></tr></thead>
+          <tbody>${top.map(g => `<tr>
+            <td style="font-weight:700">${g.tagId}</td>
+            <td>${g.fromTime}</td>
+            <td>${g.toTime}</td>
+            <td style="font-weight:700;color:var(--red)">${fmtDuration(g.gapMin)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+    document.getElementById('user-modal-backdrop').style.display = 'flex';
+  }
 
   // ── Hourly Activity chart — from currently-stored raw rows ────────
   function renderHourlyChart() {
