@@ -246,7 +246,7 @@ const printManifest = b=>{
           <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;font-size:14px;padding-bottom:1px">${b.bookingNo||'-'}</div>
         </div>
         <div style="display:flex;align-items:flex-end">
-          <span style="width:175px;flex-shrink:0;line-height:1.3">หมายเลขเอกสาร<br><i style="font-size:10px;color:#888">Import reference number</i></span>
+          <span style="width:175px;flex-shrink:0;line-height:1.3">หมายเลขอินวอยซ์<br><i style="font-size:10px;color:#888">Invoice number</i></span>
           <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:900;font-size:14px;color:#4338ca;padding-bottom:1px">${b.shipmentNo||'-'}</div>
         </div>
         <div style="display:flex;align-items:flex-end">
@@ -260,6 +260,10 @@ const printManifest = b=>{
         <div style="display:flex;align-items:flex-end">
           <span style="width:175px;flex-shrink:0;line-height:1.3">หมายเลขตู้คอนเทนเนอร์<br><i style="font-size:10px;color:#888">Container number</i></span>
           <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:700;padding-bottom:1px">${b.containerNo||'-'}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;margin-top:4px">
+          <span style="font-size:11px;color:#888">Remark</span>
+          <div style="border:1px solid black;border-radius:3px;min-height:24px;padding:3px 6px;font-size:11.5px;font-weight:700">${b.remark||''}</div>
         </div>
       </div>
 
@@ -309,6 +313,14 @@ const printManifest = b=>{
       <div style="display:flex;justify-content:space-between;align-items:flex-end;font-size:13px;font-weight:700">
         <div style="display:flex;align-items:flex-end;flex:1;gap:8px">
           <span>ลงชื่อ</span><div style="width:190px;border-bottom:1px solid black;height:18px"></div><span>พนักงานขับรถรับ-ส่งสินค้า</span>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:8px;width:180px">
+          <span>วันที่</span><div style="flex:1;border-bottom:1px solid black;height:18px"></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;font-size:13px;font-weight:700">
+        <div style="display:flex;align-items:flex-end;flex:1;gap:8px">
+          <span>ลงชื่อ</span><div style="width:190px;border-bottom:1px solid black;height:18px"></div><span>พนักงานรับสินค้าปลายทาง</span>
         </div>
         <div style="display:flex;align-items:flex-end;gap:8px;width:180px">
           <span>วันที่</span><div style="flex:1;border-bottom:1px solid black;height:18px"></div>
@@ -531,6 +543,10 @@ const FormPanel = React.memo(({form, setForm, bays, settings, onSubmit, editId, 
           onChange={e=>setForm(p=>({...p,sealNo:e.target.value}))}
           placeholder="Seal No."
           className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
+        <input type="text" value={form.remark}
+          onChange={e=>setForm(p=>({...p,remark:e.target.value}))}
+          placeholder="Remark"
+          className="w-full border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500"/>
       </div>
       {/* Allocation */}
       <div>
@@ -578,9 +594,9 @@ const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle})=>(
       </span>
       <StatusBadge booking={booking} onCycle={onCycle}/>
     </div>
-    <div className="p-3 text-xs text-slate-600 space-y-1">
+    <div className="px-3 pt-2 text-indigo-700 font-black text-[13px] tracking-tight">{booking.shipmentNo}</div>
+    <div className="p-3 pt-1 text-xs text-slate-600 space-y-1">
       <div className="font-bold text-slate-800">{booking.license} <span className="text-slate-400 font-normal">({booking.vehicle})</span></div>
-      <div className="text-indigo-600 font-bold text-[11px]">{booking.shipmentNo}</div>
       <div className="text-slate-500">{booking.vendor}</div>
       {booking.target_dock && (
         <div className="font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 text-[11px]">
@@ -740,13 +756,20 @@ const ScheduleView = ({bays,bookings,viewDate,isPower,onEdit})=>{
 };
 
 // ── List / Report View ─────────────────────────────────────
-const ListView = ({bookings,viewDate,completed,isPower,onEdit,onDelete,onManifest,onCycle,onExport})=>{
-  const data=bookings.filter(b=>completed?(b.status==='Completed'&&b.date===viewDate):b.status!=='Completed');
+const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDelete,onManifest,onCycle,onExport})=>{
+  const data=bookings.filter(b=>completed?(b.date===viewDate):(b.status!=='Completed'&&b.date===viewDate));
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fi">
       <div className="p-4 border-b border-slate-100 flex justify-between items-center">
         <h3 className="font-bold text-lg flex items-center gap-2"><Icon name={completed?"barChart":"clipboardList"} size={17}/> {completed?"รายงาน Completed":"คิวทั้งหมด"}</h3>
-        {completed && <button onClick={onExport} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors inline-flex items-center gap-1.5"><Icon name="download" size={14}/> Export CSV</button>}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center border border-slate-200 rounded-lg bg-slate-50 px-3 py-1.5">
+            <span className="text-[11px] text-slate-400 mr-2"><Icon name="calendar" size={11}/></span>
+            <input type="date" value={viewDate} onChange={e=>setViewDate(e.target.value)}
+              className="bg-transparent text-slate-700 text-xs font-bold focus:outline-none cursor-pointer"/>
+          </div>
+          {completed && <button onClick={onExport} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors inline-flex items-center gap-1.5"><Icon name="download" size={14}/> Export CSV</button>}
+        </div>
       </div>
       <div className="flex-1 overflow-auto ds p-4">
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -817,7 +840,7 @@ const getBlank = ()=>({
   shipmentNo:'', doNumber:'', vendor:'',
   license:'', vehicle:'6WT', jobType:'OUT',
   allocation:'Waitlist', driverName:'',
-  bookingNo:'', containerNo:'', sealNo:'',
+  bookingNo:'', containerNo:'', sealNo:'', remark:'',
   origin:'CEVA WAREHOUSE', destination:'PAT WAREHOUSE',
   target_dock:'',
 });
@@ -985,7 +1008,7 @@ function App() {
     }).catch(err=>alert('บันทึกไม่สำเร็จ: '+err.message));
   };
   const exportCSV=()=>{
-    const done=bookings.filter(b=>b.status==='Completed'&&b.date===viewDate);
+    const done=bookings.filter(b=>b.date===viewDate);
     if(!done.length){alert('ไม่มีข้อมูล');return;}
     const rows=[['วันที่','ช่องจอด','Doc No','IN/OUT','บริษัท','ทะเบียน','ขนาดรถ','Plan เข้า','Plan ออก','มาถึง','โหลด','รอเอกสาร','เสร็จ']];
     done.forEach(b=>rows.push([b.date,b.allocation,b.shipmentNo,b.jobType,b.vendor,b.license,b.vehicle,b.startTime,b.endTime,b.timeArrived||'',b.timeLoading||'',b.timeWaitingDoc||'',b.timeCompleted||'']));
@@ -1111,8 +1134,8 @@ function App() {
           </>)}
 
           {tab==='schedule' && <ScheduleView bays={bays} bookings={bookings} viewDate={viewDate} isPower={isPower} onEdit={handleEdit}/>}
-          {tab==='list'     && <ListView bookings={bookings} viewDate={viewDate} completed={false} isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
-          {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
+          {tab==='list'     && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={false} isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
+          {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
           {tab==='scan'     && <ScanView scanOn={scanOn} setScanOn={setScanOn} scanMsg={scanMsg}/>}
           {tab==='qr'       && <QRView bays={bays}/>}
           {tab==='settings' && <SettingsView settings={settings}/>}
