@@ -247,7 +247,7 @@ const printManifest = b=>{
         </div>
         <div style="display:flex;align-items:flex-end">
           <span style="width:175px;flex-shrink:0;line-height:1.3">หมายเลขอินวอยซ์<br><i style="font-size:10px;color:#888">Invoice number</i></span>
-          <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:900;font-size:14px;color:#4338ca;padding-bottom:1px">${b.shipmentNo||'-'}</div>
+          <div style="flex:1;border-bottom:1px solid black;text-align:center;font-weight:900;font-size:14px;color:#4338ca;padding-bottom:1px">${b.doNumber||'-'}</div>
         </div>
         <div style="display:flex;align-items:flex-end">
           <span style="width:175px;flex-shrink:0;line-height:1.3">CY Place (Origin)<br><i style="font-size:10px;color:#888">สถานที่รับสินค้า</i></span>
@@ -594,7 +594,7 @@ const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle})=>(
       </span>
       <StatusBadge booking={booking} onCycle={onCycle}/>
     </div>
-    <div className="px-3 pt-2 text-indigo-700 font-black text-[13px] tracking-tight">{booking.shipmentNo}</div>
+    <div className="px-3 pt-2 text-indigo-700 font-black text-[13px] tracking-tight">{booking.doNumber||'-'}</div>
     <div className="p-3 pt-1 text-xs text-slate-600 space-y-1">
       <div className="font-bold text-slate-800">{booking.license} <span className="text-slate-400 font-normal">({booking.vehicle})</span></div>
       <div className="text-slate-500">{booking.vendor}</div>
@@ -632,7 +632,7 @@ const DockCardOccupied = ({dock, booking, delay, otd, isPower, onEdit, onManifes
         {booking.timeArrived && <span className="text-[10px] text-slate-400">มาถึง {booking.timeArrived}</span>}
       </div>
       <div className="space-y-1">
-        <div className="flex"><span className="w-12 text-slate-400">Doc:</span><span className="font-bold text-indigo-700 truncate">{booking.shipmentNo}</span></div>
+        <div className="flex"><span className="w-12 text-slate-400">DO:</span><span className="font-bold text-indigo-700 truncate">{booking.doNumber||'-'}</span></div>
         <div className="flex"><span className="w-12 text-slate-400">Truck:</span><span className="font-bold">{booking.license} <span className="text-slate-400 font-normal">({booking.vehicle})</span></span></div>
         <div className="flex"><span className="w-12 text-slate-400">Vendor:</span><span className="truncate">{booking.vendor}</span></div>
       </div>
@@ -775,30 +775,54 @@ const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDele
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           <table className="w-full text-left text-xs md:text-sm min-w-[900px]">
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-[10px] uppercase tracking-wider">
-              <tr>
-                <th className="p-4 font-bold">วันที่ / เวลา</th><th className="p-4 font-bold">Doc No. / ซัพฯ</th>
-                <th className="p-4 font-bold">ทะเบียน / ขนาด</th><th className="p-4 font-bold">ช่องจอด</th>
-                <th className="p-4 font-bold">สถานะ</th><th className="p-4 font-bold text-center">จัดการ</th>
-              </tr>
+              {completed ? (
+                <tr>
+                  <th className="p-4 font-bold">วันที่ / แผนเวลา</th><th className="p-4 font-bold">Doc No. / ซัพฯ</th>
+                  <th className="p-4 font-bold">ทะเบียน</th><th className="p-4 font-bold">ช่องจอด</th>
+                  <th className="p-4 font-bold">มาถึง</th><th className="p-4 font-bold">เสร็จสิ้น</th>
+                  <th className="p-4 font-bold">สถานะ</th><th className="p-4 font-bold text-center">Manifest</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th className="p-4 font-bold">วันที่ / เวลา</th><th className="p-4 font-bold">Doc No. / ซัพฯ</th>
+                  <th className="p-4 font-bold">ทะเบียน / ขนาด</th><th className="p-4 font-bold">ช่องจอด</th>
+                  <th className="p-4 font-bold">สถานะ</th><th className="p-4 font-bold text-center">จัดการ</th>
+                </tr>
+              )}
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.sort((a,b)=>(a.date+a.startTime).localeCompare(b.date+b.startTime)).map(b=>(
-                <tr key={b.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="p-4"><div className="font-bold">{b.date}</div><div className="text-indigo-600 font-bold text-[11px]">{b.startTime} - {b.endTime}</div></td>
-                  <td className="p-4"><div className="font-bold text-indigo-700">{b.shipmentNo}</div><div className="text-slate-500 text-[11px]">{b.vendor}</div></td>
-                  <td className="p-4"><div className="font-bold">{b.license}</div><div className="text-slate-500 text-[11px]">{b.vehicle}</div></td>
-                  <td className="p-4 font-bold text-indigo-600">{b.allocation}</td>
-                  <td className="p-4"><StatusBadge booking={b} onCycle={onCycle}/></td>
-                  <td className="p-4">
-                    <div className="flex justify-center gap-2">
-                      {isPower&&<button onClick={()=>onEdit(b)} className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors" title="แก้ไข"><Icon name="edit" size={13}/></button>}
+                completed ? (
+                  <tr key={b.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="p-4"><div className="font-bold">{b.date}</div><div className="text-indigo-600 font-bold text-[11px]">{b.startTime} - {b.endTime}</div></td>
+                    <td className="p-4"><div className="font-bold text-indigo-700">{b.shipmentNo}</div><div className="text-slate-500 text-[11px]">{b.vendor}</div></td>
+                    <td className="p-4 font-bold">{b.license}</td>
+                    <td className="p-4 font-bold text-indigo-600">{b.allocation}</td>
+                    <td className="p-4 text-slate-600">{b.timeArrived||'—'}</td>
+                    <td className="p-4 text-emerald-600 font-bold">{b.timeCompleted||'—'}</td>
+                    <td className="p-4"><StatusBadge booking={b} onCycle={onCycle}/></td>
+                    <td className="p-4 text-center">
                       <button onClick={()=>onManifest(b)} className="p-1.5 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-lg transition-colors" title="Manifest"><Icon name="printer" size={13}/></button>
-                      {isPower&&<button onClick={()=>onDelete(b.id)} className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors" title="ลบ"><Icon name="trash" size={13}/></button>}
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={b.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="p-4"><div className="font-bold">{b.date}</div><div className="text-indigo-600 font-bold text-[11px]">{b.startTime} - {b.endTime}</div></td>
+                    <td className="p-4"><div className="font-bold text-indigo-700">{b.shipmentNo}</div><div className="text-slate-500 text-[11px]">{b.vendor}</div></td>
+                    <td className="p-4"><div className="font-bold">{b.license}</div><div className="text-slate-500 text-[11px]">{b.vehicle}</div></td>
+                    <td className="p-4 font-bold text-indigo-600">{b.allocation}</td>
+                    <td className="p-4"><StatusBadge booking={b} onCycle={onCycle}/></td>
+                    <td className="p-4">
+                      <div className="flex justify-center gap-2">
+                        {isPower&&<button onClick={()=>onEdit(b)} className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors" title="แก้ไข"><Icon name="edit" size={13}/></button>}
+                        <button onClick={()=>onManifest(b)} className="p-1.5 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-lg transition-colors" title="Manifest"><Icon name="printer" size={13}/></button>
+                        {isPower&&<button onClick={()=>onDelete(b.id)} className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors" title="ลบ"><Icon name="trash" size={13}/></button>}
+                      </div>
+                    </td>
+                  </tr>
+                )
               ))}
-              {!data.length && <tr><td colSpan="6" className="p-12 text-center text-slate-400">ไม่มีข้อมูล</td></tr>}
+              {!data.length && <tr><td colSpan={completed?8:6} className="p-12 text-center text-slate-400">ไม่มีข้อมูล</td></tr>}
             </tbody>
           </table>
         </div>
