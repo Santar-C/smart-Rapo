@@ -8,6 +8,7 @@
   <meta name="theme-color" content="#021D49">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <style>
     .dash-chips { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.85rem; }
     .dash-chip {
@@ -50,6 +51,29 @@
     .bento-label { font-size:.72rem; font-weight:700; color:var(--gray); text-transform:uppercase; letter-spacing:.04em; }
     .bento-value { font-size:1.9rem; font-weight:900; color:var(--blue); line-height:1.1; margin:.35rem 0; }
     .bento-sub { font-size:.78rem; color:var(--gray); }
+
+    /* ── Control Tower: top row (stats + donut) ───────────── */
+    .ct-top-row { display:flex; gap:.85rem; flex-wrap:wrap; margin-bottom:.85rem; }
+    .ct-top-row > .bento-card { flex:1 1 280px; min-height:230px; }
+    .chart-box { position:relative; height:190px; }
+    .chart-box.tall { height:260px; }
+
+    /* ── Process cards: colored accent + icon ─────────────── */
+    .bento-grid-procs {
+      display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+      gap:.85rem; margin-bottom:1.25rem;
+    }
+    .proc-card { border-top:4px solid var(--accent, var(--indigo)); }
+    .proc-icon {
+      width:36px; height:36px; border-radius:10px;
+      display:flex; align-items:center; justify-content:center;
+      background:var(--accent-soft, #eef2ff); color:var(--accent, var(--indigo));
+      margin-bottom:.5rem;
+    }
+
+    /* ── User Performance: clickable rows ──────────────────── */
+    #user-perf-tbody tr[data-user] { cursor:pointer; }
+    #user-perf-tbody tr[data-user]:hover td:first-child { color:var(--indigo); text-decoration:underline; }
   </style>
 </head>
 <body>
@@ -80,18 +104,24 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
       WMS Control Tower
     </div>
-    <div class="bento-grid" id="bento-grid">
-      <div class="bento-card span2 row2" id="bento-total">
+    <div class="ct-top-row">
+      <div class="bento-card" id="bento-total">
         <div class="bento-label">Total Activity วันนี้</div>
         <div class="bento-value" id="bento-total-count">–</div>
         <div class="bento-sub">Qty รวม <b id="bento-total-qty">–</b></div>
         <div id="bento-mini-bars" style="margin-top:.7rem"></div>
       </div>
-      <div class="bento-card" id="bento-proc-Receipt"></div>
-      <div class="bento-card" id="bento-proc-Putaway"></div>
-      <div class="bento-card" id="bento-proc-Picking"></div>
-      <div class="bento-card" id="bento-proc-Packing"></div>
-      <div class="bento-card" id="bento-proc-Shipping"></div>
+      <div class="bento-card">
+        <div class="bento-label" style="margin-bottom:.5rem">สัดส่วนแต่ละ Process</div>
+        <div class="chart-box"><canvas id="chart-process-dist"></canvas></div>
+      </div>
+    </div>
+    <div class="bento-grid-procs" id="bento-grid">
+      <div class="bento-card proc-card" id="bento-proc-Receipt"></div>
+      <div class="bento-card proc-card" id="bento-proc-Putaway"></div>
+      <div class="bento-card proc-card" id="bento-proc-Picking"></div>
+      <div class="bento-card proc-card" id="bento-proc-Packing"></div>
+      <div class="bento-card proc-card" id="bento-proc-Shipping"></div>
     </div>
 
     <div class="card">
@@ -114,9 +144,10 @@
     <div class="card">
       <div class="card-title">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        Activity Heatmap ตามชั่วโมง
+        Activity ตามชั่วโมง
       </div>
-      <div id="hourly-heatmap"></div>
+      <div class="chart-box tall"><canvas id="chart-hourly"></canvas></div>
+      <div id="hourly-empty-msg" style="display:none;text-align:center;padding:1.5rem;color:var(--gray);font-size:.85rem">ไม่มีข้อมูลดิบสำหรับวันที่นี้</div>
       <div style="font-size:.72rem;color:var(--gray);margin-top:.6rem">อิงจากข้อมูลดิบที่เก็บอยู่ตอนนี้ในระบบเช่นกัน</div>
     </div>
 
@@ -223,6 +254,16 @@
 
 <div id="toast" style="position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(100px);background:#1e293b;color:white;padding:.75rem 1.5rem;border-radius:12px;font-size:.9rem;font-weight:600;z-index:9999;transition:transform .3s;box-shadow:0 8px 24px rgba(0,0,0,.2)"></div>
 
+<div class="modal-backdrop" id="user-modal-backdrop" style="display:none">
+  <div class="modal" style="max-width:820px">
+    <div class="modal-header">
+      <h3 id="user-modal-title">User</h3>
+      <button class="modal-close" id="user-modal-close"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+    <div class="modal-body" id="user-modal-body"></div>
+  </div>
+</div>
+
 <script type="module">
   import { auth, db } from "./firebase-config.js";
   import { requireAuth } from "./auth.js";
@@ -235,6 +276,19 @@
   const TYPE_ORDER = ['Receipt','Putaway','Picking','Packing','Shipping'];
   const TYPE_LABEL = { Receipt:'รับเข้า (Receipt)', Putaway:'จัดเก็บ (Putaway)', Picking:'หยิบสินค้า (Picking)', Packing:'แพ็ค (Packing)', Shipping:'จัดส่ง (Shipping)' };
   const TYPE_BADGE = { Receipt:'badge-blue', Putaway:'badge-purple', Picking:'badge-amber', Packing:'badge-teal', Shipping:'badge-green' };
+  const PROC_COLOR = { Receipt:'#2563eb', Putaway:'#7c3aed', Picking:'#d97706', Packing:'#0d9488', Shipping:'#16a34a' };
+  const PROC_COLOR_SOFT = { Receipt:'#dbeafe', Putaway:'#ede9fe', Picking:'#fef3c7', Packing:'#ccfbf1', Shipping:'#dcfce7' };
+  const PROC_ICON_PATH = {
+    Receipt: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+    Putaway: '<rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+    Picking: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+    Packing: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+    Shipping: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>'
+  };
+  function procIcon(type) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PROC_ICON_PATH[type] || ''}</svg>`;
+  }
+  let chartProcessDist = null, chartHourly = null;
   const FIELD_MAP = {
     Receipt:  { code:'Code', ref:'ASN/Pre-Advice ID', lineId:'Line ID', tagId:'Tag ID', sku:'SKU', skuDesc:'SKU Description', qty:'Qty', date:'Transaction Date', time:'Transaction Time', user:'User', pallet:'Pallet ID' },
     Putaway:  { code:'Code', ref:'Pre-Advice ID', lineId:'Line ID', tagId:'Tag ID', sku:'SKU', skuDesc:'SKU Description', qty:'Qty', date:'Date', time:'Time', user:'User', fromLoc:'From Location', toLoc:'To Location' },
@@ -507,7 +561,7 @@
     currentRows = rows;
     renderDashTable();
     renderUserPerformance();
-    renderHourlyHeatmap();
+    renderHourlyChart();
   }
 
   // ── Control Tower (bento) — sourced from the persisted daily summary,
@@ -524,7 +578,7 @@
       return `<div style="display:flex;align-items:center;gap:.5rem;margin-top:.35rem">
         <span style="width:60px;font-size:.7rem;color:var(--gray)">${t}</span>
         <div style="flex:1;height:6px;background:#e2e8f0;border-radius:4px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:var(--indigo);border-radius:4px"></div>
+          <div style="height:100%;width:${pct}%;background:${PROC_COLOR[t]};border-radius:4px"></div>
         </div>
         <span style="font-size:.72rem;font-weight:700;color:var(--blue);width:28px;text-align:right">${c}</span>
       </div>`;
@@ -532,10 +586,31 @@
     TYPE_ORDER.forEach(t => {
       const el = document.getElementById('bento-proc-' + t);
       if (!el) return;
+      el.style.setProperty('--accent', PROC_COLOR[t]);
+      el.style.setProperty('--accent-soft', PROC_COLOR_SOFT[t]);
       el.innerHTML = `
+        <div class="proc-icon">${procIcon(t)}</div>
         <div class="bento-label">${t}</div>
         <div class="bento-value" style="font-size:1.5rem">${(counts[t] || 0).toLocaleString('th-TH')}</div>
         <div class="bento-sub">Qty ${(qtyByType[t] || 0).toLocaleString('th-TH')}</div>`;
+    });
+    renderProcessDistChart(counts);
+  }
+
+  function renderProcessDistChart(counts) {
+    const canvas = document.getElementById('chart-process-dist');
+    if (!canvas || typeof Chart === 'undefined') return;
+    if (chartProcessDist) chartProcessDist.destroy();
+    chartProcessDist = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: TYPE_ORDER,
+        datasets: [{ data: TYPE_ORDER.map(t => counts[t] || 0), backgroundColor: TYPE_ORDER.map(t => PROC_COLOR[t]), borderWidth: 2, borderColor: '#fff' }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '62%',
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11, family: 'Sarabun' } } } }
+      }
     });
   }
 
@@ -545,73 +620,119 @@
     const m = String(t || '').match(/^(\d{2}):(\d{2})/);
     return m ? parseInt(m[1]) * 60 + parseInt(m[2]) : null;
   }
+  function fmtMinutes(m) { return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; }
+
+  function userStats(rows) {
+    const total = rows.length;
+    const totalQty = rows.reduce((s, r) => s + (r.qty || 0), 0);
+    const byType = {}; TYPE_ORDER.forEach(t => { byType[t] = rows.filter(r => r.type === t).length; });
+    const minutes = rows.map(r => timeToMinutes(r.time)).filter(m => m !== null).sort((a, b) => a - b);
+    let spanLabel = '-', rateLabel = '-';
+    if (minutes.length >= 2) {
+      const elapsedH = (minutes[minutes.length - 1] - minutes[0]) / 60;
+      spanLabel = `${fmtMinutes(minutes[0])}–${fmtMinutes(minutes[minutes.length - 1])}`;
+      rateLabel = elapsedH > 0 ? (total / elapsedH).toFixed(1) : `${total} (< 1 นาที)`;
+    } else if (minutes.length === 1) {
+      spanLabel = fmtMinutes(minutes[0]);
+    }
+    return { total, totalQty, byType, spanLabel, rateLabel };
+  }
 
   function renderUserPerformance() {
-    const pivot = {};
+    const byUser = {};
     currentRows.forEach(r => {
       if (!r.user) return;
-      if (!pivot[r.user]) {
-        pivot[r.user] = { total: 0, minutes: [] };
-        TYPE_ORDER.forEach(t => { pivot[r.user][t] = 0; });
-      }
-      if (pivot[r.user][r.type] !== undefined) pivot[r.user][r.type]++;
-      pivot[r.user].total++;
-      const m = timeToMinutes(r.time);
-      if (m !== null) pivot[r.user].minutes.push(m);
+      (byUser[r.user] ||= []).push(r);
     });
-    const users = Object.keys(pivot).sort((a, b) => pivot[b].total - pivot[a].total);
+    const users = Object.keys(byUser).sort((a, b) => byUser[b].length - byUser[a].length);
     const tbody = document.getElementById('user-perf-tbody');
     if (!users.length) {
       tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:1.5rem;color:var(--gray)">ไม่มีข้อมูลดิบสำหรับวันที่นี้</td></tr>`;
       return;
     }
     tbody.innerHTML = users.map(u => {
-      const p = pivot[u];
-      p.minutes.sort((a, b) => a - b);
-      let spanLabel = '-', rateLabel = '-';
-      if (p.minutes.length >= 2) {
-        const first = p.minutes[0], last = p.minutes[p.minutes.length - 1];
-        const elapsedH = (last - first) / 60;
-        const fmt = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-        spanLabel = `${fmt(first)}–${fmt(last)}`;
-        rateLabel = elapsedH > 0 ? (p.total / elapsedH).toFixed(1) : `${p.total} (< 1 นาที)`;
-      } else if (p.minutes.length === 1) {
-        const fmt = m => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
-        spanLabel = fmt(p.minutes[0]);
-      }
-      return `<tr><td style="font-weight:700">${u}</td>${TYPE_ORDER.map(t => `<td>${p[t] || 0}</td>`).join('')}<td style="font-weight:700;color:var(--blue)">${p.total}</td><td style="white-space:nowrap;font-size:.78rem;color:var(--gray)">${spanLabel}</td><td style="font-weight:700">${rateLabel}</td></tr>`;
+      const s = userStats(byUser[u]);
+      return `<tr data-user="${u.replace(/"/g, '&quot;')}"><td style="font-weight:700">${u}</td>${TYPE_ORDER.map(t => `<td>${s.byType[t] || 0}</td>`).join('')}<td style="font-weight:700;color:var(--blue)">${s.total}</td><td style="white-space:nowrap;font-size:.78rem;color:var(--gray)">${s.spanLabel}</td><td style="font-weight:700">${s.rateLabel}</td></tr>`;
     }).join('');
   }
 
-  // ── Hourly Activity Heatmap — from currently-stored raw rows ──────
-  function renderHourlyHeatmap() {
+  document.getElementById('user-perf-tbody').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-user]');
+    if (tr) openUserModal(tr.dataset.user);
+  });
+
+  function openUserModal(username) {
+    const rows = currentRows.filter(r => r.user === username).slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    const s = userStats(rows);
+    document.getElementById('user-modal-title').textContent = username;
+    document.getElementById('user-modal-body').innerHTML = `
+      <div class="stats-row" style="margin-bottom:1rem">
+        <div class="stat-card"><div class="stat-value">${s.total}</div><div class="stat-label">รวมรายการ</div></div>
+        <div class="stat-card"><div class="stat-value">${s.totalQty.toLocaleString('th-TH')}</div><div class="stat-label">Qty รวม</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.05rem">${s.spanLabel}</div><div class="stat-label">ช่วงเวลาทำงาน</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.05rem">${s.rateLabel}</div><div class="stat-label">อัตราจริง/ชม.</div></div>
+      </div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem">
+        ${TYPE_ORDER.filter(t => s.byType[t]).map(t => `<span class="badge ${TYPE_BADGE[t]}">${t} ${s.byType[t]}</span>`).join('')}
+      </div>
+      <div class="table-wrap" style="max-height:360px;overflow-y:auto">
+        <table>
+          <thead><tr><th>เวลา</th><th>ประเภท</th><th>SKU</th><th>รายละเอียด</th><th>Tag ID</th><th>Qty</th><th>เลขที่อ้างอิง</th><th>Location</th></tr></thead>
+          <tbody>${rows.map(r => `<tr>
+            <td>${r.time || '-'}</td>
+            <td><span class="badge ${TYPE_BADGE[r.type]}">${r.type}</span></td>
+            <td style="font-weight:700">${r.sku || '-'}</td>
+            <td>${r.skuDesc || '-'}</td>
+            <td>${r.tagId || '-'}</td>
+            <td>${r.qty || 0}</td>
+            <td>${r.ref || '-'}</td>
+            <td>${[r.fromLoc, r.toLoc].filter(Boolean).join(' → ') || '-'}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+    document.getElementById('user-modal-backdrop').style.display = 'flex';
+  }
+
+  function closeUserModal() { document.getElementById('user-modal-backdrop').style.display = 'none'; }
+  document.getElementById('user-modal-close').addEventListener('click', closeUserModal);
+  document.getElementById('user-modal-backdrop').addEventListener('click', e => {
+    if (e.target.id === 'user-modal-backdrop') closeUserModal();
+  });
+
+  // ── Hourly Activity chart — from currently-stored raw rows ────────
+  function renderHourlyChart() {
     const grid = {};
     TYPE_ORDER.forEach(t => { grid[t] = {}; });
-    let maxCount = 1;
     currentRows.forEach(r => {
       const h = (r.time || '').slice(0, 2);
       if (!/^\d{2}$/.test(h) || !grid[r.type]) return;
       grid[r.type][h] = (grid[r.type][h] || 0) + 1;
-      maxCount = Math.max(maxCount, grid[r.type][h]);
     });
     const allHours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
     const activeHours = allHours.filter(h => TYPE_ORDER.some(t => grid[t][h]));
-    const wrap = document.getElementById('hourly-heatmap');
+    const canvas = document.getElementById('chart-hourly');
+    const emptyMsg = document.getElementById('hourly-empty-msg');
     if (!activeHours.length) {
-      wrap.innerHTML = `<div style="text-align:center;padding:1.5rem;color:var(--gray);font-size:.85rem">ไม่มีข้อมูลดิบสำหรับวันที่นี้</div>`;
+      canvas.style.display = 'none';
+      emptyMsg.style.display = 'block';
+      if (chartHourly) { chartHourly.destroy(); chartHourly = null; }
       return;
     }
-    const cellColor = n => n ? `rgba(99,102,241,${(0.15 + 0.75 * (n / maxCount)).toFixed(2)})` : '#f1f5f9';
-    wrap.innerHTML = `<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:.72rem">
-      <thead><tr><th style="padding:.3rem .5rem;text-align:left"></th>${activeHours.map(h => `<th style="padding:.3rem .3rem;text-align:center;color:var(--gray);font-weight:600">${h}น.</th>`).join('')}</tr></thead>
-      <tbody>${TYPE_ORDER.map(t => `<tr>
-        <td style="padding:.3rem .5rem;font-weight:700;white-space:nowrap">${t}</td>
-        ${activeHours.map(h => {
-          const n = grid[t][h] || 0;
-          return `<td style="padding:2px" title="${t} ${h}:00 — ${n} รายการ"><div style="width:26px;height:26px;border-radius:5px;background:${cellColor(n)};display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:${n > maxCount * 0.5 ? '#fff' : '#475569'}">${n || ''}</div></td>`;
-        }).join('')}
-      </tr>`).join('')}</tbody>
-    </table></div>`;
+    canvas.style.display = 'block';
+    emptyMsg.style.display = 'none';
+    if (chartHourly) chartHourly.destroy();
+    chartHourly = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels: activeHours.map(h => h + 'น.'),
+        datasets: TYPE_ORDER.map(t => ({ label: t, data: activeHours.map(h => grid[t][h] || 0), backgroundColor: PROC_COLOR[t], borderRadius: 3 }))
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11, family: 'Sarabun' } } } }
+      }
+    });
   }
 
   function renderDashTable() {
