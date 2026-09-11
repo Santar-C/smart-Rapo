@@ -895,6 +895,178 @@ const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDele
   );
 };
 
+// ════════════════════════════════════════════════════════════
+// ANALYTICS — Dock performance: OTD, turnaround, vehicle mix,
+// origin→destination lanes, bay utilization, arrival-hour load,
+// vendor delay ranking. All computed client-side from `bookings`
+// (the whole RTDB array is already loaded, no extra fetch needed).
+// ════════════════════════════════════════════════════════════
+const AnalyticsView = ({bookings})=>{
+  const [range, setRange] = React.useState(30);
+  const today = TODAY();
+  const fromDate = React.useMemo(()=>{
+    const d = new Date(today+'T00:00:00'); d.setDate(d.getDate()-(range-1));
+    return d.toISOString().slice(0,10);
+  },[range, today]);
+
+  const toMin = t=>{ const p=(t||'').split(':').map(Number); return p.length===2&&!isNaN(p[0])?p[0]*60+p[1]:null; };
+  const fmtDur = m=> m<60 ? `${m} นาที` : `${Math.floor(m/60)} ชม. ${m%60} นาที`;
+  const countBy = (arr,key)=>{
+    const m={}; arr.forEach(b=>{ const v=b[key]||'-'; m[v]=(m[v]||0)+1; });
+    return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+  };
+  const maxCount = arr=>Math.max(1,...arr.map(([,c])=>c));
+
+  const rows = bookings.filter(b=>b.date>=fromDate && b.date<=today);
+  const done = rows.filter(b=>b.status==='Completed');
+
+  let onTimeCount=0, otdSample=0;
+  const turnarounds=[];
+  const vendorDelay={};
+  done.forEach(b=>{
+    const planOut=toMin(b.endTime), actualOut=toMin(b.timeCompleted), arrived=toMin(b.timeArrived);
+    if(planOut!==null && actualOut!==null){
+      otdSample++;
+      const onTime = actualOut<=planOut;
+      if(onTime) onTimeCount++;
+      const v=b.vendor||'-';
+      (vendorDelay[v] ||= {n:0,late:0});
+      vendorDelay[v].n++;
+      if(!onTime) vendorDelay[v].late++;
+    }
+    if(arrived!==null && actualOut!==null && actualOut>=arrived) turnarounds.push(actualOut-arrived);
+  });
+  const otdRate = otdSample ? Math.round(onTimeCount/otdSample*100) : null;
+  const avgTurnaround = turnarounds.length ? Math.round(turnarounds.reduce((s,x)=>s+x,0)/turnarounds.length) : null;
+  const vendorDelayRanked = Object.entries(vendorDelay).filter(([,d])=>d.n>=3)
+    .map(([vendor,d])=>({vendor,n:d.n,rate:Math.round(d.late/d.n*100)}))
+    .sort((a,b)=>b.rate-a.rate);
+
+  const inCount = rows.filter(b=>b.jobType==='IN').length;
+  const outCount = rows.filter(b=>b.jobType==='OUT').length;
+  const byVehicle = countBy(rows,'vehicle');
+  const byVendor = countBy(rows,'vendor').slice(0,8);
+  const byBay = countBy(rows.filter(b=>b.allocation && b.allocation!=='Waitlist'),'allocation');
+
+  const laneMap={};
+  rows.forEach(b=>{ const k=`${b.origin||'-'} → ${b.destination||'-'}`; laneMap[k]=(laneMap[k]||0)+1; });
+  const lanes = Object.entries(laneMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  const hourCounts={};
+  rows.forEach(b=>{ if(b.timeArrived){ const h=b.timeArrived.slice(0,2); hourCounts[h]=(hourCounts[h]||0)+1; } });
+  const hourEntries = Object.entries(hourCounts).sort((a,b)=>a[0].localeCompare(b[0]));
+  const maxHour = Math.max(1,...hourEntries.map(([,c])=>c));
+
+  const Bar = ({label,count,max,color='bg-indigo-500'})=>(
+    <div className="flex items-center gap-2 text-xs">
+      <div className="w-28 shrink-0 truncate text-slate-600" title={label}>{label}</div>
+      <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{width:`${Math.max(4,Math.round(count/max*100))}%`}}/>
+      </div>
+      <div className="w-8 text-right font-bold text-slate-700">{count}</div>
+    </div>
+  );
+
+  return (
+    <div className="flex-1 overflow-auto ds space-y-4">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-3 fi">
+        <h3 className="font-bold text-lg flex items-center gap-2"><Icon name="barChart" size={17}/> วิเคราะห์ Dock Performance</h3>
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+          ช่วงเวลา:
+          {[7,14,30,90].map(d=>(
+            <button key={d} onClick={()=>setRange(d)}
+              className={`px-3 py-1.5 rounded-full transition-colors ${range===d?'bg-indigo-600 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{d} วัน</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 fi">
+          <div className="text-[10px] font-bold text-slate-400 uppercase">จำนวนเที่ยวรถ</div>
+          <div className="text-2xl font-black text-slate-800 mt-1">{rows.length}</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">IN {inCount} · OUT {outCount}</div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 fi">
+          <div className="text-[10px] font-bold text-slate-400 uppercase">อัตราตรงเวลา (OTD)</div>
+          <div className={`text-2xl font-black mt-1 ${otdRate===null?'text-slate-300':otdRate>=80?'text-emerald-600':otdRate>=60?'text-amber-600':'text-red-600'}`}>{otdRate===null?'-':otdRate+'%'}</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">{otdSample} เที่ยวที่วัดได้</div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 fi">
+          <div className="text-[10px] font-bold text-slate-400 uppercase">เวลาเฉลี่ยที่จอด</div>
+          <div className="text-2xl font-black text-slate-800 mt-1">{avgTurnaround===null?'-':fmtDur(avgTurnaround)}</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">มาถึง → เสร็จสิ้น</div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 fi">
+          <div className="text-[10px] font-bold text-slate-400 uppercase">Completed</div>
+          <div className="text-2xl font-black text-slate-800 mt-1">{done.length}</div>
+          <div className="text-[11px] text-slate-400 mt-0.5">จาก {rows.length} เที่ยว</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 fi">
+          <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-1.5"><Icon name="parking" size={14}/> ขนาดรถ</h4>
+          <div className="space-y-2">
+            {byVehicle.length ? byVehicle.map(([v,c])=><Bar key={v} label={v} count={c} max={maxCount(byVehicle)}/>) : <div className="text-slate-400 text-xs text-center py-4">ไม่มีข้อมูล</div>}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 fi">
+          <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-1.5"><Icon name="factory" size={14}/> ช่องจอดที่ใช้บ่อยสุด</h4>
+          <div className="space-y-2">
+            {byBay.length ? byBay.map(([v,c])=><Bar key={v} label={v} count={c} max={maxCount(byBay)} color="bg-purple-500"/>) : <div className="text-slate-400 text-xs text-center py-4">ไม่มีข้อมูล</div>}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 fi">
+          <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-1.5"><Icon name="target" size={14}/> ซัพพลายเออร์ที่ใช้บริการบ่อยสุด</h4>
+          <div className="space-y-2">
+            {byVendor.length ? byVendor.map(([v,c])=><Bar key={v} label={v} count={c} max={maxCount(byVendor)} color="bg-sky-500"/>) : <div className="text-slate-400 text-xs text-center py-4">ไม่มีข้อมูล</div>}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 fi">
+          <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-1.5"><Icon name="mapPin" size={14}/> เส้นทางที่วิ่งบ่อยสุด (ต้นทาง → ปลายทาง)</h4>
+          <div className="space-y-2">
+            {lanes.length ? lanes.map(([v,c])=><Bar key={v} label={v} count={c} max={maxCount(lanes)} color="bg-teal-500"/>) : <div className="text-slate-400 text-xs text-center py-4">ไม่มีข้อมูล</div>}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 fi">
+        <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-1.5"><Icon name="clock" size={14}/> ชั่วโมงที่รถเข้ามาถึงบ่อยสุด</h4>
+        {hourEntries.length ? (
+          <div className="flex items-end gap-1 h-24">
+            {hourEntries.map(([h,c])=>(
+              <div key={h} className="flex-1 flex flex-col items-center justify-end gap-1" title={`${h}:00 น. — ${c} คัน`}>
+                <div className="w-full bg-indigo-500 rounded-t" style={{height:`${Math.max(6,Math.round(c/maxHour*100))}%`}}/>
+                <div className="text-[9px] text-slate-400">{h}</div>
+              </div>
+            ))}
+          </div>
+        ) : <div className="text-slate-400 text-xs text-center py-4">ไม่มีข้อมูล</div>}
+      </div>
+
+      {!!vendorDelayRanked.length && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 fi">
+          <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-1.5"><Icon name="alertTriangle" size={14}/> ซัพพลายเออร์ที่ออกช้ากว่าแผนบ่อยสุด (อย่างน้อย 3 เที่ยว)</h4>
+          <div className="space-y-2">
+            {vendorDelayRanked.slice(0,8).map(v=>(
+              <div key={v.vendor} className="flex items-center gap-2 text-xs">
+                <div className="w-28 shrink-0 truncate text-slate-600" title={v.vendor}>{v.vendor}</div>
+                <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${v.rate>=50?'bg-red-500':v.rate>=25?'bg-amber-500':'bg-emerald-500'}`} style={{width:`${Math.max(4,v.rate)}%`}}/>
+                </div>
+                <div className="w-24 text-right font-bold text-slate-700">{v.rate}% ({v.n})</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Scan View ──────────────────────────────────────────────
 const ScanView = ({scanOn, setScanOn, scanMsg})=>(
   <div className="flex-1 flex flex-col items-center justify-start p-6 fi">
@@ -1182,6 +1354,7 @@ function App() {
     {id:'list',icon:'clipboardList',lbl:'คิวทั้งหมด',h:!isPower},
     {id:'scan',icon:'camera',lbl:'สแกน'},
     {id:'reports',icon:'barChart',lbl:'รายงาน',h:!isPower},
+    {id:'analytics',icon:'target',lbl:'วิเคราะห์',h:!isPower},
     {id:'qr',icon:'printer',lbl:'QR',h:!isAdmin},
     {id:'settings',icon:'settings',lbl:'ตั้งค่า',h:!isAdmin},
   ];
@@ -1292,6 +1465,7 @@ function App() {
           {tab==='schedule' && <ScheduleView bays={bays} bookings={bookings} viewDate={viewDate} isPower={isPower} onEdit={handleEdit}/>}
           {tab==='list'     && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={false} isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
           {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
+          {tab==='analytics' && <AnalyticsView bookings={bookings}/>}
           {tab==='scan'     && <ScanView scanOn={scanOn} setScanOn={setScanOn} scanMsg={scanMsg}/>}
           {tab==='qr'       && <QRView bays={bays}/>}
           {tab==='settings' && <SettingsView settings={settings} bays={bays} isAdmin={isAdmin}
