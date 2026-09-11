@@ -284,7 +284,7 @@
       </div>
       <div id="pick-kpi-body"></div>
       <div style="font-size:.72rem;color:var(--gray);margin-top:.6rem">
-        เต็มพาเลท = จำนวนที่หยิบหารด้วย Full Pallet Qty (Ratio 2, EA/PL จาก Master SKU) ลงตัวพอดี — ต้อง Import Master SKU ในแท็บ "นำเข้าข้อมูล" ก่อน ไม่งั้นจะขึ้น "ไม่มีข้อมูลมาตรฐาน" ทั้งหมด
+        เต็มพาเลท = จำนวนที่หยิบหารด้วย Full Pallet Qty (คอลัมน์ "Full Tag" จาก Master SKU — จำนวน EA ต่อเต็มพาเลทของ SKU นั้น) ลงตัวพอดี — ต้อง Import Master SKU ในแท็บ "นำเข้าข้อมูล" ก่อน ไม่งั้นจะขึ้น "ไม่มีข้อมูลมาตรฐาน" ทั้งหมด
       </div>
     </div>
 
@@ -394,8 +394,8 @@
         นำเข้า Master SKU (Full Pallet Qty)
       </div>
       <div class="alert alert-info">
-        เลือกไฟล์ Master SKU (.xlsx) — ระบบจะอ่านชีต "Pack config" และใช้คอลัมน์ SKU, Ratio 1 (EA/CA), Ratio 2 (EA/PL)
-        เพื่อคำนวณ Picking KPI: หยิบเต็มพาเลท (qty ที่หยิบหารด้วย Ratio 2 ลงตัว) เทียบกับหยิบเศษ
+        เลือกไฟล์ Master SKU (.xlsx) — ระบบจะอ่านชีต "Pack config" และใช้คอลัมน์ SKU, Full Tag (จำนวน EA ต่อเต็มพาเลท), Ratio 1, Ratio 2
+        เพื่อคำนวณ Picking KPI: หยิบเต็มพาเลท (qty ที่หยิบหารด้วย Full Tag ลงตัว) เทียบกับหยิบเศษ
       </div>
       <div class="form-group">
         <label>เลือกไฟล์ Master SKU (.xlsx)</label>
@@ -871,6 +871,10 @@
       const idxSku = header.indexOf('SKU');
       const idxRatio1 = header.indexOf('Ratio 1');
       const idxRatio2 = header.indexOf('Ratio 2');
+      // "Full Tag" คือคอลัมน์ที่ไฟล์ Master SKU คำนวณมาให้แล้วว่า SKU นี้เต็มพาเลทกี่ EA —
+      // เท่ากับ Ratio 1 × Ratio 2 เป๊ะ (Ratio 2 คือ CA/PL ไม่ใช่ EA/PL ตามชื่อ) ยึด Full Tag
+      // เป็นหลักเสมอ ไม่เดาจาก Ratio 2 อย่างเดียวเหมือนก่อนหน้านี้
+      const idxFullTag = header.indexOf('Full Tag');
       if (idxSku === -1 || idxRatio2 === -1) {
         throw new Error(`ไม่พบคอลัมน์ SKU หรือ Ratio 2 ในชีต "${sheetName}" — ตรวจสอบว่าไฟล์มี header ตรงตามที่ระบบต้องการ`);
       }
@@ -882,7 +886,11 @@
         if (!sku) continue;
         const r1 = idxRatio1 !== -1 && r[idxRatio1] != null ? Number(r[idxRatio1]) : null;
         const r2 = r[idxRatio2] != null ? Number(r[idxRatio2]) : null;
-        skuRows.push({ sku, ratio1: (r1 !== null && isFinite(r1)) ? r1 : null, ratio2: (r2 !== null && isFinite(r2)) ? r2 : null });
+        const ft = idxFullTag !== -1 && r[idxFullTag] != null ? Number(r[idxFullTag]) : null;
+        const ratio1 = (r1 !== null && isFinite(r1)) ? r1 : null;
+        const ratio2 = (r2 !== null && isFinite(r2)) ? r2 : null;
+        const fullPalletQty = (ft !== null && isFinite(ft) && ft > 0) ? ft : ((ratio1 && ratio2) ? ratio1 * ratio2 : null);
+        skuRows.push({ sku, ratio1, ratio2, fullPalletQty });
       }
       if (!skuRows.length) throw new Error('ไม่พบแถวข้อมูล SKU ที่ใช้ได้ในไฟล์');
 
@@ -890,7 +898,7 @@
         const chunk = skuRows.slice(i, i + 400);
         const batch = writeBatch(db);
         chunk.forEach(s => {
-          batch.set(doc(db, 'sku_master', s.sku), { ratio1: s.ratio1, ratio2: s.ratio2, updatedAt: serverTimestamp() }, { merge: true });
+          batch.set(doc(db, 'sku_master', s.sku), { ratio1: s.ratio1, ratio2: s.ratio2, fullPalletQty: s.fullPalletQty, updatedAt: serverTimestamp() }, { merge: true });
         });
         await batch.commit();
       }
@@ -1383,16 +1391,21 @@
     return masterMap;
   }
   function classifyPickLine(row, masterMap) {
-    const ratio2 = masterMap[row.sku]?.ratio2;
-    if (!ratio2 || ratio2 <= 0) return 'unknown';
-    return (row.qty > 0 && row.qty % ratio2 === 0) ? 'full' : 'partial';
+    const m = masterMap[row.sku];
+    // fullPalletQty มาจากคอลัมน์ "Full Tag" ของ Master SKU โดยตรง (SKU นี้เต็มพาเลทกี่ EA) —
+    // ratio1 × ratio2 เป็น fallback สำหรับ sku_master ที่ import ไว้ก่อนแก้บั๊กนี้ (ยังไม่มี
+    // fullPalletQty เก็บไว้) ค่าจะตรงกัน เพราะ Full Tag = Ratio 1 × Ratio 2 เป๊ะในไฟล์ต้นทาง
+    const fullQty = m?.fullPalletQty || ((m?.ratio1 && m?.ratio2) ? m.ratio1 * m.ratio2 : null);
+    if (!fullQty || fullQty <= 0) return 'unknown';
+    return (row.qty > 0 && row.qty % fullQty === 0) ? 'full' : 'partial';
   }
 
   // ── Picking KPI: Full Pallet vs Partial — needs Master SKU imported
-  //    first (sku_master/{sku} = {ratio1, ratio2}); a Picking line counts
-  //    as Full when its qty divides evenly by the SKU's Ratio 2 (EA/PL),
-  //    otherwise Partial. SKUs with no Master SKU entry go to "unknown"
-  //    rather than being guessed into either bucket. ───────────────────
+  //    first (sku_master/{sku} = {ratio1, ratio2, fullPalletQty}); a
+  //    Picking line counts as Full when its qty divides evenly by the
+  //    SKU's fullPalletQty (from the "Full Tag" column — EA per full
+  //    pallet), otherwise Partial. SKUs with no Master SKU entry go to
+  //    "unknown" rather than being guessed into either bucket. ────────
   async function renderPickKpi() {
     const el = document.getElementById('pick-kpi-body');
     const pickingRows = currentRows.filter(r => r.type === 'Picking' && r.sku);
