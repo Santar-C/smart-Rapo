@@ -143,5 +143,17 @@ service cloud.firestore {
       allow read:   if isLoggedIn();
       allow write:  if isAdmin();
     }
+    // sku_master: SKU → Ratio 1/2 (EA per case/pallet) นำเข้าจาก Master SKU.xlsx
+    // ใช้คำนวณ Picking KPI (เต็มพาเลท/หยิบเศษ) ในแดชบอร์ด
+    match /sku_master/{sku} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
+    // warehouse_locations: LocationID master นำเข้าจาก Power BI export
+    // ใช้สร้างผังคลัง 3D (warehouse-3d.html)
+    match /warehouse_locations/{locationId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
   }
 }
