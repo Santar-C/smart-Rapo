@@ -346,6 +346,30 @@
       </button>
       <div id="sku-master-result" style="margin-top:1rem"></div>
     </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+        นำเข้า Location Master (สำหรับผัง 3D)
+      </div>
+      <div class="alert alert-info">
+        เลือกไฟล์ CSV คอลัมน์ LocationID, Status ที่ export จาก Power BI (visual "LocationID and Status" → Export data → Underlying data)
+        ระบบจะแยก Aisle/Bay/Position จากรหัสให้อัตโนมัติ เพื่อสร้างผังคลัง 3D และเชื่อมกับกิจกรรม WMS จริง
+      </div>
+      <div class="form-group">
+        <label>เลือกไฟล์ LocationID (.csv)</label>
+        <input type="file" id="location-master-file" accept=".csv">
+      </div>
+      <button class="btn btn-indigo btn-full" id="btn-import-location-master" disabled>
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        นำเข้า Location Master
+      </button>
+      <div id="location-master-result" style="margin-top:1rem"></div>
+      <a href="warehouse-3d.html" class="btn btn-outline btn-full" style="margin-top:.75rem">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.89 1.45l8 4A2 2 0 0 1 22 7.24v9.53a2 2 0 0 1-1.11 1.79l-8 4a2 2 0 0 1-1.79 0l-8-4a2 2 0 0 1-1.1-1.8V7.24a2 2 0 0 1 1.11-1.79l8-4a2 2 0 0 1 1.79 0z"/><polyline points="2.32 6.16 12 11 21.68 6.16"/><line x1="12" x2="12" y1="22.76" y2="11"/></svg>
+        เปิดผังคลัง 3D
+      </a>
+    </div>
   </div>
 
   <!-- TAB: คลังข้อมูล (Admin) -->
@@ -726,6 +750,70 @@
       resultEl.innerHTML = `<div class="alert alert-error">เกิดข้อผิดพลาด: ${e.message}</div>`;
     } finally {
       btnImportSkuMaster.disabled = false;
+    }
+  });
+
+  // ── Location Master import (สำหรับผัง 3D Warehouse) ────────────
+  // LocationID format seen in the 3D model export:
+  //   Zone A: "A02--16--210"  (Aisle--Bay--LevelPosition, double-dash)
+  //   Zone B: "B01-011"       (Bay-Position, single-dash, smaller area)
+  // Anything else is kept as zone "other" rather than guessed at.
+  function parseLocationId(id) {
+    let m = id.match(/^(A\d+)--(\d+)--(\d+)$/);
+    if (m) return { zone: 'A', aisle: m[1], bay: m[2], position: m[3] };
+    m = id.match(/^(B\d+)-(\d+)$/);
+    if (m) return { zone: 'B', aisle: m[1], bay: null, position: m[2] };
+    return { zone: 'other', aisle: null, bay: null, position: null };
+  }
+
+  const locationMasterFileInput = document.getElementById('location-master-file');
+  const btnImportLocationMaster = document.getElementById('btn-import-location-master');
+  locationMasterFileInput.addEventListener('change', () => {
+    btnImportLocationMaster.disabled = !locationMasterFileInput.files.length;
+  });
+
+  btnImportLocationMaster.addEventListener('click', async () => {
+    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    const file = locationMasterFileInput.files[0];
+    if (!file) { toast('กรุณาเลือกไฟล์ก่อน'); return; }
+    const resultEl = document.getElementById('location-master-result');
+    btnImportLocationMaster.disabled = true;
+    resultEl.innerHTML = `<div class="spinner-wrap"><div class="spinner"></div>กำลังนำเข้า...</div>`;
+    try {
+      const text = await file.text();
+      const rows = parseCSV(text);
+      if (!rows.length) throw new Error('ไฟล์ไม่มีข้อมูล');
+      const header = Object.keys(rows[0]);
+      const idKey = header.find(h => h.trim().toLowerCase() === 'locationid') || header[0];
+      const statusKey = header.find(h => h.trim().toLowerCase() === 'status');
+
+      const locs = [];
+      rows.forEach(r => {
+        const id = (r[idKey] || '').trim();
+        if (!id) return;
+        locs.push({ id, status: statusKey ? (r[statusKey] || '').trim() : '', ...parseLocationId(id) });
+      });
+      if (!locs.length) throw new Error('ไม่พบแถวข้อมูล Location ที่ใช้ได้');
+
+      for (let i = 0; i < locs.length; i += 400) {
+        const chunk = locs.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(l => {
+          batch.set(doc(db, 'warehouse_locations', l.id), {
+            zone: l.zone, aisle: l.aisle, bay: l.bay, position: l.position, status: l.status, updatedAt: serverTimestamp()
+          }, { merge: true });
+        });
+        await batch.commit();
+      }
+
+      const unparsed = locs.filter(l => l.zone === 'other').length;
+      resultEl.innerHTML = `<div class="alert alert-success">${icon('check_circle', { size: 16 })} นำเข้า Location Master เรียบร้อย: ${locs.length} location${unparsed ? ` (แยกโครงสร้างไม่ได้ ${unparsed} รายการ — เก็บไว้แต่ไม่ระบุ aisle/bay)` : ''}</div>`;
+      locationMasterFileInput.value = '';
+    } catch (e) {
+      console.error(e);
+      resultEl.innerHTML = `<div class="alert alert-error">เกิดข้อผิดพลาด: ${e.message}</div>`;
+    } finally {
+      btnImportLocationMaster.disabled = false;
     }
   });
 

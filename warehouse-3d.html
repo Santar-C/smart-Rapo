@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ผังคลัง 3D — RAPO</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#021D49">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="shared.css">
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <style>
+    .page-body { max-width: 1600px; }
+    .wh3d-layout { display:grid; grid-template-columns: 1fr 320px; gap:1rem; height: calc(100dvh - 140px); min-height: 480px; }
+    @media (max-width: 900px) { .wh3d-layout { grid-template-columns: 1fr; height: auto; } #wh3d-canvas-wrap { height: 60dvh; } }
+    #wh3d-canvas-wrap {
+      position: relative; border-radius: var(--radius); overflow: hidden;
+      border: 1.5px solid var(--border); box-shadow: var(--shadow); background: #0f172a;
+    }
+    #wh3d-canvas-wrap canvas { display:block; width:100%; height:100%; }
+    #wh3d-loading {
+      position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+      gap:.75rem; color:#cbd5e1; background:#0f172a; font-size:.85rem;
+    }
+    #wh3d-empty {
+      position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+      gap:.5rem; color:#cbd5e1; background:#0f172a; font-size:.85rem; text-align:center; padding:2rem;
+    }
+    .wh3d-side { display:flex; flex-direction:column; gap:.85rem; overflow-y:auto; }
+    .wh3d-legend { display:flex; align-items:center; gap:.5rem; font-size:.78rem; color:var(--gray); }
+    .wh3d-legend-bar { flex:1; height:10px; border-radius:5px; background:linear-gradient(90deg,#334155,#0ea5e9,#f59e0b,#dc2626); }
+    .wh3d-stat { display:flex; justify-content:space-between; font-size:.82rem; padding:.3rem 0; border-bottom:1px solid var(--border); }
+    .wh3d-stat:last-child { border-bottom:none; }
+    #wh3d-detail { font-size:.85rem; }
+    #wh3d-detail .empty { color:var(--gray); text-align:center; padding:1.5rem 0; }
+    .wh3d-detail-row { display:flex; justify-content:space-between; padding:.3rem 0; border-bottom:1px solid var(--border); }
+    .wh3d-badge { display:inline-block; padding:.15rem .5rem; border-radius:20px; font-size:.7rem; font-weight:700; }
+  </style>
+</head>
+<body>
+
+<div id="topbar-placeholder"></div>
+<div class="page-body">
+
+  <div class="date-row" style="display:flex;gap:.75rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem">
+    <div class="form-group" style="flex:1;min-width:170px;margin-bottom:0">
+      <label>วันที่ดูกิจกรรม</label>
+      <input type="date" id="wh3d-date">
+    </div>
+    <div class="form-group" style="margin-bottom:0">
+      <label>โซน</label>
+      <select id="wh3d-zone-filter">
+        <option value="all">ทั้งหมด</option>
+        <option value="A">โซน A</option>
+        <option value="B">โซน B</option>
+      </select>
+    </div>
+    <button class="btn btn-outline btn-sm" id="wh3d-refresh">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+      รีเฟรช
+    </button>
+  </div>
+
+  <div class="wh3d-layout">
+    <div id="wh3d-canvas-wrap">
+      <div id="wh3d-loading"><div class="spinner"></div>กำลังโหลดผังคลัง...</div>
+      <div id="wh3d-empty">
+        ยังไม่มี Location Master ในระบบ<br>
+        <span style="font-size:.75rem">ไปที่แท็บ "นำเข้าข้อมูล" ในหน้า WMS Activity Log แล้วนำเข้าไฟล์ LocationID CSV ก่อน</span>
+      </div>
+    </div>
+
+    <div class="wh3d-side">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-title" style="font-size:.95rem">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+          ภาพรวม
+        </div>
+        <div class="wh3d-legend" style="margin-bottom:.75rem">
+          <span>ว่าง</span><div class="wh3d-legend-bar"></div><span>ยุ่งที่สุด</span>
+        </div>
+        <div id="wh3d-overview">
+          <div class="wh3d-stat"><span>Location ทั้งหมด</span><b id="wh3d-total-locs">–</b></div>
+          <div class="wh3d-stat"><span>มีกิจกรรมวันนี้</span><b id="wh3d-active-locs">–</b></div>
+          <div class="wh3d-stat"><span>Picking รายการ (จับคู่ location ได้)</span><b id="wh3d-picking-count">–</b></div>
+          <div class="wh3d-stat"><span>Putaway รายการ (จับคู่ location ได้)</span><b id="wh3d-putaway-count">–</b></div>
+          <div class="wh3d-stat"><span>จับคู่ location ไม่ได้ (รูปแบบไม่ตรง)</span><b id="wh3d-unmatched-count">–</b></div>
+        </div>
+        <div style="font-size:.7rem;color:var(--gray);margin-top:.6rem">
+          หมุน/ซูมด้วยเมาส์ในผัง 3D ทางซ้าย — คลิกที่กล่อง location เพื่อดูรายละเอียด
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:0;flex:1">
+        <div class="card-title" style="font-size:.95rem">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          รายละเอียด Location
+        </div>
+        <div id="wh3d-detail"><div class="empty">คลิกที่กล่องใน 3D เพื่อดูรายละเอียด</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { auth, db } from "./firebase-config.js";
+  import { requireAuth } from "./auth.js";
+  import { icon } from "./icons.js";
+  import {
+    collection, getDocs, query, where
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const TYPE_LABEL = { Receipt:'รับเข้า (Receipt)', Putaway:'จัดเก็บ (Putaway)', Picking:'หยิบสินค้า (Picking)', Packing:'แพ็ค (Packing)', Shipping:'จัดส่ง (Shipping)' };
+  const TYPE_BADGE = { Receipt:'badge-blue', Putaway:'badge-purple', Picking:'badge-amber', Packing:'badge-teal', Shipping:'badge-green' };
+
+  const { user, profile } = await requireAuth();
+
+  document.getElementById("topbar-placeholder").innerHTML = `
+    <nav class="topbar">
+      <div class="topbar-logo"><img src="assets/ceva-logo-clean.png" alt="CEVA" onerror="this.style.display='none'"></div>
+      <a class="topbar-back" href="wms.html" aria-label="กลับ"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></a>
+      <div style="flex:1">
+        <div class="topbar-title">${icon('map_pin', { size: 16 })} ผังคลัง 3D</div>
+        <div class="topbar-sub">Location Heatmap — เชื่อมกับกิจกรรม WMS จริง</div>
+      </div>
+      <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
+    </nav>`;
+
+  function todayISO() { return new Date().toISOString().slice(0, 10); }
+  document.getElementById('wh3d-date').value = todayISO();
+
+  // ── Normalize a WMS location string ("A02-16-2-10") into the
+  //    Location Master's id format ("A02--16--210": aisle--bay--levelpos,
+  //    level is 1 digit, position zero-padded to 2 digits) ─────────────
+  function normalizeWmsLocation(loc) {
+    const m = String(loc || '').match(/^([A-Za-z]\d+)-(\d+)-(\d+)-(\d+)$/);
+    if (!m) return null;
+    const [, aisle, bay, level, pos] = m;
+    return `${aisle.toUpperCase()}--${bay}--${level}${pos.padStart(2, '0')}`;
+  }
+
+  // ── three.js scene setup ─────────────────────────────────────────
+  const canvasWrap = document.getElementById('wh3d-canvas-wrap');
+  const loadingEl = document.getElementById('wh3d-loading');
+  const emptyEl = document.getElementById('wh3d-empty');
+
+  let renderer, scene, camera, controls, raycaster, mouse;
+  let boxMeshes = []; // { mesh, id, data }
+  let selectedMesh = null;
+
+  function initThree() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0f172a);
+
+    camera = new THREE.PerspectiveCamera(50, canvasWrap.clientWidth / canvasWrap.clientHeight, 0.1, 5000);
+    camera.position.set(60, 60, 90);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(canvasWrap.clientWidth, canvasWrap.clientHeight);
+    canvasWrap.appendChild(renderer.domElement);
+
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.maxPolarAngle = Math.PI * 0.49;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+    dir.position.set(80, 120, 60);
+    scene.add(dir);
+
+    const grid = new THREE.GridHelper(400, 40, 0x334155, 0x1e293b);
+    scene.add(grid);
+
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
+
+    renderer.domElement.addEventListener('click', onCanvasClick);
+    window.addEventListener('resize', onResize);
+
+    animate();
+  }
+
+  function onResize() {
+    if (!renderer) return;
+    camera.aspect = canvasWrap.clientWidth / canvasWrap.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(canvasWrap.clientWidth, canvasWrap.clientHeight);
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  function onCanvasClick(e) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(boxMeshes.map(b => b.mesh));
+    if (!hits.length) return;
+    const hit = boxMeshes.find(b => b.mesh === hits[0].object);
+    if (hit) selectLocation(hit);
+  }
+
+  function clearScene() {
+    boxMeshes.forEach(b => scene.remove(b.mesh));
+    boxMeshes = [];
+  }
+
+  // ── Color scale: gray (no activity) → blue → amber → red (busiest) ──
+  function heatColor(t) {
+    const stops = [
+      { t: 0,    c: [51, 65, 85] },
+      { t: 0.35, c: [14, 165, 233] },
+      { t: 0.7,  c: [245, 158, 11] },
+      { t: 1,    c: [220, 38, 38] }
+    ];
+    let a = stops[0], b = stops[stops.length - 1];
+    for (let i = 0; i < stops.length - 1; i++) {
+      if (t >= stops[i].t && t <= stops[i + 1].t) { a = stops[i]; b = stops[i + 1]; break; }
+    }
+    const span = (b.t - a.t) || 1;
+    const f = (t - a.t) / span;
+    const r = Math.round(a.c[0] + (b.c[0] - a.c[0]) * f);
+    const g = Math.round(a.c[1] + (b.c[1] - a.c[1]) * f);
+    const bl = Math.round(a.c[2] + (b.c[2] - a.c[2]) * f);
+    return (r << 16) | (g << 8) | bl;
+  }
+
+  const SUBPOS_X = { '01': 0, '02': 1, '03': 2, '51': 0, '52': 1, '53': 2 };
+  const SUBPOS_Z = { '01': 0, '02': 0, '03': 0, '51': 1, '52': 1, '53': 1 };
+
+  function buildScene(locations, activityByLoc, zoneFilter) {
+    clearScene();
+    const CELL = 1.6, GAP = 0.35, LEVEL_H = 1.4, AISLE_SPACING = 6, BAY_SPACING = 3;
+
+    const zoneA = locations.filter(l => l.zone === 'A' && (zoneFilter === 'all' || zoneFilter === 'A'));
+    const zoneB = locations.filter(l => l.zone === 'B' && (zoneFilter === 'all' || zoneFilter === 'B'));
+
+    const maxActivity = Math.max(1, ...locations.map(l => (activityByLoc[l.id]?.total) || 0));
+
+    // ── Zone A: real aisle/bay grid ──────────────────────────────────
+    const aisles = [...new Set(zoneA.map(l => l.aisle))].sort();
+    const bays = [...new Set(zoneA.map(l => l.bay))].sort();
+    const aisleIndex = Object.fromEntries(aisles.map((a, i) => [a, i]));
+    const bayIndex = Object.fromEntries(bays.map((b, i) => [b, i]));
+
+    zoneA.forEach(loc => {
+      const ax = aisleIndex[loc.aisle] ?? 0;
+      const bz = bayIndex[loc.bay] ?? 0;
+      const posStr = String(loc.position || '000').padStart(3, '0');
+      const level = parseInt(posStr[0], 10) || 1;
+      const sub = posStr.slice(1);
+      const sx = SUBPOS_X[sub] ?? 0;
+      const sz = SUBPOS_Z[sub] ?? 0;
+
+      const x = ax * AISLE_SPACING + sx * (CELL + GAP);
+      const y = level * LEVEL_H;
+      const z = bz * BAY_SPACING + sz * (CELL + GAP) * 1.5;
+
+      addBox(loc, x, y, z, CELL, activityByLoc, maxActivity);
+    });
+
+    // ── Zone B: simpler flat cluster, offset to one side ─────────────
+    const bBays = [...new Set(zoneB.map(l => l.aisle))].sort(); // "aisle" holds e.g. "B01" here
+    const bBayIndex = Object.fromEntries(bBays.map((b, i) => [b, i]));
+    const zoneAWidth = aisles.length * AISLE_SPACING;
+
+    zoneB.forEach(loc => {
+      const bi = bBayIndex[loc.aisle] ?? 0;
+      const posNum = parseInt(loc.position, 10) || 0;
+      const col = Math.floor(posNum / 10);
+      const row = posNum % 10;
+      const x = -20 - bi * AISLE_SPACING;
+      const y = (row + 1) * LEVEL_H;
+      const z = col * BAY_SPACING;
+      addBox(loc, x, y, z, CELL, activityByLoc, maxActivity);
+    });
+
+    if (!zoneA.length && !zoneB.length) return;
+
+    // frame the built scene
+    const box = new THREE.Box3();
+    boxMeshes.forEach(b => box.expandByObject(b.mesh));
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const dist = Math.max(size.x, size.z, 20) * 1.4;
+    camera.position.set(center.x + dist * 0.6, dist * 0.8, center.z + dist * 0.6);
+    controls.target.copy(center);
+    controls.update();
+  }
+
+  function addBox(loc, x, y, z, size, activityByLoc, maxActivity) {
+    const activity = activityByLoc[loc.id];
+    const total = activity ? activity.total : 0;
+    const color = total > 0 ? heatColor(Math.min(1, total / maxActivity)) : 0x475569;
+
+    const geo = new THREE.BoxGeometry(size, size, size);
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.1 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y, z);
+    scene.add(mesh);
+    boxMeshes.push({ mesh, id: loc.id, data: { ...loc, activity } });
+  }
+
+  function selectLocation(hit) {
+    if (selectedMesh) selectedMesh.mesh.material.emissive?.setHex(0x000000);
+    selectedMesh = hit;
+    hit.mesh.material.emissive = new THREE.Color(0x6366f1);
+    hit.mesh.material.emissiveIntensity = 0.6;
+
+    const { id, zone, aisle, bay, activity } = hit.data;
+    const detailEl = document.getElementById('wh3d-detail');
+    const rows = activity?.rows || [];
+    detailEl.innerHTML = `
+      <div class="wh3d-detail-row"><span>Location ID</span><b>${id}</b></div>
+      <div class="wh3d-detail-row"><span>โซน</span><b>${zone}</b></div>
+      ${aisle ? `<div class="wh3d-detail-row"><span>Aisle</span><b>${aisle}</b></div>` : ''}
+      ${bay ? `<div class="wh3d-detail-row"><span>Bay</span><b>${bay}</b></div>` : ''}
+      <div class="wh3d-detail-row"><span>กิจกรรมวันนี้</span><b>${activity ? activity.total : 0} รายการ</b></div>
+      ${rows.length ? `
+        <div style="margin-top:.6rem;max-height:220px;overflow-y:auto">
+          ${rows.slice(0, 30).map(r => `<div style="display:flex;justify-content:space-between;gap:.5rem;padding:.25rem 0;border-bottom:1px solid var(--border);font-size:.78rem">
+            <span class="wh3d-badge ${TYPE_BADGE[r.type] || 'badge-gray'}">${r.type}</span>
+            <span style="flex:1;text-align:left;padding-left:.4rem">${r.sku || '-'}</span>
+            <span style="color:var(--gray)">${r.time || '-'}</span>
+          </div>`).join('')}
+          ${rows.length > 30 ? `<div style="text-align:center;color:var(--gray);font-size:.72rem;padding-top:.4rem">...และอีก ${rows.length - 30} รายการ</div>` : ''}
+        </div>` : `<div style="color:var(--gray);font-size:.78rem;margin-top:.5rem">ไม่มีกิจกรรม WMS ที่จับคู่กับ location นี้ในวันที่เลือก</div>`}
+    `;
+  }
+
+  // ── Load location master + today's WMS activity, then render ───────
+  async function loadAndRender() {
+    loadingEl.style.display = 'flex';
+    emptyEl.style.display = 'none';
+
+    const locSnap = await getDocs(collection(db, 'warehouse_locations'));
+    const locations = locSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    if (!locations.length) {
+      loadingEl.style.display = 'none';
+      emptyEl.style.display = 'flex';
+      return;
+    }
+
+    const date = document.getElementById('wh3d-date').value || todayISO();
+    let wmsRows = [];
+    try {
+      const snap = await getDocs(query(collection(db, 'wms_activity'), where('date', '==', date)));
+      wmsRows = snap.docs.map(d => d.data()).filter(r => r.type === 'Putaway' || r.type === 'Picking');
+    } catch (e) { console.error(e); }
+
+    const locationIdSet = new Set(locations.map(l => l.id));
+    const activityByLoc = {};
+    let matchedPicking = 0, matchedPutaway = 0, unmatched = 0;
+    wmsRows.forEach(r => {
+      const rawLoc = r.type === 'Picking' ? r.fromLoc : r.toLoc;
+      const normId = normalizeWmsLocation(rawLoc);
+      if (!normId || !locationIdSet.has(normId)) { unmatched++; return; }
+      activityByLoc[normId] = activityByLoc[normId] || { total: 0, rows: [] };
+      activityByLoc[normId].total++;
+      activityByLoc[normId].rows.push(r);
+      if (r.type === 'Picking') matchedPicking++; else matchedPutaway++;
+    });
+
+    document.getElementById('wh3d-total-locs').textContent = locations.length.toLocaleString('th-TH');
+    document.getElementById('wh3d-active-locs').textContent = Object.keys(activityByLoc).length.toLocaleString('th-TH');
+    document.getElementById('wh3d-picking-count').textContent = matchedPicking.toLocaleString('th-TH');
+    document.getElementById('wh3d-putaway-count').textContent = matchedPutaway.toLocaleString('th-TH');
+    document.getElementById('wh3d-unmatched-count').textContent = unmatched.toLocaleString('th-TH');
+
+    if (!renderer) initThree();
+    const zoneFilter = document.getElementById('wh3d-zone-filter').value;
+    buildScene(locations, activityByLoc, zoneFilter);
+
+    loadingEl.style.display = 'none';
+  }
+
+  document.getElementById('wh3d-date').addEventListener('change', loadAndRender);
+  document.getElementById('wh3d-zone-filter').addEventListener('change', loadAndRender);
+  document.getElementById('wh3d-refresh').addEventListener('click', loadAndRender);
+
+  await loadAndRender();
+</script>
+</body>
+</html>
