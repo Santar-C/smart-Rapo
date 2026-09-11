@@ -169,6 +169,10 @@
       font-size:.85rem; font-weight:700; color:var(--tp2); text-transform:uppercase; letter-spacing:.05em;
       margin-bottom:.85rem; border-bottom:1px solid var(--bd2); padding-bottom:.6rem;
     }
+    #tab-kpi .kpi-2col { display:grid; grid-template-columns:1fr 1fr; gap:1rem; align-items:start; }
+    @media (max-width:980px) { #tab-kpi .kpi-2col { grid-template-columns:1fr; } }
+    #tab-kpi .kpi-2col .kpi-panel { margin-bottom:0; }
+    #tab-kpi tr[data-clickable] { cursor:pointer; }
     #tab-kpi table { width:100%; border-collapse:collapse; }
     #tab-kpi th {
       background:var(--bgc3); color:var(--ts2); font-size:10px; font-weight:700; text-transform:uppercase;
@@ -468,17 +472,32 @@
   <!-- TAB: KPI -->
   <div id="tab-kpi" style="display:none">
     <div class="kpi-grid" id="kpi-stat-cards"></div>
-    <div class="kpi-panel" style="margin-bottom:1rem">
-      <div class="kpi-panel-title">🏆 % Achievement เทียบมาตรฐาน (Standard Productivity)</div>
-      <div style="overflow-x:auto">
-        <table>
-          <thead><tr><th>User</th><th>Process</th><th>ช่วงเวลาทำงาน</th><th>มาตรฐาน</th><th>อัตราจริง</th><th>% Achievement</th><th>สถานะ</th></tr></thead>
-          <tbody id="kpi-tbody"></tbody>
-        </table>
+
+    <div class="kpi-2col" style="margin-bottom:1rem">
+      <div class="kpi-panel">
+        <div class="kpi-panel-title">📦 สรุปตาม Process (กดแถวเพื่อดูรายคน)</div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>Process</th><th>จำนวนคน</th><th>มาตรฐาน</th><th>อัตราเฉลี่ยทีม</th><th>% Achievement</th><th>สถานะ</th></tr></thead>
+            <tbody id="kpi-proc-tbody"></tbody>
+          </table>
+        </div>
       </div>
-      <div style="font-size:.72rem;color:var(--tm2);margin-top:.75rem">
+      <div class="kpi-panel">
+        <div class="kpi-panel-title">👤 สรุปตาม User (กดแถวเพื่อดูราย Process)</div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead><tr><th>User</th><th>จำนวน Process</th><th>รวมรายการ</th><th>% Achievement</th><th>สถานะ</th></tr></thead>
+            <tbody id="kpi-user-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="kpi-panel" style="margin-bottom:1rem">
+      <div style="font-size:.72rem;color:var(--tm2)">
         มาตรฐานยืนยันจาก WMS log อัตโนมัติ 4 อย่าง: <b>Receipt</b> (120.0 Pallet/คน/ชม.), <b>Putaway</b> (60.0), <b>Picking เต็มพาเลท</b> (17.1 — qty ที่หยิบหารด้วย Full Pallet Qty ของ SKU ลงตัว), <b>Picking หยิบเศษ</b> (15.0 Line/คน/ชม. — ที่เหลือ)
-        ส่วน Process อื่นที่เหลือในตาราง (Sorting, Check Accuracy, Weighing, Consolidation, Loading, VAS, Admin, Relocation, Replenishment) ยังไม่มีที่มาข้อมูล Actual อัตโนมัติ — กรอกเองได้ที่ช่องด้านล่าง<br>
+        ส่วน Process อื่นที่เหลือ (Sorting, Check Accuracy, Weighing, Consolidation, Loading, VAS, Admin, Relocation, Replenishment) ยังไม่มีที่มาข้อมูล Actual อัตโนมัติ — กรอกเองได้ที่ช่องด้านล่าง<br>
         ชี้ที่ตัวเลขมีเส้นประ (·····) เพื่อดูสูตรคำนวณ
       </div>
     </div>
@@ -1505,7 +1524,7 @@
       const hasActual = numericRate.test(s.rateLabel);
       const pct = (std && hasActual) ? Math.round((parseFloat(s.rateLabel) / std) * 100) : null;
       const label = KPI_TYPE_LABEL[e.type] || TYPE_LABEL[e.type] || e.type;
-      return { user: e.user, label, spanLabel: s.spanLabel, rateLabel: s.rateLabel, std, cycleSec: KPI_CYCLE_SEC[e.type] || null, pct, hasActual, hasStd: !!std };
+      return { user: e.user, label, spanLabel: s.spanLabel, rateLabel: s.rateLabel, std, cycleSec: KPI_CYCLE_SEC[e.type] || null, pct, hasActual, hasStd: !!std, count: s.total, rows: e.rows };
     });
 
     const manualEntries = kpiManualCache.map(m => {
@@ -1516,7 +1535,8 @@
       const pct = (std && hasActual) ? Math.round((parseFloat(rateLabel) / std) * 100) : null;
       return {
         user: m.user || 'ทั้ง Process', label: (p ? p.name : m.procId) + ' (กรอกเอง)',
-        spanLabel: hasActual ? m.hours.toFixed(1) + ' ชม.' : '-', rateLabel, std, cycleSec: p ? p.ct : null, pct, hasActual, hasStd: !!std
+        spanLabel: hasActual ? m.hours.toFixed(1) + ' ชม.' : '-', rateLabel, std, cycleSec: p ? p.ct : null, pct, hasActual, hasStd: !!std,
+        count: m.qty || 0, manual: m
       };
     });
 
@@ -1548,39 +1568,145 @@
         <div class="kpi-ks">รวมทุก process วันนี้</div>
       </div>`;
 
-    document.getElementById('kpi-tbody').innerHTML = entries.length ? entries.map(e => {
-      let statusBadge, pctCell;
-      if (!e.hasStd) {
-        statusBadge = `<span class="kbadge kbadge-b">ไม่มีมาตรฐาน</span>`;
-        pctCell = `<span style="color:var(--tm2);font-size:11px">—</span>`;
-      } else if (!e.hasActual) {
-        statusBadge = `<span class="kbadge kbadge-b">ยังไม่มี Actual</span>`;
-        pctCell = `<span style="color:var(--tm2);font-size:11px">—</span>`;
-      } else {
-        statusBadge = e.pct >= 100 ? `<span class="kbadge kbadge-g">🌟 เกิน Standard</span>` : e.pct >= 80 ? `<span class="kbadge kbadge-a">✅ ปกติ</span>` : `<span class="kbadge kbadge-r">⚠️ ต่ำกว่า Standard</span>`;
-        const barColor = e.pct >= 100 ? 'var(--ag2)' : e.pct >= 80 ? 'var(--aa2)' : 'var(--ar2)';
-        pctCell = calcTip(
-          `<span style="display:inline-flex;align-items:center;gap:8px"><span class="kpbar"><span class="kpfill" style="display:block;width:${Math.min(e.pct, 100)}%;background:${barColor}"></span></span><span class="mono" style="font-size:11px;font-weight:700">${e.pct}%</span></span>`,
-          '% Achievement', 'Actual ÷ Standard × 100',
-          [['Actual', e.rateLabel + '/ชม.'], ['Standard', e.std.toFixed(1) + '/ชม.'], ['= ผลลัพธ์', e.pct + '%']]
-        );
-      }
-      const stdCell = e.hasStd
-        ? calcTip(`<span class="mono" style="color:var(--ts2)">${e.std.toFixed(1)}/ชม.</span>`, 'Standard Productivity', `3600 ÷ Cycle Time (${e.cycleSec}s)`,
-            [['Cycle Time', e.cycleSec + ' วินาที'], ['= Standard', e.std.toFixed(1) + '/ชม.']])
-        : `<span class="mono" style="color:var(--tm2)">—</span>`;
+    // ── Group the same entries into a Process summary and a User
+    //    summary — the flat table was too hard to scan, so each summary
+    //    row aggregates its entries and drills into the raw entries via
+    //    the shared modal ─────────────────────────────────────────────
+    const procGroups = {};
+    entries.forEach(e => {
+      const g = (procGroups[e.label] ||= { label: e.label, entries: [], std: e.std, cycleSec: e.cycleSec, hasStd: e.hasStd, users: new Set() });
+      g.entries.push(e);
+      if (e.user !== 'ทั้ง Process') g.users.add(e.user);
+    });
+    const procRows = Object.values(procGroups).map(g => {
+      const scored = g.entries.filter(e => e.hasStd && e.hasActual);
+      const avgRate = scored.length ? scored.reduce((s, e) => s + parseFloat(e.rateLabel), 0) / scored.length : null;
+      const avgPct = scored.length ? Math.round(scored.reduce((s, e) => s + e.pct, 0) / scored.length) : null;
+      return { label: g.label, userCount: g.users.size, std: g.std, hasStd: g.hasStd, avgRate, avgPct, entries: g.entries };
+    }).sort((a, b) => (b.avgPct ?? -1) - (a.avgPct ?? -1));
+    kpiProcGroupsCache = procRows;
 
-      return `<tr>
-        <td style="font-weight:600">${e.user}</td>
-        <td style="color:var(--ts2)">${e.label}</td>
-        <td class="mono" style="white-space:nowrap">${e.spanLabel}</td>
+    const userGroups = {};
+    entries.forEach(e => {
+      if (e.user === 'ทั้ง Process') return; // manual entries with no specific user aren't a "person"
+      (userGroups[e.user] ||= { user: e.user, entries: [] }).entries.push(e);
+    });
+    const userRows = Object.values(userGroups).map(g => {
+      const scored = g.entries.filter(e => e.hasStd && e.hasActual);
+      const avgPct = scored.length ? Math.round(scored.reduce((s, e) => s + e.pct, 0) / scored.length) : null;
+      const procCount = new Set(g.entries.map(e => e.label)).size;
+      const totalCount = g.entries.reduce((s, e) => s + (e.count || 0), 0);
+      return { user: g.user, procCount, totalCount, avgPct, entries: g.entries };
+    }).sort((a, b) => (b.avgPct ?? -1) - (a.avgPct ?? -1));
+    kpiUserGroupsCache = userRows;
+
+    function pctBadgeHTML(pct) {
+      if (pct === null) return `<span class="kbadge kbadge-b">—</span>`;
+      return pct >= 100 ? `<span class="kbadge kbadge-g">🌟 ${pct}%</span>` : pct >= 80 ? `<span class="kbadge kbadge-a">✅ ${pct}%</span>` : `<span class="kbadge kbadge-r">⚠️ ${pct}%</span>`;
+    }
+
+    document.getElementById('kpi-proc-tbody').innerHTML = procRows.length ? procRows.map(g => {
+      const stdCell = g.hasStd
+        ? calcTip(`<span class="mono" style="color:var(--ts2)">${g.std.toFixed(1)}/ชม.</span>`, 'Standard Productivity', `3600 ÷ Cycle Time (${g.cycleSec}s)`,
+            [['Cycle Time', g.cycleSec + ' วินาที'], ['= Standard', g.std.toFixed(1) + '/ชม.']])
+        : `<span class="mono" style="color:var(--tm2)">—</span>`;
+      const pctCell = g.avgPct !== null
+        ? calcTip(`<span class="mono" style="font-weight:700">${g.avgPct}%</span>`, '% Achievement เฉลี่ยทีม', 'ค่าเฉลี่ยของ Actual ÷ Standard × 100 ของแต่ละคนในกลุ่ม',
+            [['อัตราเฉลี่ยทีม', g.avgRate.toFixed(1) + '/ชม.'], ['Standard', g.std.toFixed(1) + '/ชม.'], ['= ผลลัพธ์', g.avgPct + '%']])
+        : `<span style="color:var(--tm2)">—</span>`;
+      return `<tr data-clickable data-proc-label="${g.label.replace(/"/g, '&quot;')}">
+        <td style="font-weight:600">${g.label}</td>
+        <td class="mono">${g.userCount || '—'}</td>
         <td>${stdCell}</td>
-        <td class="mono" style="color:var(--ag2);font-weight:700">${e.hasActual ? e.rateLabel + '/ชม.' : '—'}</td>
+        <td class="mono" style="color:var(--ag2);font-weight:700">${g.avgRate !== null ? g.avgRate.toFixed(1) + '/ชม.' : '—'}</td>
         <td>${pctCell}</td>
-        <td>${statusBadge}</td>
+        <td>${pctBadgeHTML(g.avgPct)}</td>
       </tr>`;
-    }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--tm2);padding:24px">ไม่มีข้อมูลสำหรับวันที่นี้</td></tr>`;
+    }).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--tm2);padding:24px">ไม่มีข้อมูลสำหรับวันที่นี้</td></tr>`;
+
+    document.getElementById('kpi-user-tbody').innerHTML = userRows.length ? userRows.map(g => {
+      const pctCell = g.avgPct !== null
+        ? calcTip(`<span class="mono" style="font-weight:700">${g.avgPct}%</span>`, '% Achievement เฉลี่ย', 'ค่าเฉลี่ยของ % Achievement ในทุก process ที่คนนี้ทำวันนี้',
+            [['จำนวน process ที่มีมาตรฐานเทียบได้', String(g.entries.filter(e => e.hasStd && e.hasActual).length)], ['= ผลลัพธ์', g.avgPct + '%']])
+        : `<span style="color:var(--tm2)">—</span>`;
+      return `<tr data-clickable data-kpi-user="${g.user.replace(/"/g, '&quot;')}">
+        <td style="font-weight:600">${g.user}</td>
+        <td class="mono">${g.procCount}</td>
+        <td class="mono">${g.totalCount.toLocaleString('th-TH')}</td>
+        <td>${pctCell}</td>
+        <td>${pctBadgeHTML(g.avgPct)}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="5" style="text-align:center;color:var(--tm2);padding:24px">ไม่มีข้อมูลสำหรับวันที่นี้</td></tr>`;
   }
+
+  // ── Drill-down: process-summary and user-summary rows both open the
+  //    shared (light-themed) modal with the raw entries behind them ───
+  let kpiProcGroupsCache = [];
+  let kpiUserGroupsCache = [];
+
+  function kpiEntryRowHTML(e) {
+    const hasBoth = e.hasStd && e.hasActual;
+    const statusText = !e.hasStd ? 'ไม่มีมาตรฐาน' : !e.hasActual ? 'ยังไม่มี Actual' : (e.pct >= 100 ? '🌟 เกิน Standard' : e.pct >= 80 ? '✅ ปกติ' : '⚠️ ต่ำกว่า Standard');
+    const statusColor = !hasBoth ? 'var(--gray)' : (e.pct >= 100 ? 'var(--green)' : e.pct >= 80 ? 'var(--amber)' : 'var(--red)');
+    return `<tr>
+      <td style="font-weight:600">${e.user}</td>
+      <td>${e.label}</td>
+      <td>${e.spanLabel}</td>
+      <td>${e.hasStd ? e.std.toFixed(1) + '/ชม.' : '—'}</td>
+      <td style="font-weight:700">${e.hasActual ? e.rateLabel + '/ชม.' : '—'}</td>
+      <td style="font-weight:700">${hasBoth ? e.pct + '%' : '—'}</td>
+      <td style="color:${statusColor};font-weight:600">${statusText}</td>
+    </tr>`;
+  }
+  function kpiEntryTableHTML(list) {
+    return `<div class="table-wrap" style="max-height:360px;overflow-y:auto">
+      <table>
+        <thead><tr><th>User</th><th>Process</th><th>ช่วงเวลา/ชม.</th><th>มาตรฐาน</th><th>อัตราจริง</th><th>%</th><th>สถานะ</th></tr></thead>
+        <tbody>${list.map(kpiEntryRowHTML).join('')}</tbody>
+      </table>
+    </div>`;
+  }
+  function kpiStatColor(pct) { return pct === null ? 'var(--gray)' : pct >= 90 ? 'var(--green)' : pct >= 70 ? 'var(--amber)' : 'var(--red)'; }
+
+  function openKpiProcessModal(label) {
+    const g = kpiProcGroupsCache.find(x => x.label === label);
+    if (!g) return;
+    const rows = g.entries.slice().sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+    document.getElementById('user-modal-title').textContent = `Process: ${label}`;
+    document.getElementById('user-modal-body').innerHTML = `
+      <div class="stats-row" style="margin-bottom:1rem">
+        <div class="stat-card"><div class="stat-value">${g.userCount || '—'}</div><div class="stat-label">จำนวนคน</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.05rem">${g.hasStd ? g.std.toFixed(1) + '/ชม.' : '—'}</div><div class="stat-label">มาตรฐาน</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.05rem">${g.avgRate !== null ? g.avgRate.toFixed(1) + '/ชม.' : '—'}</div><div class="stat-label">อัตราเฉลี่ยทีม</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:${kpiStatColor(g.avgPct)}">${g.avgPct === null ? '—' : g.avgPct + '%'}</div><div class="stat-label">% Achievement เฉลี่ย</div></div>
+      </div>
+      ${kpiEntryTableHTML(rows)}`;
+    document.getElementById('user-modal-backdrop').style.display = 'flex';
+  }
+
+  function openKpiUserModal(user) {
+    const g = kpiUserGroupsCache.find(x => x.user === user);
+    if (!g) return;
+    const rows = g.entries.slice().sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+    document.getElementById('user-modal-title').textContent = `User: ${user}`;
+    document.getElementById('user-modal-body').innerHTML = `
+      <div class="stats-row" style="margin-bottom:1rem">
+        <div class="stat-card"><div class="stat-value">${g.procCount}</div><div class="stat-label">จำนวน Process</div></div>
+        <div class="stat-card"><div class="stat-value">${g.totalCount.toLocaleString('th-TH')}</div><div class="stat-label">รวมรายการ</div></div>
+        <div class="stat-card"><div class="stat-value" style="font-size:1.2rem;color:${kpiStatColor(g.avgPct)}">${g.avgPct === null ? '—' : g.avgPct + '%'}</div><div class="stat-label">% Achievement เฉลี่ย</div></div>
+      </div>
+      ${kpiEntryTableHTML(rows)}`;
+    document.getElementById('user-modal-backdrop').style.display = 'flex';
+  }
+
+  document.getElementById('kpi-proc-tbody').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-proc-label]');
+    if (tr) openKpiProcessModal(tr.dataset.procLabel);
+  });
+  document.getElementById('kpi-user-tbody').addEventListener('click', e => {
+    const tr = e.target.closest('tr[data-kpi-user]');
+    if (tr) openKpiUserModal(tr.dataset.kpiUser);
+  });
 
   // ── KPI manual entry — for the Process Database rows with no
   //    confirmed automatic data source yet (Sorting, Check Accuracy,
