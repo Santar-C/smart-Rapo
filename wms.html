@@ -6,7 +6,7 @@
   <title>WMS Activity Log — RAPO</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#021D49">
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="shared.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -146,6 +146,61 @@
       .bottleneck-row { grid-template-columns:1fr; row-gap:.35rem; }
       .bottleneck-value { text-align:left; }
     }
+
+    /* ── KPI tab: dark "command center" styling, scoped to this tab
+       only — the rest of the dashboard stays the light theme ────── */
+    #tab-kpi {
+      --cr:#E6100D; --cb2:#002048; --bg2:#0A1322; --bgc2:#10192B; --bgc3:#162338;
+      --bd2:#26344C; --tp2:#E9EEF5; --ts2:#8C9BB5; --tm2:#4C5A73;
+      --ab2:#1E7FD4; --ag2:#3FB950; --aa2:#D29922; --ar2:#F85149; --ap2:#BC8CFF;
+      background:var(--bg2); border-radius:var(--radius); padding:1.25rem;
+    }
+    #tab-kpi .mono { font-family:'JetBrains Mono',monospace; }
+    #tab-kpi .kpi-grid {
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+      gap:.85rem; margin-bottom:1.25rem;
+    }
+    #tab-kpi .kpi-card { padding:14px 18px; border-radius:8px; background:var(--bgc3); border:1px solid var(--bd2); }
+    #tab-kpi .kpi-kv { font-size:26px; font-weight:900; font-family:'JetBrains Mono',monospace; margin:3px 0; line-height:1; }
+    #tab-kpi .kpi-kl { font-size:10px; font-weight:700; color:var(--ts2); text-transform:uppercase; letter-spacing:.7px; }
+    #tab-kpi .kpi-ks { font-size:11px; color:var(--tm2); margin-top:3px; }
+    #tab-kpi .kpi-panel { background:var(--bgc2); border:1px solid var(--bd2); border-radius:var(--radius); padding:1.1rem 1.25rem; }
+    #tab-kpi .kpi-panel-title {
+      font-size:.85rem; font-weight:700; color:var(--tp2); text-transform:uppercase; letter-spacing:.05em;
+      margin-bottom:.85rem; border-bottom:1px solid var(--bd2); padding-bottom:.6rem;
+    }
+    #tab-kpi table { width:100%; border-collapse:collapse; }
+    #tab-kpi th {
+      background:var(--bgc3); color:var(--ts2); font-size:10px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.5px; padding:9px 11px; border-bottom:1px solid var(--bd2); text-align:left; white-space:nowrap;
+    }
+    #tab-kpi td { padding:9px 11px; border-bottom:1px solid rgba(148,163,184,.12); font-size:12px; vertical-align:middle; color:var(--tp2); }
+    #tab-kpi tr:hover td { background:rgba(255,255,255,.02); }
+    #tab-kpi .kbadge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; text-transform:uppercase; }
+    #tab-kpi .kbadge-r { background:rgba(248,81,73,.15); color:var(--ar2); }
+    #tab-kpi .kbadge-g { background:rgba(63,185,80,.15); color:var(--ag2); }
+    #tab-kpi .kbadge-a { background:rgba(210,153,34,.15); color:var(--aa2); }
+    #tab-kpi .kbadge-b { background:rgba(14,118,189,.15); color:var(--ab2); }
+    #tab-kpi .kpbar { height:5px; width:80px; background:var(--bd2); border-radius:3px; overflow:hidden; display:inline-block; vertical-align:middle; }
+    #tab-kpi .kpfill { height:100%; border-radius:3px; }
+    #tab-kpi .calc { position:relative; cursor:help; border-bottom:1px dotted var(--ts2); }
+
+    /* Audit tooltip — hover any calculated number to see its formula.
+       Element itself lives at document.body level (added via JS) so it
+       always escapes this card's own overflow, hence the unscoped class. */
+    .kpi-calc-tip {
+      visibility:hidden; opacity:0; position:fixed;
+      background:#04101F; border:1px solid #BC8CFF; border-radius:8px; padding:10px 13px;
+      width:max-content; max-width:380px; font-size:11px; font-weight:400; line-height:1.5;
+      color:#E9EEF5; text-align:left; z-index:9999; box-shadow:0 8px 24px rgba(0,0,0,.5);
+      transition:opacity .12s; pointer-events:none;
+    }
+    .kpi-calc-tip.show { visibility:visible; opacity:1; }
+    .kpi-calc-tip .ct-title { color:#BC8CFF; font-weight:800; font-size:10px; text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; display:block; }
+    .kpi-calc-tip .ct-formula { font-family:'JetBrains Mono',monospace; color:#FFD580; font-size:10.5px; display:block; margin-bottom:6px; word-break:break-word; }
+    .kpi-calc-tip .ct-row { display:flex; justify-content:space-between; gap:10px; padding:2px 0; border-top:1px solid rgba(255,255,255,.06); }
+    .kpi-calc-tip .ct-row span:first-child { color:#8C9BB5; }
+    .kpi-calc-tip .ct-row span:last-child { color:#E9EEF5; font-weight:700; font-family:'JetBrains Mono',monospace; }
   </style>
 </head>
 <body>
@@ -157,6 +212,7 @@
     <button class="tab-btn active" data-tab="dashboard"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> แดชบอร์ด</button>
     <button class="tab-btn" data-tab="import" id="tab-import-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> นำเข้าข้อมูล</button>
     <button class="tab-btn" data-tab="archive" id="tab-archive-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg> คลังข้อมูล</button>
+    <button class="tab-btn" data-tab="kpi">🏆 KPI</button>
   </div>
 
   <!-- TAB: แดชบอร์ด -->
@@ -409,6 +465,25 @@
     </div>
   </div>
 
+  <!-- TAB: KPI -->
+  <div id="tab-kpi" style="display:none">
+    <div class="kpi-grid" id="kpi-stat-cards"></div>
+    <div class="kpi-panel">
+      <div class="kpi-panel-title">🏆 % Achievement เทียบมาตรฐาน (Standard Productivity)</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>User</th><th>Process</th><th>ช่วงเวลาทำงาน</th><th>มาตรฐาน</th><th>อัตราจริง</th><th>% Achievement</th><th>สถานะ</th></tr></thead>
+          <tbody id="kpi-tbody"></tbody>
+        </table>
+      </div>
+      <div style="font-size:.72rem;color:var(--tm2);margin-top:.75rem">
+        มาตรฐาน (Standard Productivity) ยืนยันแล้วเฉพาะ <b>Receipt</b> (120.0 Pallet/คน/ชม., Cycle Time 30s) และ <b>Putaway</b> (60.0 Pallet/คน/ชม., Cycle Time 60s) จาก Process Database —
+        Picking/Packing/Shipping ยังไม่แสดง % Achievement เพราะ WMS log ปัจจุบันไม่แยกกลุ่ม process ย่อยที่มาตรฐานต่างกัน (เช่น Picking Full Pallet vs Partial Pallet มีมาตรฐานคนละค่า)
+        ชี้ที่ตัวเลขมีเส้นประ (·····) เพื่อดูสูตรคำนวณ
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div id="toast" style="position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%) translateY(100px);background:#1e293b;color:white;padding:.75rem 1.5rem;border-radius:12px;font-size:.9rem;font-weight:600;z-index:9999;transition:transform .3s;box-shadow:0 8px 24px rgba(0,0,0,.2)"></div>
@@ -503,10 +578,11 @@
       document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       const tab = btn.dataset.tab;
-      ["dashboard","import","archive"].forEach(t =>
+      ["dashboard","import","archive","kpi"].forEach(t =>
         document.getElementById(`tab-${t}`).style.display = t === tab ? "block" : "none"
       );
       if (tab === "archive") refreshArchiveStats();
+      if (tab === "kpi") renderKpiTab();
     });
   });
 
@@ -865,6 +941,7 @@
     renderTopSku();
     renderPickKpi();
     renderBottleneck();
+    renderKpiTab();
 
     let dockBookingsToday = [];
     try {
@@ -1278,6 +1355,132 @@
       const entry = bySku[tr.dataset.sku];
       tr.addEventListener('click', () => openDetailModal(`${tr.dataset.sku} — Picking`, entry.rows));
     });
+  }
+
+  // ── KPI tab: % Achievement vs. confirmed Standard Productivity ─────
+  // Standards below are the only two verified against the Process
+  // Database so far (P003 Receiving, P004 Put-Away — both map 1:1 onto
+  // this system's Receipt/Putaway types). Picking/Packing/Shipping are
+  // deliberately left without a standard: the Process Database splits
+  // Picking alone into 3 sub-processes with different standards
+  // (Full Pallet / Check Accuracy / Partial Pallet) and this system's
+  // raw log doesn't say which one a given row is — showing a % against
+  // the wrong standard would be worse than showing none.
+  const KPI_STANDARD = { Receipt: 120.0, Putaway: 60.0 };
+  const KPI_CYCLE_SEC = { Receipt: 30, Putaway: 60 };
+
+  function calcTip(displayHTML, title, formula, rows) {
+    const rowsHTML = (rows || []).map(([label, val]) => `<div class="ct-row"><span>${label}</span><span>${val}</span></div>`).join('');
+    const tipHTML = `<span class="ct-title">🔍 ${title}</span><span class="ct-formula">${formula}</span>${rowsHTML}`;
+    return `<span class="calc" data-tip="${tipHTML.replace(/"/g, '&quot;')}">${displayHTML}</span>`;
+  }
+  let kpiTipEl = null;
+  function ensureKpiTipEl() {
+    if (kpiTipEl) return kpiTipEl;
+    kpiTipEl = document.createElement('div');
+    kpiTipEl.className = 'kpi-calc-tip';
+    document.body.appendChild(kpiTipEl);
+    return kpiTipEl;
+  }
+  document.addEventListener('mouseover', e => {
+    const target = e.target.closest('#tab-kpi .calc');
+    if (!target) return;
+    const tip = ensureKpiTipEl();
+    tip.innerHTML = target.getAttribute('data-tip');
+    tip.classList.add('show');
+    const tr = target.getBoundingClientRect();
+    const tipR = tip.getBoundingClientRect();
+    let left = tr.left + tr.width / 2 - tipR.width / 2;
+    let top = tr.top - tipR.height - 8;
+    if (top < 4) top = tr.bottom + 8;
+    if (left < 4) left = 4;
+    if (left + tipR.width > window.innerWidth - 4) left = window.innerWidth - tipR.width - 4;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  });
+  document.addEventListener('mouseout', e => {
+    const target = e.target.closest('#tab-kpi .calc');
+    if (!target) return;
+    if (e.relatedTarget && target.contains(e.relatedTarget)) return;
+    if (kpiTipEl) kpiTipEl.classList.remove('show');
+  });
+
+  function renderKpiTab() {
+    const byUserProc = {};
+    currentRows.forEach(r => {
+      if (!r.user) return;
+      const key = r.user + '__' + r.type;
+      (byUserProc[key] ||= { user: r.user, type: r.type, rows: [] }).rows.push(r);
+    });
+
+    const numericRate = /^\d+(\.\d+)?$/;
+    const entries = Object.values(byUserProc).map(e => {
+      const s = userStats(e.rows);
+      const std = KPI_STANDARD[e.type] || null;
+      const hasActual = numericRate.test(s.rateLabel);
+      const pct = (std && hasActual) ? Math.round((parseFloat(s.rateLabel) / std) * 100) : null;
+      return { user: e.user, type: e.type, spanLabel: s.spanLabel, rateLabel: s.rateLabel, std, pct, hasActual, hasStd: !!std };
+    }).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+
+    const scored = entries.filter(e => e.hasStd && e.hasActual);
+    const avgPct = scored.length ? Math.round(scored.reduce((s, e) => s + e.pct, 0) / scored.length) : null;
+    const topPerf = scored[0] || null;
+    const belowTarget = scored.filter(e => e.pct < 80).length;
+
+    document.getElementById('kpi-stat-cards').innerHTML = `
+      <div class="kpi-card">
+        <div class="kpi-kl">ค่าเฉลี่ย % Achievement</div>
+        <div class="kpi-kv" style="color:${avgPct === null ? 'var(--tm2)' : avgPct >= 90 ? 'var(--ag2)' : avgPct >= 70 ? 'var(--aa2)' : 'var(--ar2)'}">${avgPct === null ? '—' : avgPct + '%'}</div>
+        <div class="kpi-ks">เฉพาะ Receipt/Putaway ที่มีมาตรฐานยืนยันแล้ว</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-kl">Top Performer วันนี้</div>
+        <div class="kpi-kv" style="font-size:16px;color:var(--ag2)">${topPerf ? topPerf.user : '—'}</div>
+        <div class="kpi-ks">${topPerf ? (TYPE_LABEL[topPerf.type] || topPerf.type) + ' · ' + topPerf.pct + '%' : 'ยังไม่มีข้อมูล'}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-kl">ต่ำกว่า 80%</div>
+        <div class="kpi-kv" style="color:var(--ar2)">${belowTarget}</div>
+        <div class="kpi-ks">รายการ (คน × process)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-kl">รายการที่มีมาตรฐานเทียบได้</div>
+        <div class="kpi-kv" style="color:var(--ab2)">${scored.length} / ${entries.length}</div>
+        <div class="kpi-ks">รวมทุก process วันนี้</div>
+      </div>`;
+
+    document.getElementById('kpi-tbody').innerHTML = entries.length ? entries.map(e => {
+      let statusBadge, pctCell;
+      if (!e.hasStd) {
+        statusBadge = `<span class="kbadge kbadge-b">ไม่มีมาตรฐาน</span>`;
+        pctCell = `<span style="color:var(--tm2);font-size:11px">—</span>`;
+      } else if (!e.hasActual) {
+        statusBadge = `<span class="kbadge kbadge-b">ยังไม่มี Actual</span>`;
+        pctCell = `<span style="color:var(--tm2);font-size:11px">—</span>`;
+      } else {
+        statusBadge = e.pct >= 100 ? `<span class="kbadge kbadge-g">🌟 เกิน Standard</span>` : e.pct >= 80 ? `<span class="kbadge kbadge-a">✅ ปกติ</span>` : `<span class="kbadge kbadge-r">⚠️ ต่ำกว่า Standard</span>`;
+        const barColor = e.pct >= 100 ? 'var(--ag2)' : e.pct >= 80 ? 'var(--aa2)' : 'var(--ar2)';
+        pctCell = calcTip(
+          `<span style="display:inline-flex;align-items:center;gap:8px"><span class="kpbar"><span class="kpfill" style="display:block;width:${Math.min(e.pct, 100)}%;background:${barColor}"></span></span><span class="mono" style="font-size:11px;font-weight:700">${e.pct}%</span></span>`,
+          '% Achievement', 'Actual ÷ Standard × 100',
+          [['Actual', e.rateLabel + '/ชม.'], ['Standard', e.std.toFixed(1) + '/ชม.'], ['= ผลลัพธ์', e.pct + '%']]
+        );
+      }
+      const stdCell = e.hasStd
+        ? calcTip(`<span class="mono" style="color:var(--ts2)">${e.std.toFixed(1)}/ชม.</span>`, 'Standard Productivity', `3600 ÷ Cycle Time (${KPI_CYCLE_SEC[e.type]}s)`,
+            [['Cycle Time', KPI_CYCLE_SEC[e.type] + ' วินาที'], ['= Standard', e.std.toFixed(1) + '/ชม.']])
+        : `<span class="mono" style="color:var(--tm2)">—</span>`;
+
+      return `<tr>
+        <td style="font-weight:600">${e.user}</td>
+        <td style="color:var(--ts2)">${TYPE_LABEL[e.type] || e.type}</td>
+        <td class="mono" style="white-space:nowrap">${e.spanLabel}</td>
+        <td>${stdCell}</td>
+        <td class="mono" style="color:var(--ag2);font-weight:700">${e.hasActual ? e.rateLabel + '/ชม.' : '—'}</td>
+        <td>${pctCell}</td>
+        <td>${statusBadge}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--tm2);padding:24px">ไม่มีข้อมูลสำหรับวันที่นี้</td></tr>`;
   }
 
   // ── Bottleneck analysis ─────────────────────────────────────────
