@@ -468,7 +468,7 @@
   <!-- TAB: KPI -->
   <div id="tab-kpi" style="display:none">
     <div class="kpi-grid" id="kpi-stat-cards"></div>
-    <div class="kpi-panel">
+    <div class="kpi-panel" style="margin-bottom:1rem">
       <div class="kpi-panel-title">🏆 % Achievement เทียบมาตรฐาน (Standard Productivity)</div>
       <div style="overflow-x:auto">
         <table>
@@ -477,9 +477,39 @@
         </table>
       </div>
       <div style="font-size:.72rem;color:var(--tm2);margin-top:.75rem">
-        มาตรฐาน (Standard Productivity) ยืนยันแล้วเฉพาะ <b>Receipt</b> (120.0 Pallet/คน/ชม., Cycle Time 30s) และ <b>Putaway</b> (60.0 Pallet/คน/ชม., Cycle Time 60s) จาก Process Database —
-        Picking/Packing/Shipping ยังไม่แสดง % Achievement เพราะ WMS log ปัจจุบันไม่แยกกลุ่ม process ย่อยที่มาตรฐานต่างกัน (เช่น Picking Full Pallet vs Partial Pallet มีมาตรฐานคนละค่า)
+        มาตรฐานยืนยันจาก WMS log อัตโนมัติ 4 อย่าง: <b>Receipt</b> (120.0 Pallet/คน/ชม.), <b>Putaway</b> (60.0), <b>Picking เต็มพาเลท</b> (17.1 — qty ที่หยิบหารด้วย Full Pallet Qty ของ SKU ลงตัว), <b>Picking หยิบเศษ</b> (15.0 Line/คน/ชม. — ที่เหลือ)
+        ส่วน Process อื่นที่เหลือในตาราง (Sorting, Check Accuracy, Weighing, Consolidation, Loading, VAS, Admin, Relocation, Replenishment) ยังไม่มีที่มาข้อมูล Actual อัตโนมัติ — กรอกเองได้ที่ช่องด้านล่าง<br>
         ชี้ที่ตัวเลขมีเส้นประ (·····) เพื่อดูสูตรคำนวณ
+      </div>
+    </div>
+
+    <div class="kpi-panel">
+      <div class="kpi-panel-title">✍️ บันทึกข้อมูลเอง (Manual Entry) — สำหรับ Process ที่ยังไม่มี Actual อัตโนมัติ</div>
+      <div style="display:grid;grid-template-columns:1.4fr 1fr .8fr .8fr auto;gap:.6rem;align-items:end;margin-bottom:1rem" id="kpi-manual-form">
+        <div>
+          <label style="display:block;font-size:10px;font-weight:700;color:var(--ts2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem">Process</label>
+          <select id="kpi-manual-proc" style="width:100%;padding:.5rem .6rem;border-radius:8px;border:1px solid var(--bd2);background:var(--bgc3);color:var(--tp2);font-size:.8rem"></select>
+        </div>
+        <div>
+          <label style="display:block;font-size:10px;font-weight:700;color:var(--ts2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem">User (เว้นว่าง = รวมทั้ง Process)</label>
+          <input type="text" id="kpi-manual-user" list="kpi-manual-user-list" placeholder="ชื่อพนักงาน (ไม่บังคับ)" style="width:100%;padding:.5rem .6rem;border-radius:8px;border:1px solid var(--bd2);background:var(--bgc3);color:var(--tp2);font-size:.8rem">
+          <datalist id="kpi-manual-user-list"></datalist>
+        </div>
+        <div>
+          <label style="display:block;font-size:10px;font-weight:700;color:var(--ts2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem">จำนวนที่ทำได้ (Actual)</label>
+          <input type="number" id="kpi-manual-qty" min="0" step="1" style="width:100%;padding:.5rem .6rem;border-radius:8px;border:1px solid var(--bd2);background:var(--bgc3);color:var(--tp2);font-size:.8rem">
+        </div>
+        <div>
+          <label style="display:block;font-size:10px;font-weight:700;color:var(--ts2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem">ชั่วโมงที่ใช้</label>
+          <input type="number" id="kpi-manual-hours" min="0" step="0.1" style="width:100%;padding:.5rem .6rem;border-radius:8px;border:1px solid var(--bd2);background:var(--bgc3);color:var(--tp2);font-size:.8rem">
+        </div>
+        <button class="btn btn-indigo" id="btn-kpi-manual-add" style="white-space:nowrap">+ บันทึก</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>Process</th><th>User</th><th>Actual</th><th>ชั่วโมง</th><th>อัตรา/ชม.</th><th>บันทึกโดย</th><th></th></tr></thead>
+          <tbody id="kpi-manual-tbody"></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -503,7 +533,7 @@
   import { requireAuth } from "./auth.js";
   import { icon } from "./icons.js";
   import {
-    collection, doc, getDoc, getDocs, setDoc, writeBatch,
+    collection, doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch,
     query, where, orderBy, limit, increment, serverTimestamp, documentId
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import { ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -523,6 +553,33 @@
   function procIcon(type) {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PROC_ICON_PATH[type] || ''}</svg>`;
   }
+
+  // ── Process Database — standard times per the reference table.
+  //    Productivity = 3600 ÷ Cycle Time (s). Only P003/P004/P005/P007
+  //    are wired to automatic WMS data (see AUTO_PROCESS_MAP below);
+  //    the rest have no confirmed data source yet and are manual-entry
+  //    only in the KPI tab. ──────────────────────────────────────────
+  const PROCESS_DB = [
+    { id: 'P001', name: 'Pallet Unloading', flow: 'inbound', uom: 'Pallet', ct: 60 },
+    { id: 'P002', name: 'Pallet Sorting', flow: 'inbound', uom: 'Pallet', ct: 300 },
+    { id: 'P003', name: 'Receiving', flow: 'inbound', uom: 'Pallet', ct: 30 },
+    { id: 'P004', name: 'Put-Away', flow: 'inbound', uom: 'Pallet', ct: 60 },
+    { id: 'P005', name: 'Picking Full Pallet', flow: 'outbound', uom: 'Pallet', ct: 210 },
+    { id: 'P006', name: 'Picking Check Accuracy', flow: 'outbound', uom: 'Pallet', ct: 30 },
+    { id: 'P007', name: 'Picking Partial Pallet', flow: 'outbound', uom: 'Line', ct: 240 },
+    { id: 'P008', name: 'Weighing', flow: 'outbound', uom: 'Pallet', ct: 480 },
+    { id: 'P009', name: 'Pallet Consolidation', flow: 'conso', uom: 'Pallet', ct: 1200 },
+    { id: 'P010', name: 'Pallet Loading', flow: 'outbound', uom: 'Pallet', ct: 90 },
+    { id: 'P011', name: 'Modification (VAS)', flow: 'outbound', uom: 'Pallet', ct: 300 },
+    { id: 'P012', name: 'Admin Inbound', flow: 'admin', uom: 'Document', ct: 300 },
+    { id: 'P013', name: 'Admin Outbound', flow: 'admin', uom: 'Document', ct: 300 },
+    { id: 'P014', name: 'Relocation', flow: 'admin', uom: 'Pallet', ct: 120 },
+    { id: 'P015', name: 'Replenishment', flow: 'admin', uom: 'Pallet', ct: 180 }
+  ];
+  function procStd(ct) { return 3600 / ct; }
+  function procById(id) { return PROCESS_DB.find(p => p.id === id); }
+  const AUTO_PROCESS_MAP = { Receipt: 'P003', Putaway: 'P004', PickingFull: 'P005', PickingPartial: 'P007' };
+  const MANUAL_PROCESS_IDS = PROCESS_DB.map(p => p.id).filter(id => !Object.values(AUTO_PROCESS_MAP).includes(id));
   let chartProcessDist = null, chartHourly = null, chartTrend = null, chartDockCorrelation = null;
   const FIELD_MAP = {
     Receipt:  { code:'Code', ref:'ASN/Pre-Advice ID', lineId:'Line ID', tagId:'Tag ID', sku:'SKU', skuDesc:'SKU Description', qty:'Qty', date:'Transaction Date', time:'Transaction Time', user:'User', pallet:'Pallet ID' },
@@ -1291,6 +1348,26 @@
     document.querySelector('.control-tower').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
+  // ── Shared SKU-master lookup + Full/Partial classification — used by
+  //    both the Picking KPI card and the KPI tab's Picking Full/Partial
+  //    split, so the two never disagree on which bucket a line falls in.
+  async function fetchSkuMaster(skus) {
+    const masterMap = {};
+    try {
+      for (let i = 0; i < skus.length; i += 30) {
+        const chunk = skus.slice(i, i + 30);
+        const snap = await getDocs(query(collection(db, 'sku_master'), where(documentId(), 'in', chunk)));
+        snap.docs.forEach(d => { masterMap[d.id] = d.data(); });
+      }
+    } catch (e) { console.error(e); }
+    return masterMap;
+  }
+  function classifyPickLine(row, masterMap) {
+    const ratio2 = masterMap[row.sku]?.ratio2;
+    if (!ratio2 || ratio2 <= 0) return 'unknown';
+    return (row.qty > 0 && row.qty % ratio2 === 0) ? 'full' : 'partial';
+  }
+
   // ── Picking KPI: Full Pallet vs Partial — needs Master SKU imported
   //    first (sku_master/{sku} = {ratio1, ratio2}); a Picking line counts
   //    as Full when its qty divides evenly by the SKU's Ratio 2 (EA/PL),
@@ -1304,29 +1381,17 @@
       return;
     }
     const skus = [...new Set(pickingRows.map(r => r.sku))];
-    const masterMap = {};
-    try {
-      for (let i = 0; i < skus.length; i += 30) {
-        const chunk = skus.slice(i, i + 30);
-        const snap = await getDocs(query(collection(db, 'sku_master'), where(documentId(), 'in', chunk)));
-        snap.docs.forEach(d => { masterMap[d.id] = d.data(); });
-      }
-    } catch (e) { console.error(e); }
+    const masterMap = await fetchSkuMaster(skus);
 
     const bySku = {};
     let fullLines = 0, partialLines = 0, unknownLines = 0;
     pickingRows.forEach(r => {
-      const master = masterMap[r.sku];
-      const ratio2 = master && master.ratio2;
+      const cls = classifyPickLine(r, masterMap);
       const entry = (bySku[r.sku] ||= { sku: r.sku, desc: r.skuDesc || '', full: 0, partial: 0, unknown: 0, rows: [] });
       entry.rows.push(r);
-      if (!ratio2 || ratio2 <= 0) {
-        entry.unknown++; unknownLines++;
-      } else if (r.qty > 0 && r.qty % ratio2 === 0) {
-        entry.full++; fullLines++;
-      } else {
-        entry.partial++; partialLines++;
-      }
+      if (cls === 'unknown') { entry.unknown++; unknownLines++; }
+      else if (cls === 'full') { entry.full++; fullLines++; }
+      else { entry.partial++; partialLines++; }
     });
 
     const totalLines = fullLines + partialLines + unknownLines;
@@ -1358,16 +1423,23 @@
   }
 
   // ── KPI tab: % Achievement vs. confirmed Standard Productivity ─────
-  // Standards below are the only two verified against the Process
-  // Database so far (P003 Receiving, P004 Put-Away — both map 1:1 onto
-  // this system's Receipt/Putaway types). Picking/Packing/Shipping are
-  // deliberately left without a standard: the Process Database splits
-  // Picking alone into 3 sub-processes with different standards
-  // (Full Pallet / Check Accuracy / Partial Pallet) and this system's
-  // raw log doesn't say which one a given row is — showing a % against
-  // the wrong standard would be worse than showing none.
-  const KPI_STANDARD = { Receipt: 120.0, Putaway: 60.0 };
-  const KPI_CYCLE_SEC = { Receipt: 30, Putaway: 60 };
+  // Standards wired to automatic WMS data: Receipt/Putaway map 1:1 onto
+  // Process Database entries P003/P004. Picking splits into Full vs
+  // Partial using the same classifyPickLine() as the Picking KPI card
+  // above (P005/P007) — Picking Check Accuracy (P006) still has no
+  // data source and stays manual-entry only. Packing/Shipping and every
+  // other process in PROCESS_DB have no confirmed standard mapping yet.
+  const KPI_STANDARD = {}, KPI_CYCLE_SEC = {}, KPI_TYPE_LABEL = {};
+  Object.entries(AUTO_PROCESS_MAP).forEach(([key, pid]) => {
+    const p = procById(pid);
+    KPI_STANDARD[key] = procStd(p.ct);
+    KPI_CYCLE_SEC[key] = p.ct;
+  });
+  KPI_TYPE_LABEL.Receipt = TYPE_LABEL.Receipt;
+  KPI_TYPE_LABEL.Putaway = TYPE_LABEL.Putaway;
+  KPI_TYPE_LABEL.PickingFull = 'Picking เต็มพาเลท (P005)';
+  KPI_TYPE_LABEL.PickingPartial = 'Picking หยิบเศษ (P007)';
+  KPI_TYPE_LABEL.PickingUnknown = 'Picking (ไม่มีมาตรฐาน SKU)';
 
   function calcTip(displayHTML, title, formula, rows) {
     const rowsHTML = (rows || []).map(([label, val]) => `<div class="ct-row"><span>${label}</span><span>${val}</span></div>`).join('');
@@ -1405,23 +1477,50 @@
     if (kpiTipEl) kpiTipEl.classList.remove('show');
   });
 
-  function renderKpiTab() {
+  async function renderKpiTab() {
+    await loadKpiManualEntries(dashDate);
+    renderKpiManualTable();
+    updateKpiManualUserList();
+
+    const pickingRows = currentRows.filter(r => r.type === 'Picking' && r.sku);
+    const skus = [...new Set(pickingRows.map(r => r.sku))];
+    const masterMap = skus.length ? await fetchSkuMaster(skus) : {};
+
     const byUserProc = {};
     currentRows.forEach(r => {
       if (!r.user) return;
-      const key = r.user + '__' + r.type;
-      (byUserProc[key] ||= { user: r.user, type: r.type, rows: [] }).rows.push(r);
+      let procKey = r.type;
+      if (r.type === 'Picking') {
+        const cls = r.sku ? classifyPickLine(r, masterMap) : 'unknown';
+        procKey = cls === 'full' ? 'PickingFull' : cls === 'partial' ? 'PickingPartial' : 'PickingUnknown';
+      }
+      const key = r.user + '__' + procKey;
+      (byUserProc[key] ||= { user: r.user, type: procKey, rows: [] }).rows.push(r);
     });
 
     const numericRate = /^\d+(\.\d+)?$/;
-    const entries = Object.values(byUserProc).map(e => {
+    const autoEntries = Object.values(byUserProc).map(e => {
       const s = userStats(e.rows);
       const std = KPI_STANDARD[e.type] || null;
       const hasActual = numericRate.test(s.rateLabel);
       const pct = (std && hasActual) ? Math.round((parseFloat(s.rateLabel) / std) * 100) : null;
-      return { user: e.user, type: e.type, spanLabel: s.spanLabel, rateLabel: s.rateLabel, std, pct, hasActual, hasStd: !!std };
-    }).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+      const label = KPI_TYPE_LABEL[e.type] || TYPE_LABEL[e.type] || e.type;
+      return { user: e.user, label, spanLabel: s.spanLabel, rateLabel: s.rateLabel, std, cycleSec: KPI_CYCLE_SEC[e.type] || null, pct, hasActual, hasStd: !!std };
+    });
 
+    const manualEntries = kpiManualCache.map(m => {
+      const p = procById(m.procId);
+      const std = p ? procStd(p.ct) : null;
+      const hasActual = m.hours > 0;
+      const rateLabel = hasActual ? (m.qty / m.hours).toFixed(1) : '-';
+      const pct = (std && hasActual) ? Math.round((parseFloat(rateLabel) / std) * 100) : null;
+      return {
+        user: m.user || 'ทั้ง Process', label: (p ? p.name : m.procId) + ' (กรอกเอง)',
+        spanLabel: hasActual ? m.hours.toFixed(1) + ' ชม.' : '-', rateLabel, std, cycleSec: p ? p.ct : null, pct, hasActual, hasStd: !!std
+      };
+    });
+
+    const entries = [...autoEntries, ...manualEntries].sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
     const scored = entries.filter(e => e.hasStd && e.hasActual);
     const avgPct = scored.length ? Math.round(scored.reduce((s, e) => s + e.pct, 0) / scored.length) : null;
     const topPerf = scored[0] || null;
@@ -1431,12 +1530,12 @@
       <div class="kpi-card">
         <div class="kpi-kl">ค่าเฉลี่ย % Achievement</div>
         <div class="kpi-kv" style="color:${avgPct === null ? 'var(--tm2)' : avgPct >= 90 ? 'var(--ag2)' : avgPct >= 70 ? 'var(--aa2)' : 'var(--ar2)'}">${avgPct === null ? '—' : avgPct + '%'}</div>
-        <div class="kpi-ks">เฉพาะ Receipt/Putaway ที่มีมาตรฐานยืนยันแล้ว</div>
+        <div class="kpi-ks">เฉพาะรายการที่มีมาตรฐานเทียบได้</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-kl">Top Performer วันนี้</div>
         <div class="kpi-kv" style="font-size:16px;color:var(--ag2)">${topPerf ? topPerf.user : '—'}</div>
-        <div class="kpi-ks">${topPerf ? (TYPE_LABEL[topPerf.type] || topPerf.type) + ' · ' + topPerf.pct + '%' : 'ยังไม่มีข้อมูล'}</div>
+        <div class="kpi-ks">${topPerf ? topPerf.label + ' · ' + topPerf.pct + '%' : 'ยังไม่มีข้อมูล'}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-kl">ต่ำกว่า 80%</div>
@@ -1467,13 +1566,13 @@
         );
       }
       const stdCell = e.hasStd
-        ? calcTip(`<span class="mono" style="color:var(--ts2)">${e.std.toFixed(1)}/ชม.</span>`, 'Standard Productivity', `3600 ÷ Cycle Time (${KPI_CYCLE_SEC[e.type]}s)`,
-            [['Cycle Time', KPI_CYCLE_SEC[e.type] + ' วินาที'], ['= Standard', e.std.toFixed(1) + '/ชม.']])
+        ? calcTip(`<span class="mono" style="color:var(--ts2)">${e.std.toFixed(1)}/ชม.</span>`, 'Standard Productivity', `3600 ÷ Cycle Time (${e.cycleSec}s)`,
+            [['Cycle Time', e.cycleSec + ' วินาที'], ['= Standard', e.std.toFixed(1) + '/ชม.']])
         : `<span class="mono" style="color:var(--tm2)">—</span>`;
 
       return `<tr>
         <td style="font-weight:600">${e.user}</td>
-        <td style="color:var(--ts2)">${TYPE_LABEL[e.type] || e.type}</td>
+        <td style="color:var(--ts2)">${e.label}</td>
         <td class="mono" style="white-space:nowrap">${e.spanLabel}</td>
         <td>${stdCell}</td>
         <td class="mono" style="color:var(--ag2);font-weight:700">${e.hasActual ? e.rateLabel + '/ชม.' : '—'}</td>
@@ -1481,6 +1580,90 @@
         <td>${statusBadge}</td>
       </tr>`;
     }).join('') : `<tr><td colspan="7" style="text-align:center;color:var(--tm2);padding:24px">ไม่มีข้อมูลสำหรับวันที่นี้</td></tr>`;
+  }
+
+  // ── KPI manual entry — for the Process Database rows with no
+  //    confirmed automatic data source yet (Sorting, Check Accuracy,
+  //    Weighing, Consolidation, Loading, VAS, Admin, Relocation,
+  //    Replenishment). Scoped to the dashboard's selected date, same as
+  //    everything else here; write access is admin-only like every
+  //    other write in this page. ──────────────────────────────────────
+  let kpiManualCache = [];
+
+  async function loadKpiManualEntries(date) {
+    try {
+      const snap = await getDocs(query(collection(db, 'kpi_manual_entries'), where('date', '==', date)));
+      kpiManualCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    } catch (e) { console.error(e); kpiManualCache = []; }
+  }
+
+  function renderKpiManualTable() {
+    const tbody = document.getElementById('kpi-manual-tbody');
+    if (!kpiManualCache.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--tm2);padding:16px">ยังไม่มีการบันทึกเองสำหรับวันที่นี้</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = kpiManualCache.map(m => {
+      const p = procById(m.procId);
+      const rate = m.hours > 0 ? (m.qty / m.hours).toFixed(1) : '-';
+      return `<tr>
+        <td style="font-weight:600">${p ? p.name : m.procId}</td>
+        <td>${m.user || 'ทั้ง Process'}</td>
+        <td class="mono">${m.qty}</td>
+        <td class="mono">${m.hours}</td>
+        <td class="mono" style="color:var(--ag2)">${rate}</td>
+        <td style="color:var(--ts2);font-size:11px">${m.enteredBy || '-'}</td>
+        <td><button type="button" class="kpi-manual-del" data-id="${m.id}" style="background:none;border:none;color:var(--ar2);cursor:pointer;font-size:14px;line-height:1">×</button></td>
+      </tr>`;
+    }).join('');
+    tbody.querySelectorAll('.kpi-manual-del').forEach(btn => {
+      btn.addEventListener('click', () => deleteKpiManualEntry(btn.dataset.id));
+    });
+  }
+
+  async function deleteKpiManualEntry(id) {
+    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    if (!confirm('ลบรายการนี้?')) return;
+    try {
+      await deleteDoc(doc(db, 'kpi_manual_entries', id));
+      kpiManualCache = kpiManualCache.filter(m => m.id !== id);
+      renderKpiManualTable();
+      renderKpiTab();
+    } catch (e) { console.error(e); toast('ลบไม่สำเร็จ: ' + e.message); }
+  }
+
+  function updateKpiManualUserList() {
+    const users = [...new Set(currentRows.map(r => r.user).filter(Boolean))].sort();
+    document.getElementById('kpi-manual-user-list').innerHTML = users.map(u => `<option value="${u.replace(/"/g, '&quot;')}">`).join('');
+  }
+
+  function initKpiManualForm() {
+    const procSelect = document.getElementById('kpi-manual-proc');
+    procSelect.innerHTML = MANUAL_PROCESS_IDS.map(id => {
+      const p = procById(id);
+      return `<option value="${id}">${id} — ${p.name} (${p.uom})</option>`;
+    }).join('');
+
+    document.getElementById('btn-kpi-manual-add').addEventListener('click', async () => {
+      if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+      const procId = procSelect.value;
+      const user = document.getElementById('kpi-manual-user').value.trim();
+      const qty = parseFloat(document.getElementById('kpi-manual-qty').value);
+      const hours = parseFloat(document.getElementById('kpi-manual-hours').value);
+      if (!procId || !isFinite(qty) || qty < 0 || !isFinite(hours) || hours <= 0) {
+        toast('กรอกจำนวนและชั่วโมงให้ถูกต้อง (ชั่วโมงต้องมากกว่า 0)');
+        return;
+      }
+      try {
+        const ref = doc(collection(db, 'kpi_manual_entries'));
+        await setDoc(ref, { date: dashDate, procId, user, qty, hours, enteredBy: currentProfile.name, enteredAt: serverTimestamp() });
+        document.getElementById('kpi-manual-user').value = '';
+        document.getElementById('kpi-manual-qty').value = '';
+        document.getElementById('kpi-manual-hours').value = '';
+        toast('บันทึกเรียบร้อย');
+        await renderKpiTab();
+      } catch (e) { console.error(e); toast('บันทึกไม่สำเร็จ: ' + e.message); }
+    });
   }
 
   // ── Bottleneck analysis ─────────────────────────────────────────
@@ -1776,6 +1959,7 @@
   });
 
   // ── Init ────────────────────────────────────────────────────
+  initKpiManualForm();
   await initDashboardDefaultDate();
   await refreshDashboard();
   await loadTrend();

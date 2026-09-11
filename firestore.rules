@@ -155,5 +155,11 @@ service cloud.firestore {
       allow read:   if isLoggedIn();
       allow write:  if isAdmin();
     }
+    // kpi_manual_entries: Actual ที่กรอกเองสำหรับ Process ที่ยังไม่มี
+    // ที่มาข้อมูลอัตโนมัติ (แท็บ KPI ใน wms.html)
+    match /kpi_manual_entries/{entryId} {
+      allow read:   if isLoggedIn();
+      allow write:  if isAdmin();
+    }
   }
 }
