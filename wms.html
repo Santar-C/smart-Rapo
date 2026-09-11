@@ -185,6 +185,7 @@
     #tab-kpi .kbadge-g { background:rgba(63,185,80,.15); color:var(--ag2); }
     #tab-kpi .kbadge-a { background:rgba(210,153,34,.15); color:var(--aa2); }
     #tab-kpi .kbadge-b { background:rgba(14,118,189,.15); color:var(--ab2); }
+    #tab-kpi .kbadge-p { background:rgba(188,140,255,.15); color:var(--ap2); cursor:help; }
     #tab-kpi .kpbar { height:5px; width:80px; background:var(--bd2); border-radius:3px; overflow:hidden; display:inline-block; vertical-align:middle; }
     #tab-kpi .kpfill { height:100%; border-radius:3px; }
     #tab-kpi .calc { position:relative; cursor:help; border-bottom:1px dotted var(--ts2); }
@@ -498,7 +499,7 @@
       <div style="font-size:.72rem;color:var(--tm2)">
         มาตรฐานยืนยันจาก WMS log อัตโนมัติ 4 อย่าง: <b>Receipt</b> (120.0 Pallet/คน/ชม.), <b>Putaway</b> (60.0), <b>Picking เต็มพาเลท</b> (17.1 — qty ที่หยิบหารด้วย Full Pallet Qty ของ SKU ลงตัว), <b>Picking หยิบเศษ</b> (15.0 Line/คน/ชม. — ที่เหลือ)
         ส่วน Process อื่นที่เหลือ (Sorting, Check Accuracy, Weighing, Consolidation, Loading, VAS, Admin, Relocation, Replenishment) ยังไม่มีที่มาข้อมูล Actual อัตโนมัติ — กรอกเองได้ที่ช่องด้านล่าง<br>
-        ชี้ที่ตัวเลขมีเส้นประ (·····) เพื่อดูสูตรคำนวณ
+        ชี้ที่ตัวเลขมีเส้นประ (·····) เพื่อดูสูตรคำนวณ · แถวที่มี <span class="kbadge kbadge-p" style="vertical-align:middle">❗ N</span> คือรายการที่ระบบคำนวณแล้วพบว่าอัตราจริงเร็วเกินจริงทางฟิสิกส์ (เวลาต่อชิ้นสั้นกว่าครึ่งหนึ่งของ Cycle Time มาตรฐาน) — มักเกิดจากสแกนย้อนหลังเป็นชุดในเวลาสั้นๆ ไม่ใช่เวลาทำงานจริง ระบบไม่นับรวมรายการนี้ในค่าเฉลี่ย กดแถวเพื่อดูว่ารายการไหนถูกตีเป็นข้อมูลผิดปกติ
       </div>
     </div>
 
@@ -1274,15 +1275,15 @@
     const totalQty = rows.reduce((s, r) => s + (r.qty || 0), 0);
     const byType = {}; TYPE_ORDER.forEach(t => { byType[t] = rows.filter(r => r.type === t).length; });
     const minutes = rows.map(r => timeToMinutes(r.time)).filter(m => m !== null).sort((a, b) => a - b);
-    let spanLabel = '-', rateLabel = '-';
+    let spanLabel = '-', rateLabel = '-', elapsedH = null;
     if (minutes.length >= 2) {
-      const elapsedH = (minutes[minutes.length - 1] - minutes[0]) / 60;
+      elapsedH = (minutes[minutes.length - 1] - minutes[0]) / 60;
       spanLabel = `${fmtMinutes(minutes[0])}–${fmtMinutes(minutes[minutes.length - 1])}`;
       rateLabel = elapsedH > 0 ? (total / elapsedH).toFixed(1) : `${total} (< 1 นาที)`;
     } else if (minutes.length === 1) {
       spanLabel = fmtMinutes(minutes[0]);
     }
-    return { total, totalQty, byType, spanLabel, rateLabel };
+    return { total, totalQty, byType, spanLabel, rateLabel, elapsedH };
   }
 
   function renderUserPerformance() {
@@ -1521,10 +1522,16 @@
     const autoEntries = Object.values(byUserProc).map(e => {
       const s = userStats(e.rows);
       const std = KPI_STANDARD[e.type] || null;
+      const cycleSec = KPI_CYCLE_SEC[e.type] || null;
       const hasActual = numericRate.test(s.rateLabel);
       const pct = (std && hasActual) ? Math.round((parseFloat(s.rateLabel) / std) * 100) : null;
       const label = KPI_TYPE_LABEL[e.type] || TYPE_LABEL[e.type] || e.type;
-      return { user: e.user, label, spanLabel: s.spanLabel, rateLabel: s.rateLabel, std, cycleSec: KPI_CYCLE_SEC[e.type] || null, pct, hasActual, hasStd: !!std, count: s.total, rows: e.rows };
+      // ข้อมูลผิดปกติ: ถ้าเวลาเฉลี่ยต่อรายการตามเวลาที่สแกนจริง (elapsedH × 3600 ÷ count)
+      // สั้นกว่าครึ่งหนึ่งของ Cycle Time มาตรฐาน แปลว่าทำไม่ทันจริงในทางฟิสิกส์ —
+      // ส่วนใหญ่เกิดจากสแกนย้อนหลังเป็นชุดในเวลาสั้นๆ ไม่ใช่เวลาทำงานจริง
+      const impliedSecPerUnit = (hasActual && s.elapsedH && s.total) ? (s.elapsedH * 3600) / s.total : null;
+      const suspicious = !!(cycleSec && impliedSecPerUnit !== null && impliedSecPerUnit < cycleSec * 0.5);
+      return { user: e.user, label, spanLabel: s.spanLabel, rateLabel: s.rateLabel, std, cycleSec, pct, hasActual, hasStd: !!std, count: s.total, rows: e.rows, suspicious, impliedSecPerUnit };
     });
 
     const manualEntries = kpiManualCache.map(m => {
@@ -1541,7 +1548,10 @@
     });
 
     const entries = [...autoEntries, ...manualEntries].sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
-    const scored = entries.filter(e => e.hasStd && e.hasActual);
+    // ตัดรายการ "ข้อมูลผิดปกติ" (suspicious) ออกจากค่าเฉลี่ย/Top Performer —
+    // ตัวเลขพวกนี้เกินจริงทางฟิสิกส์ (ทำไม่ทันตาม Cycle Time) เอามาเฉลี่ยรวมจะโกหกภาพรวม
+    const scored = entries.filter(e => e.hasStd && e.hasActual && !e.suspicious);
+    const suspiciousCount = entries.filter(e => e.suspicious).length;
     const avgPct = scored.length ? Math.round(scored.reduce((s, e) => s + e.pct, 0) / scored.length) : null;
     const topPerf = scored[0] || null;
     const belowTarget = scored.filter(e => e.pct < 80).length;
@@ -1566,6 +1576,11 @@
         <div class="kpi-kl">รายการที่มีมาตรฐานเทียบได้</div>
         <div class="kpi-kv" style="color:var(--ab2)">${scored.length} / ${entries.length}</div>
         <div class="kpi-ks">รวมทุก process วันนี้</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-kl">❗ ข้อมูลผิดปกติ</div>
+        <div class="kpi-kv" style="color:${suspiciousCount ? 'var(--ap2)' : 'var(--tm2)'}">${suspiciousCount}</div>
+        <div class="kpi-ks">อัตราสูงเกินจริงทางฟิสิกส์ — กดดูรายละเอียดที่ตาราง</div>
       </div>`;
 
     // ── Group the same entries into a Process summary and a User
@@ -1579,10 +1594,11 @@
       if (e.user !== 'ทั้ง Process') g.users.add(e.user);
     });
     const procRows = Object.values(procGroups).map(g => {
-      const scored = g.entries.filter(e => e.hasStd && e.hasActual);
+      const scored = g.entries.filter(e => e.hasStd && e.hasActual && !e.suspicious);
       const avgRate = scored.length ? scored.reduce((s, e) => s + parseFloat(e.rateLabel), 0) / scored.length : null;
       const avgPct = scored.length ? Math.round(scored.reduce((s, e) => s + e.pct, 0) / scored.length) : null;
-      return { label: g.label, userCount: g.users.size, std: g.std, hasStd: g.hasStd, avgRate, avgPct, entries: g.entries };
+      const suspiciousCount = g.entries.filter(e => e.suspicious).length;
+      return { label: g.label, userCount: g.users.size, std: g.std, hasStd: g.hasStd, avgRate, avgPct, suspiciousCount, entries: g.entries };
     }).sort((a, b) => (b.avgPct ?? -1) - (a.avgPct ?? -1));
     kpiProcGroupsCache = procRows;
 
@@ -1592,11 +1608,12 @@
       (userGroups[e.user] ||= { user: e.user, entries: [] }).entries.push(e);
     });
     const userRows = Object.values(userGroups).map(g => {
-      const scored = g.entries.filter(e => e.hasStd && e.hasActual);
+      const scored = g.entries.filter(e => e.hasStd && e.hasActual && !e.suspicious);
       const avgPct = scored.length ? Math.round(scored.reduce((s, e) => s + e.pct, 0) / scored.length) : null;
       const procCount = new Set(g.entries.map(e => e.label)).size;
       const totalCount = g.entries.reduce((s, e) => s + (e.count || 0), 0);
-      return { user: g.user, procCount, totalCount, avgPct, entries: g.entries };
+      const suspiciousCount = g.entries.filter(e => e.suspicious).length;
+      return { user: g.user, procCount, totalCount, avgPct, suspiciousCount, entries: g.entries };
     }).sort((a, b) => (b.avgPct ?? -1) - (a.avgPct ?? -1));
     kpiUserGroupsCache = userRows;
 
@@ -1614,8 +1631,11 @@
         ? calcTip(`<span class="mono" style="font-weight:700">${g.avgPct}%</span>`, '% Achievement เฉลี่ยทีม', 'ค่าเฉลี่ยของ Actual ÷ Standard × 100 ของแต่ละคนในกลุ่ม',
             [['อัตราเฉลี่ยทีม', g.avgRate.toFixed(1) + '/ชม.'], ['Standard', g.std.toFixed(1) + '/ชม.'], ['= ผลลัพธ์', g.avgPct + '%']])
         : `<span style="color:var(--tm2)">—</span>`;
+      const suspiciousFlag = g.suspiciousCount
+        ? ` <span class="kbadge kbadge-p" title="มี ${g.suspiciousCount} รายการที่เวลาสแกนจริงสั้นกว่าครึ่งหนึ่งของ Cycle Time มาตรฐาน — ทำไม่ทันจริงในทางฟิสิกส์ ส่วนใหญ่เกิดจากสแกนย้อนหลังเป็นชุด ไม่นับรวมในค่าเฉลี่ยนี้ กดแถวเพื่อดูรายละเอียด">❗ ${g.suspiciousCount}</span>`
+        : '';
       return `<tr data-clickable data-proc-label="${g.label.replace(/"/g, '&quot;')}">
-        <td style="font-weight:600">${g.label}</td>
+        <td style="font-weight:600">${g.label}${suspiciousFlag}</td>
         <td class="mono">${g.userCount || '—'}</td>
         <td>${stdCell}</td>
         <td class="mono" style="color:var(--ag2);font-weight:700">${g.avgRate !== null ? g.avgRate.toFixed(1) + '/ชม.' : '—'}</td>
@@ -1626,11 +1646,14 @@
 
     document.getElementById('kpi-user-tbody').innerHTML = userRows.length ? userRows.map(g => {
       const pctCell = g.avgPct !== null
-        ? calcTip(`<span class="mono" style="font-weight:700">${g.avgPct}%</span>`, '% Achievement เฉลี่ย', 'ค่าเฉลี่ยของ % Achievement ในทุก process ที่คนนี้ทำวันนี้',
-            [['จำนวน process ที่มีมาตรฐานเทียบได้', String(g.entries.filter(e => e.hasStd && e.hasActual).length)], ['= ผลลัพธ์', g.avgPct + '%']])
+        ? calcTip(`<span class="mono" style="font-weight:700">${g.avgPct}%</span>`, '% Achievement เฉลี่ย', 'ค่าเฉลี่ยของ % Achievement ในทุก process ที่คนนี้ทำวันนี้ (ไม่รวมรายการที่ถูกตีเป็นข้อมูลผิดปกติ)',
+            [['จำนวน process ที่นับรวมในค่าเฉลี่ย', String(g.entries.filter(e => e.hasStd && e.hasActual && !e.suspicious).length)], ['= ผลลัพธ์', g.avgPct + '%']])
         : `<span style="color:var(--tm2)">—</span>`;
+      const suspiciousFlag = g.suspiciousCount
+        ? ` <span class="kbadge kbadge-p" title="มี ${g.suspiciousCount} รายการที่เวลาสแกนจริงสั้นกว่าครึ่งหนึ่งของ Cycle Time มาตรฐาน — ทำไม่ทันจริงในทางฟิสิกส์ ส่วนใหญ่เกิดจากสแกนย้อนหลังเป็นชุด ไม่นับรวมในค่าเฉลี่ยนี้ กดแถวเพื่อดูรายละเอียด">❗ ${g.suspiciousCount}</span>`
+        : '';
       return `<tr data-clickable data-kpi-user="${g.user.replace(/"/g, '&quot;')}">
-        <td style="font-weight:600">${g.user}</td>
+        <td style="font-weight:600">${g.user}${suspiciousFlag}</td>
         <td class="mono">${g.procCount}</td>
         <td class="mono">${g.totalCount.toLocaleString('th-TH')}</td>
         <td>${pctCell}</td>
@@ -1646,8 +1669,18 @@
 
   function kpiEntryRowHTML(e) {
     const hasBoth = e.hasStd && e.hasActual;
-    const statusText = !e.hasStd ? 'ไม่มีมาตรฐาน' : !e.hasActual ? 'ยังไม่มี Actual' : (e.pct >= 100 ? '🌟 เกิน Standard' : e.pct >= 80 ? '✅ ปกติ' : '⚠️ ต่ำกว่า Standard');
-    const statusColor = !hasBoth ? 'var(--gray)' : (e.pct >= 100 ? 'var(--green)' : e.pct >= 80 ? 'var(--amber)' : 'var(--red)');
+    let statusText, statusColor;
+    if (e.suspicious) {
+      statusText = `❗ ข้อมูลผิดปกติ (${Math.round(e.impliedSecPerUnit)}s/ชิ้น < ครึ่งหนึ่งของ Cycle Time ${e.cycleSec}s)`;
+      statusColor = 'var(--purple)';
+    } else if (!e.hasStd) {
+      statusText = 'ไม่มีมาตรฐาน'; statusColor = 'var(--gray)';
+    } else if (!e.hasActual) {
+      statusText = 'ยังไม่มี Actual'; statusColor = 'var(--gray)';
+    } else {
+      statusText = e.pct >= 100 ? '🌟 เกิน Standard' : e.pct >= 80 ? '✅ ปกติ' : '⚠️ ต่ำกว่า Standard';
+      statusColor = e.pct >= 100 ? 'var(--green)' : e.pct >= 80 ? 'var(--amber)' : 'var(--red)';
+    }
     return `<tr>
       <td style="font-weight:600">${e.user}</td>
       <td>${e.label}</td>
