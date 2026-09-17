@@ -42,6 +42,28 @@
   table{width:100%;border-collapse:collapse;font-size:.75rem;margin-bottom:1rem}
   th{background:#002048;color:#fff;padding:.4rem .5rem;text-align:left}
   td{padding:.3rem .5rem;border-bottom:1px solid #f1f5f9}
+
+  /* ══ RESPONSIVE — เครื่องมือแอดมิน ใช้บนคอมเป็นหลัก แต่ต้องไม่พังบน
+     แท็บเล็ต/มือถือ (breakpoint ชุดเดียวกับทั้งระบบ) ══ */
+  @media (max-width: 640px) {
+    body { padding: 1rem; }
+    .card { padding: 1.4rem; }
+  }
+  @media (max-width: 480px) {
+    body { padding: .75rem; }
+    .card { padding: 1.1rem; border-radius: 12px; }
+    h2 { font-size: .95rem; }
+    .log-area { height: 150px; }
+    .btn { min-height: 44px; }
+  }
+  @media (max-width: 360px) {
+    .card { padding: .9rem; }
+  }
+  @media (max-height: 480px) and (orientation: landscape) {
+    body { padding: .75rem; }
+    .card { padding: 1.1rem; }
+    .log-area { height: 110px; }
+  }
 </style>
 </head>
 <body>

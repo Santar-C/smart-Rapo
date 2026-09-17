@@ -41,6 +41,35 @@
     #toast.err  { background:#dc2626; }
     #toast.ok   { background:#16a34a; }
     #reader__dashboard_section_csr, #reader__dashboard_section_swaplink { display:none !important; }
+
+    /* ══════════════════════════════════════════════════════════
+       RESPONSIVE เพิ่มเติมเฉพาะหน้านี้ — breakpoint พื้นฐาน (768/600/360/
+       landscape เตี้ย/1600) มาจาก shared.css แล้ว ที่นี่ปรับเฉพาะจุดที่
+       shared.css รู้ไม่ได้ เช่น ฟอนต์/ปุ่มขนาดใหญ่เฉพาะหน้า กล้องสแกน และ
+       รายการนับที่กินพื้นที่แนวตั้งเยอะ */
+    @media (max-width: 600px) {
+      .big-title { font-size: 1.55rem; }
+      .scan-input-big { font-size: 1.35rem !important; padding: .9rem !important; }
+      .big-btn { font-size: 1.15rem !important; padding: .9rem !important; }
+      .chk-row .tick { width: 40px; height: 40px; }
+      .stepper button { width: 44px; height: 44px; }
+    }
+    @media (max-width: 360px) {
+      .big-title { font-size: 1.32rem; }
+      .chk-row .tag { font-size: 1.05rem; }
+      .chk-row .name { font-size: .9rem; }
+      .qty-direct { width: 58px; font-size: 1.15rem; }
+    }
+    /* แนวนอนจอเตี้ย — กล้อง/รายการนับสูงเกินไปจนกล้องแทบเต็มจอ ต้องหด
+       ให้เหลือพื้นที่พอเห็นทั้งปุ่มปิดกล้องและคำแนะนำในจอเดียว */
+    @media (max-height: 480px) and (orientation: landscape) {
+      .chk-list { max-height: 30vh; }
+      #cam-modal { padding: .5rem; }
+      #cam-reader { min-height: 150px !important; }
+      .progress-wrap > div:first-child { width: 76px !important; height: 76px !important; }
+      .ring-svg { width: 76px; height: 76px; }
+      .big-title { font-size: 1.4rem; }
+    }
   </style>
 </head>
 <body>

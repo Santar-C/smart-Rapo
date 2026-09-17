@@ -31,6 +31,32 @@
   .warn{background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:.75rem;font-size:.8rem;color:#92400e;margin-bottom:1rem;line-height:1.6}
   .auth-ok{background:#dcfce7;border:1px solid #86efac;border-radius:8px;padding:.6rem .85rem;font-size:.82rem;color:#166534;margin-bottom:1rem}
   .auth-no{background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:.6rem .85rem;font-size:.82rem;color:#92400e;margin-bottom:1rem}
+
+  /* ══ RESPONSIVE — เครื่องมือแอดมิน ใช้บนคอมเป็นหลัก แต่ต้องไม่พังบน
+     แท็บเล็ต/มือถือ (breakpoint ชุดเดียวกับทั้งระบบ) ══ */
+  @media (max-width: 640px) {
+    body { padding: 1rem; }
+    .card { padding: 1.4rem; }
+  }
+  @media (max-width: 480px) {
+    body { padding: .75rem; }
+    .card { padding: 1.1rem; border-radius: 12px; }
+    h2 { font-size: .95rem; }
+    .stat-grid { gap: .4rem; }
+    .stat-num { font-size: 1.15rem; }
+    .stat-lbl { font-size: .62rem; }
+    .log-area { height: 150px; }
+    .btn { min-height: 44px; }
+  }
+  @media (max-width: 360px) {
+    .card { padding: .9rem; }
+    .stat-grid { grid-template-columns: repeat(3, 1fr); gap: .35rem; }
+  }
+  @media (max-height: 480px) and (orientation: landscape) {
+    body { padding: .75rem; }
+    .card { padding: 1.1rem; }
+    .log-area { height: 110px; }
+  }
 </style>
 </head>
 <body>
