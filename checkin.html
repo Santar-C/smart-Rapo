@@ -35,6 +35,20 @@
       100%{transform:scale(1);opacity:1}
     }
     .bounce-in { animation:bounce-in 0.5s ease forwards; }
+
+    /* ═══ Landscape / short-viewport fallback ═══════════════
+       Primary use is portrait on a phone, but a driver may hold
+       the phone sideways — shrink the big CTA + paddings so the
+       whole flow still fits without excessive scrolling.
+    ══════════════════════════════════════════════════════════ */
+    @media (max-height: 500px) and (orientation: landscape) {
+      header{padding-top:.5rem!important;padding-bottom:.5rem!important}
+      main{padding-top:.5rem!important;padding-bottom:.5rem!important;align-items:flex-start!important}
+      #btn-checkin{width:8rem;height:8rem}
+      #btn-checkin svg{width:2rem;height:2rem}
+      #state-init p{margin-bottom:.75rem}
+      .fade-up{animation-duration:.25s}
+    }
   </style>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex flex-col">

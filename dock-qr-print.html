@@ -104,7 +104,8 @@
       background:#1e293b; color:white; padding:0.7rem 1.4rem;
       border-radius:12px; font-size:0.88rem; font-weight:600;
       z-index:9999; transition:transform 0.3s;
-      box-shadow:0 8px 24px rgba(0,0,0,0.2); white-space:nowrap;
+      box-shadow:0 8px 24px rgba(0,0,0,0.2);
+      max-width:90vw; text-align:center; white-space:normal;
     }
     #toast.show { transform:translateX(-50%) translateY(0); }
 
@@ -218,6 +219,17 @@
 
     /* Hidden print sheet (screen) */
     #print-sheet { display:none; }
+
+    /* Small-phone tweaks — this page is primarily a print launcher,
+       just keep it from overflowing / looking cramped if opened
+       on a phone before printing */
+    @media (max-width: 480px) {
+      .topbar { padding:0.65rem 0.85rem; }
+      .controls { padding:0.85rem; }
+      .grid-preview { padding:0.85rem; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:0.65rem; }
+      .preview-card { padding:0.7rem; }
+      .preview-card img { width:80px; height:80px; }
+    }
   </style>
 </head>
 <body>
