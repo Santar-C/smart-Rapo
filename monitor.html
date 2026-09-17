@@ -125,6 +125,27 @@
 
     /* ── Round-progress % chip, spins briefly while KPIs recompute ──── */
     .pct-spin { animation: spin 0.6s ease; }
+
+    /* ── Responsive — page-specific density (shared.css handles topbar/
+       page-body/table/modal already) ─────────────────────────────── */
+    @media (max-width: 768px) {
+      .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 0.6rem; }
+      .round-banner { padding: 1rem 1.15rem; }
+    }
+    @media (max-width: 600px) {
+      .kpi-grid { grid-template-columns: repeat(auto-fit, minmax(102px, 1fr)); gap: 0.5rem; }
+      .kpi-card { padding: 0.8rem 0.9rem; }
+      .kpi-card .kval { font-size: 1.45rem; }
+      .round-banner { padding: 0.9rem 1rem; }
+      .round-banner .rlabel { font-size: 0.95rem; }
+    }
+    @media (max-width: 360px) {
+      .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-height: 480px) and (orientation: landscape) {
+      .round-banner { padding: 0.7rem 1rem; margin-bottom: 0.6rem; }
+      .kpi-grid { gap: 0.5rem; margin-bottom: 0.6rem; }
+    }
   </style>
 </head>
 <body>
@@ -357,7 +378,7 @@
 
 <script type="module">
   import { auth, db } from "./firebase-config.js";
-  import { requireAdmin } from "./auth.js";
+  import { requirePermission } from "./auth.js";
   import { icon } from "./icons.js";
   import {
     collection, doc, getDocs, setDoc, addDoc, updateDoc,
@@ -366,7 +387,7 @@
 
   let currentUser, currentProfile;
 
-  const { user, profile } = await requireAdmin();
+  const { user, profile } = await requirePermission("page_monitor");
   currentUser = user; currentProfile = profile;
 
   document.getElementById("topbar-placeholder").innerHTML = `

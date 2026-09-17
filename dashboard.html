@@ -65,7 +65,7 @@
       background:radial-gradient(260px 160px at 95% -20%, rgba(255,255,255,0.16), transparent);
     }
     .hero-ring-wrap { position:relative; width:150px; height:150px; flex-shrink:0; }
-    .hero-ring-wrap svg { transform:rotate(-90deg); }
+    .hero-ring-wrap svg { width:100%; height:100%; display:block; transform:rotate(-90deg); }
     .hero-ring-num { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
     .hero-ring-num .v { font-size:2.3rem; font-weight:900; line-height:1; }
     .hero-ring-num .l { font-size:0.68rem; opacity:.8; margin-top:2px; }
@@ -109,6 +109,27 @@
     body.tv-mode .hero-stat .v { font-size:2.2rem; }
     body.tv-mode .group-card .gpct { font-size:3.2rem; }
     body.tv-mode .chart-card .cwrap { height:320px; }
+
+    /* ── Responsive — exec dashboard specific layout ──────────
+       (topbar/page-body/stats/modal/table already handled by shared.css) */
+    @media (max-width: 768px) {
+      .chart-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .exec-filterbar { padding: 0.65rem 0.85rem; gap: 0.5rem; }
+      .exec-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; padding: 1.25rem; gap: 1rem; }
+      .hero-ring-wrap { width: 118px; height: 118px; }
+      .hero-ring-num .v { font-size: 1.9rem; }
+      .hero-stats { grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: 0.6rem; width: 100%; }
+      .group-grid { grid-template-columns: 1fr; }
+      .chart-card .cwrap { height: 220px; }
+    }
+    @media (max-height: 480px) and (orientation: landscape) {
+      .exec-hero { padding: 0.9rem 1.1rem; gap: 1rem; }
+      .hero-ring-wrap { width: 92px; height: 92px; }
+      .hero-ring-num .v { font-size: 1.5rem; }
+      .chart-card .cwrap { height: 170px; }
+    }
   </style>
 </head>
 <body>
@@ -165,13 +186,13 @@
 
 <script type="module">
   import { db } from "./firebase-config.js";
-  import { requireAdmin } from "./auth.js";
+  import { requirePermission } from "./auth.js";
   import { icon } from "./icons.js";
   import {
     collection, doc, query, orderBy, onSnapshot
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const { user, profile } = await requireAdmin();
+  const { user, profile } = await requirePermission("page_dashboard");
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">

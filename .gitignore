@@ -1,0 +1,3 @@
+# Claude Code agent tooling state (background subagent worktrees, etc.)
+# — not project content, never commit
+.claude/

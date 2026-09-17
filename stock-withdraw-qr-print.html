@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QR เบิกสินค้า — พิมพ์แปะหน้าคลัง</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
@@ -77,6 +78,37 @@
     background:#fef3c7; border:1.5px solid #fbbf24; border-radius:4mm;
     padding:3.5mm 5mm; width:100%; max-width:160mm; margin-bottom:8mm;
     font-size:3.5mm; color:#92400e; line-height:1.6;
+  }
+
+  /* ══ RESPONSIVE (SCREEN ONLY) ═════════════════════════════════
+     หน้านี้ใช้หน่วย mm ตั้งใจให้ตรงขนาดจริงตอนพิมพ์ (A4) — ถ้าเปิดจาก
+     มือถือ/แท็บเล็ตก่อนพิมพ์ ความกว้าง 210mm (~794px) จะกว้างกว่าจอ
+     ทำให้ scroll แนวนอน จึงบังคับ width เป็น fluid เฉพาะตอนแสดงผลบนจอ
+     (@media screen) เท่านั้น — ตอนพิมพ์จริงยังคงใช้ @page/ขนาด mm เดิม
+     ทุกประการเพราะ media "print" ไม่ตรงกับ query นี้ ══════════════ */
+  @media screen and (max-width: 820px) {
+    body { width:100%; min-height:100dvh; padding:6vw 5vw; }
+  }
+  @media screen and (max-width: 480px) {
+    .hdr-right { font-size:2.6mm; }
+    .title { font-size:9mm; }
+    .title-sub { font-size:4mm; margin-bottom:6mm; }
+    .instruction { font-size:3.6mm; margin-bottom:6mm; }
+    .qr-box { padding:6mm 5mm; margin-bottom:6mm; }
+    .qr-box img { width:52mm; height:52mm; }
+    .steps { flex-wrap:wrap; row-gap:4mm; margin-bottom:7mm; }
+    .step-item { flex:1 1 30%; min-width:28%; }
+    .step-item:not(:last-child)::after { display:none; }
+    .cat-box, .note-box { padding:4mm 4mm; }
+  }
+  @media screen and (max-height: 480px) and (orientation: landscape) {
+    body { padding:4vw 5vw; }
+    .title { font-size:7mm; margin-bottom:2mm; }
+    .title-sub { margin-bottom:4mm; }
+    .instruction { margin-bottom:4mm; }
+    .qr-box { padding:4mm; margin-bottom:4mm; }
+    .qr-box img { width:40mm; height:40mm; }
+    .steps { margin-bottom:5mm; }
   }
 </style>
 </head>

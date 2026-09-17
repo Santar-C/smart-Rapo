@@ -165,6 +165,57 @@
     #toast.show{transform:translateX(-50%) translateY(0)}
     /* EMPTY */
     .empty{text-align:center;padding:2rem;color:#94a3b8;font-size:.88rem}
+
+    /* ══════════════════════════════════════════════════════════
+       RESPONSIVE — คอม / แท็บเล็ต / มือถือ × แนวตั้ง / แนวนอน
+       (หน้านี้ไม่ได้ใช้ shared.css จึงต้องกำหนด breakpoint เอง
+       ให้ตรงชุดเดียวกับหน้าอื่นๆ ในระบบ: 768 / 600 / 360 / landscape เตี้ย / 1600)
+       ══════════════════════════════════════════════════════════ */
+
+    /* จอกว้างกว่ามือถือ (แท็บเล็ต/คอม) — จำกัดความกว้างการ์ดไว้เท่าคอลัมน์
+       มือถือ ไม่ให้ฟอร์มยืดเต็มจอโล่งๆ เวลาเปิดจากแท็บเล็ต/คอมโดยไม่ตั้งใจ */
+    @media (min-width: 640px) {
+      .hdr, .main, .success-screen, .loading-screen { max-width: 480px; margin: 0 auto; width: 100%; }
+    }
+    @media (min-width: 1600px) {
+      .hdr, .main, .success-screen, .loading-screen { max-width: 560px; }
+    }
+
+    /* แท็บเล็ต/จอเล็ก ~768px */
+    @media (max-width: 768px) {
+      .main { padding: 1rem 1rem 1.25rem; }
+    }
+
+    /* มือถือแนวตั้ง ~600px — ขยายพื้นที่แตะให้ ≥44px ตามหลัก touch target */
+    @media (max-width: 600px) {
+      .hdr { padding: .85rem 1rem .65rem; gap: .6rem; }
+      .cat-tab { padding: .6rem 1.1rem; min-height: 44px; display: inline-flex; align-items: center; }
+      .name-chip { padding: .55rem 1rem; min-height: 40px; display: inline-flex; align-items: center; }
+      .prod-item { min-height: 44px; }
+      .qty-btn { width: 48px; height: 48px; }
+      .submit-btn, .new-btn { min-height: 48px; }
+    }
+
+    /* จอเล็กมาก เช่น iPhone SE ~360px */
+    @media (max-width: 360px) {
+      .main { padding: .75rem .75rem 1rem; gap: .65rem; }
+      .card { padding: .9rem; }
+      .step { font-size: .66rem; padding: .5rem .3rem; }
+      .hdr-title { font-size: .92rem; }
+      .qty-input { font-size: 1.35rem; }
+    }
+
+    /* แนวนอนจอเตี้ย (มือถือ/แท็บเล็ตหมุนนอน) — เน้นประหยัดความสูง */
+    @media (max-height: 480px) and (orientation: landscape) {
+      .hdr { padding: .6rem 1.25rem; }
+      .main { padding: .65rem 1rem 1rem; gap: .6rem; }
+      .card { padding: .75rem .9rem; }
+      .prod-list { max-height: 34vh; }
+      .success-screen { padding: 1rem; gap: .6rem; }
+      .success-icon svg { width: 42px; height: 42px; }
+      .success-title { font-size: 1.1rem; }
+      .loading-screen { gap: .6rem; }
+    }
   </style>
 </head>
 <body>

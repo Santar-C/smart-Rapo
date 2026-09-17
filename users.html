@@ -14,6 +14,13 @@
     #toast.show { transform:translateX(-50%) translateY(0); }
     #toast.ok  { background:#16a34a; }
     #toast.err { background:#dc2626; }
+
+    .users-list-head { flex-wrap: wrap; gap: 0.6rem; }
+    .users-search-wrap { width: 200px; }
+    @media (max-width: 600px) {
+      .users-list-head { padding: 0.75rem 1rem; }
+      .users-search-wrap { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -24,7 +31,15 @@
   <div class="stats-row">
     <div class="stat-card"><div class="stat-value" id="stat-total">—</div><div class="stat-label">ผู้ใช้ทั้งหมด</div></div>
     <div class="stat-card"><div class="stat-value" style="color:var(--red)" id="stat-admin">—</div><div class="stat-label">Admin</div></div>
-    <div class="stat-card"><div class="stat-value" style="color:var(--indigo)" id="stat-user">—</div><div class="stat-label">User ทั่วไป</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--indigo)" id="stat-sup">—</div><div class="stat-label">Sup</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--indigo)" id="stat-shipco">—</div><div class="stat-label">Ship Co</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--indigo)" id="stat-employee">—</div><div class="stat-label">พนักงาน</div></div>
+  </div>
+
+  <!-- Banner: migrate role เก่า "user" -> "employee" -->
+  <div id="migrate-banner" class="alert alert-info" style="display:none; margin-bottom:1rem; display:flex; align-items:center; gap:0.75rem; justify-content:space-between;">
+    <span>พบผู้ใช้ <b id="migrate-count">0</b> คนที่ยังใช้ role เก่า ("user") — ย้ายไปเป็น "พนักงาน" (สิทธิ์ต่ำสุด) ได้ทันที แล้วค่อยปรับสิทธิ์รายคนภายหลัง</span>
+    <button class="btn btn-primary btn-sm" id="btn-migrate-roles">ย้าย Role ทั้งหมด → พนักงาน</button>
   </div>
 
   <!-- เพิ่ม User ใหม่ -->
@@ -50,8 +65,10 @@
       <div class="form-group">
         <label>บทบาท (Role)</label>
         <select id="new-role">
-          <option value="user">User — ทำรายการได้ ไม่มีสิทธิ์จัดการ</option>
-          <option value="admin">Admin — สิทธิ์เต็ม</option>
+          <option value="employee">พนักงาน — สิทธิ์ต่ำสุด (ปรับได้ทีหลัง)</option>
+          <option value="shipco">Ship Co</option>
+          <option value="sup">Sup</option>
+          <option value="admin">Admin — สิทธิ์เต็ม (ปรับได้ที่ตาราง Roles &amp; Permissions)</option>
         </select>
       </div>
     </div>
@@ -65,9 +82,9 @@
 
   <!-- รายชื่อ User -->
   <div class="card" style="padding:0; overflow:hidden;">
-    <div style="padding:0.85rem 1.25rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+    <div class="users-list-head" style="padding:0.85rem 1.25rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
       <div class="card-title" style="margin-bottom:0;display:flex;align-items:center;gap:0.5rem;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> รายชื่อผู้ใช้งานทั้งหมด</div>
-      <div class="search-bar" style="margin:0; width:200px;">
+      <div class="search-bar users-search-wrap" style="margin:0;">
         <input type="text" id="user-search" placeholder="ค้นหา..." autocomplete="off" style="padding:0.45rem 0.75rem 0.45rem 2rem; font-size:0.85rem;">
       </div>
     </div>
@@ -91,6 +108,30 @@
         </table>
       </div>
     </div>
+  </div>
+
+  <!-- Roles & Permissions -->
+  <div class="card">
+    <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Roles &amp; Permissions</div>
+    <div class="alert alert-info" style="font-size:0.85rem; margin-bottom:1rem;">
+      ติ๊กเพื่อกำหนดว่าแต่ละ Role เข้าถึงอะไรได้บ้าง ครอบคลุมทุกหน้าในระบบรวมถึง Dock — บันทึกแล้วมีผลทันทีกับผู้ใช้ทุกคนที่มี role นั้น (ปรับ Admin ได้ด้วย ระวังอย่าถอดสิทธิ์ตัวเองจนเข้าหน้านี้ไม่ได้)
+    </div>
+    <div id="perm-table-wrap" class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>สิทธิ์</th>
+            <th style="text-align:center">Admin</th>
+            <th style="text-align:center">Sup</th>
+            <th style="text-align:center">Ship Co</th>
+            <th style="text-align:center">พนักงาน</th>
+          </tr>
+        </thead>
+        <tbody id="perm-tbody"></tbody>
+      </table>
+    </div>
+    <div id="perm-error" class="alert alert-error" style="display:none; margin-top:0.75rem;"></div>
+    <button class="btn btn-primary" id="btn-save-perms" style="margin-top:0.9rem;display:inline-flex;align-items:center;gap:0.4rem;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> บันทึกสิทธิ์</button>
   </div>
 
 </div><!-- end page-body -->
@@ -123,11 +164,13 @@
 
 <script type="module">
   import { auth, db } from "./firebase-config.js";
-  import { requireAdmin } from "./auth.js";
+  import {
+    requirePermission, ROLES, ROLE_LABELS, PERMISSION_GROUPS, DEFAULT_ROLE_PERMISSIONS
+  } from "./auth.js";
   import { icon } from "./icons.js";
   import {
-    collection, doc, getDocs, setDoc, updateDoc, deleteDoc,
-    query, orderBy, onSnapshot, serverTimestamp
+    collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
+    query, orderBy, onSnapshot, serverTimestamp, writeBatch
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import {
     createUserWithEmailAndPassword,
@@ -161,8 +204,9 @@
   let currentUser, profile;
   let allUsers = [], userSearch = "";
   let resetTargetUid = null, resetTargetName = "";
+  let permMatrix = null; // { admin:{...}, sup:{...}, shipco:{...}, employee:{...} }
 
-  const { user, profile: prof } = await requireAdmin();
+  const { user, profile: prof } = await requirePermission("page_users");
   currentUser = user; profile = prof;
 
   document.getElementById("topbar-placeholder").innerHTML = `
@@ -197,9 +241,20 @@
   });
 
   function updateStats() {
-    document.getElementById("stat-total").textContent = allUsers.length;
-    document.getElementById("stat-admin").textContent = allUsers.filter(u=>u.role==="admin").length;
-    document.getElementById("stat-user").textContent  = allUsers.filter(u=>u.role==="user").length;
+    document.getElementById("stat-total").textContent    = allUsers.length;
+    document.getElementById("stat-admin").textContent    = allUsers.filter(u=>u.role==="admin").length;
+    document.getElementById("stat-sup").textContent      = allUsers.filter(u=>u.role==="sup").length;
+    document.getElementById("stat-shipco").textContent   = allUsers.filter(u=>u.role==="shipco").length;
+    document.getElementById("stat-employee").textContent = allUsers.filter(u=>u.role==="employee").length;
+
+    const legacyUsers = allUsers.filter(u=>u.role==="user" || !ROLES.includes(u.role));
+    const banner = document.getElementById("migrate-banner");
+    if (legacyUsers.length) {
+      document.getElementById("migrate-count").textContent = legacyUsers.length;
+      banner.style.display = "flex";
+    } else {
+      banner.style.display = "none";
+    }
   }
 
   function getAvatarBg(name) {
@@ -223,9 +278,10 @@
     tbody.innerHTML = data.map(u => {
       const initial = (u.name||u.email||"U")[0].toUpperCase();
       const bg      = getAvatarBg(u.name || u.email);
-      const roleBadge = u.role === "admin"
+      const roleKey = ROLES.includes(u.role) ? u.role : "employee"; // role เก่า "user" หรือค่าแปลกๆ → แสดงเป็นพนักงานไว้ก่อน
+      const roleBadge = roleKey === "admin"
         ? `<span class="badge badge-red">Admin</span>`
-        : `<span class="badge badge-indigo">User</span>`;
+        : `<span class="badge badge-indigo">${ROLE_LABELS[roleKey]}</span>`;
       const isMe = u.uid === currentUser.uid;
       return `<tr>
         <td>
@@ -243,8 +299,7 @@
           ${!isMe ? `
             <select onchange="changeRole('${u.uid}',this.value)"
               style="padding:0.35rem 0.6rem;border:1.5px solid var(--border);border-radius:7px;font-family:Sarabun,sans-serif;font-size:0.85rem;background:white;cursor:pointer;">
-              <option value="user"  ${u.role==="user" ?"selected":""}>User</option>
-              <option value="admin" ${u.role==="admin"?"selected":""}>Admin</option>
+              ${ROLES.map(r => `<option value="${r}" ${roleKey===r?"selected":""}>${ROLE_LABELS[r]}</option>`).join("")}
             </select>` : `<span style="font-size:0.8rem;color:var(--gray);">ตัวเอง</span>`}
         </td>
         <td>
@@ -310,7 +365,7 @@
 
       toast(`สร้าง Account "${name}" เรียบร้อย`, "ok");
       ["new-name","new-email","new-password"].forEach(id => document.getElementById(id).value="");
-      document.getElementById("new-role").value="user";
+      document.getElementById("new-role").value="employee";
 
     } catch(e) {
       const msgs = {
@@ -398,6 +453,81 @@
       toast(`ลบไม่สำเร็จ: ${e.code || e.message}`, "err", 5000);
     }
   };
+
+  // ── Migrate role เก่า "user" → "employee" (สิทธิ์ต่ำสุด) ──
+  document.getElementById("btn-migrate-roles").addEventListener("click", async () => {
+    const legacyUsers = allUsers.filter(u=>u.role==="user" || !ROLES.includes(u.role));
+    if (!legacyUsers.length) return;
+    if (!confirm(`ย้าย role ของผู้ใช้ ${legacyUsers.length} คนเป็น "พนักงาน" (สิทธิ์ต่ำสุด)?\nปรับสิทธิ์รายคนใหม่ได้ทีหลังที่ตารางด้านบน`)) return;
+    try {
+      const batch = writeBatch(db);
+      legacyUsers.forEach(u => batch.update(doc(db,"users",u.uid), { role: "employee" }));
+      await batch.commit();
+      toast(`ย้าย role ผู้ใช้ ${legacyUsers.length} คนเรียบร้อย`, "ok");
+    } catch (e) {
+      toast(`ย้าย role ไม่สำเร็จ: ${e.code || e.message}`, "err", 5000);
+    }
+  });
+
+  // ── Roles & Permissions ──────────────────────────────────
+  function cloneDefaultPerms() {
+    return JSON.parse(JSON.stringify(DEFAULT_ROLE_PERMISSIONS));
+  }
+  function mergePermsWithDefaults(saved) {
+    const merged = cloneDefaultPerms();
+    for (const role of ROLES) {
+      for (const g of PERMISSION_GROUPS) {
+        for (const { key } of g.keys) {
+          const v = saved?.[role]?.[key];
+          if (typeof v === "boolean") merged[role][key] = v;
+        }
+      }
+    }
+    return merged;
+  }
+
+  function renderPermTable() {
+    const tbody = document.getElementById("perm-tbody");
+    tbody.innerHTML = PERMISSION_GROUPS.map(g => {
+      const groupHeader = `<tr><td colspan="5" style="background:#f8fafc;font-weight:700;font-size:0.8rem;color:var(--navy);padding:0.5rem 0.75rem;">${g.group}</td></tr>`;
+      const rows = g.keys.map(({ key, label }) => `
+        <tr>
+          <td style="font-size:0.85rem;">${label}</td>
+          ${ROLES.map(r => `<td style="text-align:center"><input type="checkbox" data-role="${r}" data-key="${key}" ${permMatrix[r][key] ? "checked" : ""}></td>`).join("")}
+        </tr>`).join("");
+      return groupHeader + rows;
+    }).join("");
+  }
+
+  async function loadPermMatrix() {
+    try {
+      const snap = await getDoc(doc(db, "app_settings", "role_permissions"));
+      permMatrix = snap.exists() ? mergePermsWithDefaults(snap.data()) : cloneDefaultPerms();
+    } catch (e) {
+      console.error("loadPermMatrix failed:", e);
+      permMatrix = cloneDefaultPerms();
+    }
+    renderPermTable();
+  }
+
+  document.getElementById("btn-save-perms").addEventListener("click", async () => {
+    const errEl = document.getElementById("perm-error");
+    errEl.style.display = "none";
+    const next = cloneDefaultPerms();
+    document.querySelectorAll("#perm-tbody input[type=checkbox]").forEach(cb => {
+      next[cb.dataset.role][cb.dataset.key] = cb.checked;
+    });
+    try {
+      await setDoc(doc(db, "app_settings", "role_permissions"), next);
+      permMatrix = next;
+      toast("บันทึกสิทธิ์เรียบร้อย มีผลทันที", "ok");
+    } catch (e) {
+      errEl.textContent = `บันทึกไม่สำเร็จ: ${e.code || e.message}`;
+      errEl.style.display = "block";
+    }
+  });
+
+  loadPermMatrix();
 </script>
 </body>
 </html>

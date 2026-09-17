@@ -61,6 +61,52 @@
   .ess{background:#fbbf24;color:#000;padding:0 .3rem;border-radius:4px;font-size:.6rem;font-weight:900;margin-left:.3rem}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
   .blink{animation:pulse 1.4s ease-in-out infinite}
+
+  /* ══════════════════════════════════════════════════════════
+     RESPONSIVE — จอนี้ออกแบบไว้สำหรับจอทีวีแนวนอนติดผนังเป็นหลัก
+     แต่ต้องไม่พังถ้าเปิดจากแท็บเล็ต/มือถือ (breakpoint ชุดเดียวกับ
+     ทั้งระบบ: 1600 / 768 / 600 / 360 / landscape เตี้ย) ══════════ */
+  @media (max-width: 1200px) {
+    .kpi { grid-template-columns: repeat(3, 1fr); }
+  }
+  /* แท็บเล็ตแนวตั้ง/จอแคบ — สองคอลัมน์ (urgent/soon) แน่นเกินไป
+     ให้สลับเป็นซ้อนกันแนวตั้งแทน แต่ละแผงเลื่อนของตัวเองได้ */
+  @media (max-width: 768px) {
+    body { overflow-y: auto; overflow-x: hidden; }
+    .top { flex-wrap: wrap; row-gap: .35rem; padding: .5rem 1rem; }
+    .clock { margin-left: auto; text-align: right; }
+    .kpi { grid-template-columns: repeat(2, 1fr); padding: .6rem 1rem; }
+    .wrap { grid-template-columns: 1fr; height: auto; padding: 0 1rem 1rem; }
+    .panel { height: 46vh; }
+  }
+  @media (max-width: 600px) {
+    .t-title { font-size: 1.05rem; }
+    .t-sub { font-size: .66rem; }
+    .c-time { font-size: 1.4rem; }
+    .c-date { font-size: .64rem; }
+    .k-n { font-size: 1.35rem; }
+    .k-l { font-size: .64rem; }
+    .row { flex-wrap: wrap; row-gap: .3rem; }
+  }
+  @media (max-width: 360px) {
+    .kpi { grid-template-columns: repeat(2, 1fr); gap: .4rem; padding: .5rem .75rem; }
+    .k { padding: .5rem .6rem; }
+    .panel { height: 42vh; }
+  }
+  /* แนวนอนจอเตี้ย (แท็บเล็ต/มือถือหมุนนอน) — ยังเป็น 2 คอลัมน์แบบทีวีได้
+     แค่ลดความสูง header/kpi แล้วปรับความสูง .wrap ให้พอดีใหม่ */
+  @media (max-height: 480px) and (orientation: landscape) and (min-width: 769px) {
+    .top { padding: .35rem 1.4rem; }
+    .kpi { padding: .4rem 1.4rem; gap: .5rem; }
+    .k { padding: .4rem .6rem; }
+    .k-n { font-size: 1.5rem; }
+    .wrap { height: calc(100dvh - 108px); }
+  }
+  @media (max-height: 480px) and (orientation: landscape) and (max-width: 768px) {
+    .top { padding: .35rem 1rem; }
+    .kpi { padding: .4rem 1rem; gap: .4rem; }
+    .panel { height: 38vh; }
+  }
 </style>
 </head>
 <body>

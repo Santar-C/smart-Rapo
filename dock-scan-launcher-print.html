@@ -2,6 +2,7 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>QR เปิดแอปสแกน Dock — พิมพ์แปะหน้าคลัง</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
@@ -27,6 +28,32 @@
         font-weight:900; font-size:4.5mm; display:flex; align-items:center; justify-content:center; }
   .step-text{ font-size:4.5mm; color:#1e293b; line-height:1.5; padding-top:0.5mm; }
   .footer{ margin-top:auto; padding-top:10mm; font-size:3mm; color:#94a3b8; }
+
+  /* ═══ Screen fallback — this page exists for window.print(), but
+     if opened on a phone before printing, the physical mm-sized page
+     must not force horizontal scroll ═══ */
+  @media screen and (max-width: 210mm) {
+    body{ width:100%; max-width:100vw; height:auto; min-height:100vh; padding:6vw 5vw 20vw; }
+    .logo-row img{ height:9vw; max-height:44px; }
+    h1{ font-size:6.6vw; margin-bottom:3vw; }
+    .desc{ font-size:3.8vw; max-width:92vw; margin-bottom:6vw; }
+    .qr-box{ padding:6vw; border-radius:5vw; max-width:92vw; }
+    .qr-box img.qr{ width:60vw; height:60vw; max-width:300px; max-height:300px; }
+    .steps{ margin-top:7vw; max-width:92vw; gap:4vw; }
+    .num{ width:7vw; height:7vw; min-width:7vw; font-size:3.4vw; }
+    .step-text{ font-size:3.6vw; }
+    .footer{ padding-top:6vw; font-size:2.8vw; }
+  }
+
+  #printBtn{
+    position:fixed; left:50%; bottom:5vw; transform:translateX(-50%);
+    background:#002048; color:#fff; border:none; border-radius:999px;
+    font-family:'Sarabun',sans-serif; font-weight:700; font-size:4vw;
+    padding:3.2vw 7vw; min-height:44px; box-shadow:0 6px 20px rgba(0,32,72,.35);
+    cursor:pointer;
+  }
+  @media screen and (min-width: 210mm){ #printBtn{ font-size:16px; padding:12px 28px; } }
+  @media print{ #printBtn{ display:none!important; } }
 </style>
 </head>
 <body>
@@ -53,6 +80,8 @@
   </div>
 
   <div class="footer">RAPO System · Smart Dock Pro</div>
+
+  <button id="printBtn" onclick="window.print()" aria-label="พิมพ์">🖨️ พิมพ์หน้านี้</button>
 
   <script>
     // สร้าง QR ของ URL หน้าสแกนจริง ด้วย service เดียวกับที่ใช้ในระบบ (dock.html)

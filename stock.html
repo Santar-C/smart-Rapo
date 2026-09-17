@@ -34,8 +34,11 @@
       display:flex;align-items:center;justify-content:center;text-decoration:none;color:#fff;
       font-size:1.1rem;flex-shrink:0;transition:background .2s}
     .back-btn:hover{background:rgba(255,255,255,.22)}
-    .top-title{font-size:1rem;font-weight:700;line-height:1.2}
-    .top-sub{font-size:.72rem;opacity:.6}
+    .top-bar-left{display:flex;align-items:center;gap:.75rem;min-width:0;flex:1}
+    .top-bar-titles{min-width:0}
+    .top-bar-right{display:flex;align-items:center;gap:.6rem;flex-shrink:0}
+    .top-title{font-size:1rem;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .top-sub{font-size:.72rem;opacity:.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .role-pill{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);
       padding:.3rem .8rem;border-radius:20px;font-size:.78rem;font-weight:600}
     /* ALERT BANNER */
@@ -111,6 +114,11 @@
     .form-group .hint{font-size:.68rem;color:#94a3b8;margin-top:.2rem}
     .form-group.span2{grid-column:span 2}
     .form-group.span3{grid-column:span 3}
+    /* DASHBOARD CHART ROWS — เดิมเป็น inline style grid-template-columns คงที่
+       (1fr 2fr / 1fr 1fr) ย้ายมาเป็น class เพื่อให้ media query คุมได้จริง */
+    .dash-row{display:grid;gap:1rem}
+    .dash-row-12{grid-template-columns:1fr 2fr}
+    .dash-row-11{grid-template-columns:1fr 1fr}
 
     /* CSS TOOLTIP — ไม่ต้องพึ่ง JS เลย */
     
@@ -175,10 +183,46 @@
       font-size:.88rem;font-weight:600;z-index:9999;transition:transform .3s;
       box-shadow:0 8px 24px rgba(0,0,0,.2);white-space:nowrap;pointer-events:none}
     #toast.show{transform:translateX(-50%) translateY(0)}
+    /* ══ RESPONSIVE ══════════════════════════════════════════ */
+    .table-wrap{-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    .table-wrap::-webkit-scrollbar{display:none}
+
+    @media(max-width:900px){
+      .dash-row-12,.dash-row-11{grid-template-columns:1fr}
+    }
     @media(max-width:600px){
       .stats-row{grid-template-columns:repeat(3,1fr)}
       .form-grid{grid-template-columns:repeat(2,1fr)}
       .form-group.span3{grid-column:span 2}
+      .top-bar{padding:.65rem .9rem;gap:.6rem}
+      .top-bar-logo{width:30px;height:30px}
+      .back-btn{width:32px;height:32px;font-size:1rem}
+      .top-title{font-size:.88rem}
+      .top-sub{display:none}
+      .role-pill{font-size:.68rem;padding:.25rem .6rem}
+      .page-body{padding:.65rem .9rem 1.5rem}
+      .stats-row{padding:.85rem .9rem 0}
+      .tab-bar{padding:.65rem .9rem 0}
+      .card{padding:.9rem}
+      table{min-width:720px}
+      th,td{padding:.45rem .55rem}
+    }
+    @media(max-width:380px){
+      .stats-row{grid-template-columns:repeat(2,1fr)}
+      .form-grid{grid-template-columns:1fr}
+      .form-group.span2,.form-group.span3{grid-column:span 1}
+    }
+    /* ── แนวนอนจอเตี้ย (มือถือ/แท็บเล็ตหมุนนอน) ── ประหยัดความสูง ── */
+    @media (max-height:480px) and (orientation:landscape){
+      .top-bar{padding:.5rem .9rem}
+      .top-bar-logo{width:26px;height:26px}
+      .back-btn{width:28px;height:28px}
+      .top-sub{display:none}
+      .stats-row{padding:.6rem .9rem 0;grid-template-columns:repeat(auto-fill,minmax(100px,1fr))}
+      .tab-bar{padding:.5rem .9rem 0}
+      .page-body{padding:.5rem .9rem 1rem}
+      .card{padding:.75rem;margin-bottom:.6rem}
+      .dash-row-12,.dash-row-11{grid-template-columns:1fr 1fr}
     }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -186,15 +230,15 @@
 <body>
 
 <div class="top-bar">
-  <div style="display:flex;align-items:center;gap:.75rem">
+  <div class="top-bar-left">
     <div class="top-bar-logo"><img src="assets/ceva-logo-clean.png" alt="CEVA" onerror="this.style.display='none'"></div>
     <a href="index.html" class="back-btn"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg></a>
-    <div>
+    <div class="top-bar-titles">
       <div class="top-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> ระบบสต็อก Consumables</div>
       <div class="top-sub">RAPO · Essentials & Packaging Materials</div>
     </div>
   </div>
-  <div style="display:flex;align-items:center;gap:.6rem">
+  <div class="top-bar-right">
     <div class="role-pill" id="role-pill">—</div>
     <button class="btn btn-ghost btn-sm" id="btn-logout" style="color:#fff;border-color:rgba(255,255,255,.3)">ออก</button>
   </div>
@@ -221,7 +265,7 @@
   <button class="tab-btn" onclick="switchTab('log')" id="tab-log"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h12a2 2 0 0 0 2-2v-2H10v2a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v3h4"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/></svg> ประวัติ</button>
   <button class="tab-btn" onclick="switchTab('dashboard')" id="tab-dashboard"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> Dashboard</button>
   <button class="tab-btn" onclick="switchTab('cycle')" id="tab-cycle"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></svg> Cycle Count</button>
-  <button class="tab-btn admin-only" onclick="switchTab('manage')" id="tab-manage" style="display:none"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg> จัดการ</button>
+  <button class="tab-btn" onclick="switchTab('manage')" id="tab-manage" style="display:none"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg> จัดการ</button>
 </div>
 
 <div class="page-body">
@@ -253,7 +297,7 @@
         <th style="background:#065f46;white-space:nowrap"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></svg> ใช้ได้</th>
         <th style="background:#7f1d1d;white-space:nowrap"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg> ควรสั่ง</th>
         <th>Moving Status</th>
-        <th class="admin-only"></th>
+        <th id="list-actions-th"></th>
       </tr></thead>
       <tbody id="product-tbody"></tbody>
     </table>
@@ -264,7 +308,7 @@
 
   <!-- ══ INFO SECTION: ที่มาและสูตรคำนวณ ══ -->
   <details style="margin-top:1.25rem;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)">
-    <summary style="padding:.85rem 1.1rem;font-weight:700;font-size:.9rem;color:#002048;cursor:pointer;list-style:none;display:flex;align-items:center;gap:.5rem;user-select:none">
+    <summary style="padding:.85rem 1.1rem;font-weight:700;font-size:.9rem;color:#002048;cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;user-select:none">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> ที่มาและหลักการคำนวณทุก Field (คลิกเพื่อขยาย / สำหรับ Auditor)
       <span style="margin-left:auto;font-size:.75rem;color:#64748b;font-weight:400">กด ▶ เพื่อดูสูตร</span>
     </summary>
@@ -447,7 +491,7 @@
 
 <!-- RECEIVE -->
 <div id="pane-receive" style="display:none">
-  <div class="card admin-only">
+  <div class="card" id="receive-card">
     <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg> รับสินค้าเข้า (Receive / GR)</div>
     <div class="form-grid">
       <div class="form-group span3">
@@ -475,13 +519,13 @@
 
 <!-- REORDER -->
 <div id="pane-reorder" style="display:none">
-  <div style="display:flex;justify-content:flex-end;gap:.5rem;margin-bottom:.9rem">
+  <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:.5rem;margin-bottom:.9rem">
     <button class="btn btn-primary btn-sm" onclick="printPR()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> พิมพ์ใบขอซื้อ (PR)</button>
     <button class="btn btn-ghost btn-sm" onclick="printKanban()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg> พิมพ์ Kanban Card</button>
     <button class="btn btn-ghost btn-sm" onclick="printAnnualReview()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg> Annual Review</button>
     <button class="btn btn-ghost btn-sm" onclick="exportStockCSV()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Export CSV</button>
   </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.75rem">
     <div style="font-weight:700;font-size:.95rem;color:var(--navy)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg> รายการที่ควรสั่งซื้อ</div>
     <button class="btn btn-ghost btn-sm" onclick="exportReorder()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg> Export CSV</button>
   </div>
@@ -497,7 +541,7 @@
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem;margin-bottom:1.25rem" id="dash-kpi"></div>
 
   <!-- Row 1: วงกลม + แท่ง -->
-  <div style="display:grid;grid-template-columns:1fr 2fr;gap:1rem;margin-bottom:1rem">
+  <div class="dash-row dash-row-12" style="margin-bottom:1rem">
     <div class="card" style="padding:1rem">
       <div style="font-weight:700;font-size:.88rem;color:var(--navy);margin-bottom:.75rem"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg> สัดส่วนสถานะสต็อก</div>
       <canvas id="chart-donut" height="220"></canvas>
@@ -515,7 +559,7 @@
   </div>
 
   <!-- Row 3: รายการสั่งซื้อ + Stock vs RP -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+  <div class="dash-row dash-row-11" style="margin-bottom:1rem">
     <div class="card" style="padding:1rem">
       <div style="font-weight:700;font-size:.88rem;color:var(--navy);margin-bottom:.75rem"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg> รายการต้องสั่งซื้อพร้อมยอดรวม</div>
       <div id="dash-reorder-list" style="max-height:280px;overflow-y:auto"></div>
@@ -548,7 +592,7 @@
       </select>
       <button class="btn btn-primary btn-sm" onclick="renderCycle()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg> โหลดรายการ</button>
       <button class="btn btn-ghost btn-sm" onclick="printCountSheet()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg> พิมพ์ใบนับสต็อก</button>
-      <button class="btn btn-ghost btn-sm" onclick="saveCycleCount()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> บันทึกผลนับ</button>
+      <button class="btn btn-ghost btn-sm" id="btn-save-cycle" onclick="saveCycleCount()"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg> บันทึกผลนับ</button>
       <span id="cy-summary" style="margin-left:auto;font-size:.82rem;color:#64748b"></span>
     </div>
   </div>
@@ -595,7 +639,7 @@
 
 <!-- MANAGE (Admin) -->
 <div id="pane-manage" style="display:none">
-  <div class="card">
+  <div class="card" id="manage-form-card">
     <div class="card-title" id="manage-title">เพิ่มสินค้าใหม่</div>
     <div class="form-grid">
       <div class="form-group"><label>SKU *</label><input type="text" id="m-sku" placeholder="CON-001"></div>
@@ -683,7 +727,7 @@
   </div>
 
   <!-- Adjust -->
-  <div class="card">
+  <div class="card" id="adjust-card">
     <div class="card-title"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> ปรับยอดสต็อก (Stock Adjustment)</div>
     <div class="form-grid">
       <div class="form-group span3">
@@ -720,10 +764,9 @@
 
 <!-- tooltip ใช้ CSS แล้ว -->
 <script type="module">
-import { auth, db } from "./firebase-config.js";
-import { getUserProfile, logoutUser } from "./auth.js";
+import { db } from "./firebase-config.js";
+import { requireAuth, logoutUser, hasPermission, ROLE_LABELS } from "./auth.js";
 import { icon, dot } from "./icons.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   collection, doc, onSnapshot, setDoc, updateDoc, addDoc, deleteDoc,
   query, orderBy, limit, serverTimestamp
@@ -733,7 +776,7 @@ const COL_PRODUCTS = "stock_products";
 const COL_LOGS     = "stock_logs";
 let allProducts = [], allLogs = [];
 let currentFilter = 'all', currentSearch = '';
-let currentRole = 'user', currentUser = null;
+let currentRole = 'employee', currentUser = null, currentPerms = {};
 
 // ══════════════════════════════════
 // CALC HELPERS
@@ -983,9 +1026,9 @@ function renderList(){
     const rowBg    = st==='out'     ? 'background:#fff5f5' :
                      st==='low'     ? 'background:#fff9f0' :
                      st==='reorder' ? 'background:#fffef0' : '';
-    const adminBtn = currentRole==='admin' ?
-      `<button class="btn btn-ghost btn-sm" onclick="window.editP('${p.id}')">${icon('edit',{size:14})}</button>
-       <button class="btn btn-ghost btn-sm" onclick="window.deleteP('${p.id}','${p.name.replace(/'/g,'')}')" style="color:var(--red)">${icon('trash',{size:14})}</button>` : '';
+    const adminBtn =
+      (hasPermission(currentPerms,'stock_product_edit') ? `<button class="btn btn-ghost btn-sm" onclick="window.editP('${p.id}')">${icon('edit',{size:14})}</button>` : '') +
+      (hasPermission(currentPerms,'stock_product_delete') ? `<button class="btn btn-ghost btn-sm" onclick="window.deleteP('${p.id}','${p.name.replace(/'/g,'')}')" style="color:var(--red)">${icon('trash',{size:14})}</button>` : '');
     return `<tr style="${rowBg}">
       <td style="font-weight:600">${p.name}</td>
       <td class="sku-cell">${p.sku}</td>
@@ -1168,7 +1211,11 @@ function renderLog(){
 
 function renderManageList(){
   const tbody = document.getElementById('manage-tbody');
-  tbody.innerHTML = allProducts.map(p=>`<tr>
+  tbody.innerHTML = allProducts.map(p=>{
+    const btns =
+      (hasPermission(currentPerms,'stock_product_edit') ? `<button class="btn btn-ghost btn-sm" onclick="window.editP('${p.id}')">${icon('edit',{size:14})}</button>` : '') +
+      (hasPermission(currentPerms,'stock_product_delete') ? `<button class="btn btn-ghost btn-sm" onclick="window.deleteP('${p.id}','${p.name.replace(/'/g,'')}')" style="color:var(--red)">${icon('trash',{size:14})}</button>` : '');
+    return `<tr>
     <td style="font-weight:600">${p.name}</td>
     <td class="sku-cell">${p.sku}</td>
     <td><b>${p.qty??0}</b></td>
@@ -1178,16 +1225,14 @@ function renderManageList(){
     <td style="color:var(--amber);font-weight:700">${calcRP(p)}</td>
     <td>${calcMin(p)}</td>
     <td>${calcMax(p)}</td>
-    <td>
-      <button class="btn btn-ghost btn-sm" onclick="window.editP('${p.id}')">${icon('edit',{size:14})}</button>
-      <button class="btn btn-ghost btn-sm" onclick="window.deleteP('${p.id}','${p.name.replace(/'/g,'')}')'" style="color:var(--red)">${icon('trash',{size:14})}</button>
-    </td>
-  </tr>`).join('');
+    <td>${btns}</td>
+  </tr>`;
+  }).join('');
 }
 
 function renderAll(){
   renderStats(); renderList(); renderReorder(); renderLog();
-  if(currentRole==='admin') renderManageList();
+  if(hasPermission(currentPerms,'stock_product_edit') || hasPermission(currentPerms,'stock_product_delete') || hasPermission(currentPerms,'stock_manage_tab')) renderManageList();
 }
 
 // ══════════════════════════════════
@@ -1251,7 +1296,7 @@ window.clearW = function(){
 // RECEIVE
 // ══════════════════════════════════
 window.doReceive = async function(){
-  if(currentRole!=='admin'){ toast('สิทธิ์ Admin เท่านั้น'); return; }
+  if(!hasPermission(currentPerms,'stock_receive')){ toast('ไม่มีสิทธิ์รับสินค้าเข้า'); return; }
   const sku = document.getElementById('r-sku').value.trim();
   const qty = parseInt(document.getElementById('r-qty').value);
   const po  = document.getElementById('r-po').value.trim();
@@ -1283,7 +1328,7 @@ window.clearR = function(){
 // ADJUST
 // ══════════════════════════════════
 window.doAdjust = async function(){
-  if(currentRole!=='admin'){ toast('สิทธิ์ Admin เท่านั้น'); return; }
+  if(!hasPermission(currentPerms,'stock_adjust')){ toast('ไม่มีสิทธิ์ปรับยอดสต็อก'); return; }
   const sku  = document.getElementById('adj-sku').value.trim();
   const qty  = parseInt(document.getElementById('adj-qty').value);
   const note = document.getElementById('adj-note').value.trim();
@@ -1306,7 +1351,7 @@ window.doAdjust = async function(){
 // SAVE PRODUCT
 // ══════════════════════════════════
 window.saveProduct = async function(){
-  if(currentRole!=='admin'){ toast('สิทธิ์ Admin เท่านั้น'); return; }
+  if(!hasPermission(currentPerms,'stock_manage_tab')){ toast('ไม่มีสิทธิ์จัดการสินค้า'); return; }
   const sku  = document.getElementById('m-sku').value.trim().toUpperCase();
   const name = document.getElementById('m-name').value.trim();
   if(!sku || !name){ toast('กรุณากรอก SKU และชื่อสินค้า'); return; }
@@ -1378,7 +1423,7 @@ window.editP = function(id){
 };
 
 window.deleteP = async function(id, name){
-  if(currentRole!=='admin'){ toast('สิทธิ์ Admin เท่านั้น'); return; }
+  if(!hasPermission(currentPerms,'stock_product_delete')){ toast('ไม่มีสิทธิ์ลบสินค้า'); return; }
   if(!confirm(`ลบ "${name}" ออกจากระบบ?`)) return;
   try { await deleteDoc(doc(db, COL_PRODUCTS, id)); toast('ลบเรียบร้อย'); }
   catch(e){ toast(e.message); }
@@ -1924,7 +1969,7 @@ window.calcDiff = function(inp){
 };
 
 window.saveCycleCount = async function(){
-  if(currentRole !== 'admin'){ toast('เฉพาะ Admin เท่านั้น'); return; }
+  if(!hasPermission(currentPerms,'stock_cyclecount_save')){ toast('ไม่มีสิทธิ์บันทึกผลนับสต็อก'); return; }
   const inputs = [...document.querySelectorAll('.cy-actual')].filter(i => i.value !== '');
   if(!inputs.length){ toast('ยังไม่ได้กรอกยอดนับ'); return; }
 
@@ -2282,17 +2327,42 @@ function startListeners(){
 // ═══════════════════════════════════
 // AUTH
 // ═══════════════════════════════════
-onAuthStateChanged(auth, async user=>{
-  if(!user){ window.location.href='index.html'; return; }
+requireAuth().then(({ user, profile, permissions })=>{
   currentUser = user;
-  const profile = await getUserProfile(user.uid);
-  currentRole = profile.role || 'user';
-  document.getElementById('role-pill').textContent = currentRole==='admin'?'Admin':'User';
-  document.querySelectorAll('.admin-only').forEach(el=>{ el.style.display=currentRole==='admin'?'':'none'; });
-  if(currentRole !== 'admin'){
-    document.getElementById('receive-noaccess').style.display='block';
-    document.getElementById('pane-receive').querySelector('.admin-only').style.display='none';
+  currentRole = profile.role || 'employee';
+  currentPerms = permissions;
+  document.getElementById('role-pill').textContent = ROLE_LABELS[currentRole] || currentRole;
+
+  const canEdit   = hasPermission(currentPerms, 'stock_product_edit');
+  const canDelete = hasPermission(currentPerms, 'stock_product_delete');
+  const canManage = hasPermission(currentPerms, 'stock_manage_tab');
+  const canAdjust = hasPermission(currentPerms, 'stock_adjust');
+  const canReceive= hasPermission(currentPerms, 'stock_receive');
+  const canCycle  = hasPermission(currentPerms, 'stock_cyclecount_save');
+
+  const listActionsTh = document.getElementById('list-actions-th');
+  if (listActionsTh) listActionsTh.style.display = (canEdit || canDelete) ? '' : 'none';
+
+  const tabManage = document.getElementById('tab-manage');
+  if (tabManage) tabManage.style.display = (canManage || canAdjust || canEdit || canDelete) ? '' : 'none';
+  const manageFormCard = document.getElementById('manage-form-card');
+  if (manageFormCard) manageFormCard.style.display = canManage ? '' : 'none';
+  const adjustCard = document.getElementById('adjust-card');
+  if (adjustCard) adjustCard.style.display = canAdjust ? '' : 'none';
+
+  const receiveCard = document.getElementById('receive-card');
+  const receiveNoAccess = document.getElementById('receive-noaccess');
+  if (canReceive) {
+    if (receiveCard) receiveCard.style.display = '';
+    if (receiveNoAccess) receiveNoAccess.style.display = 'none';
+  } else {
+    if (receiveCard) receiveCard.style.display = 'none';
+    if (receiveNoAccess) receiveNoAccess.style.display = 'block';
   }
+
+  const btnSaveCycle = document.getElementById('btn-save-cycle');
+  if (btnSaveCycle) btnSaveCycle.style.display = canCycle ? '' : 'none';
+
   startListeners();
   buildDD('w-search','w-dropdown','w-sku','w-stock-info');
   buildDD('r-search','r-dropdown','r-sku',null);

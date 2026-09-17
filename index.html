@@ -168,7 +168,7 @@
       max-width: 440px;
       height: 420px;
     }
-    @media (min-width: 901px) {
+    @media (min-width: 901px) and (min-height: 700px) {
       .login-visual { display: block; }
     }
     .halo-visual-label {
@@ -646,10 +646,49 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── RESPONSIVE ──────────────────────────────── */
+    @media (max-width: 900px) {
+      .menu-halo-stage { height: 240px; }
+      .dash-body { padding: 1.15rem; }
+    }
     @media (max-width: 480px) {
-      .menu-halo-stage { height: 230px; }
+      .menu-halo-stage { height: 210px; }
       .dash-body { padding: 1rem; }
       .user-badge span.name { display: none; }
+      .dash-header { padding: 0.85rem 1rem; }
+      .dash-header-title { font-size: 1rem; }
+      .dash-greeting h2 { font-size: 1.2rem; }
+      .login-card { padding: 2rem 1.35rem; }
+    }
+    @media (max-width: 360px) {
+      .login-card { padding: 1.5rem 1.1rem; }
+      .login-logo img, .login-logo .logo-fallback { width: 70px; height: 70px; }
+    }
+
+    /* ── มือถือ/แท็บเล็ตแนวนอน จอเตี้ย ───────────────
+       เน้นลดความสูงของทุกส่วนที่ซ้อนกันแนวตั้ง กัน login-card /
+       เมนูหมุนวนโดน rapo-dock ลอยทับหรือล้นจอ */
+    @media (max-height: 480px) and (orientation: landscape) {
+      #login-page { gap: 1.5rem; padding: 1rem 1.5rem; align-items: center; }
+      .rapo-dock-wrap { top: 0.5rem; }
+      .rapo-dock { height: 38px; }
+      .rapo-dock-item { height: 30px; font-size: .68rem; padding: 0 10px; }
+      .login-visual { display: none !important; }
+      .login-card { padding: 1.1rem 1.5rem; max-height: 92dvh; overflow-y: auto; }
+      .login-logo { margin-bottom: 0.6rem; }
+      .login-logo img, .login-logo .logo-fallback { width: 52px; height: 52px; border-radius: 12px; }
+      .login-title { font-size: 1.2rem; margin-bottom: 0.1rem; }
+      .login-subtitle { margin-bottom: 0.9rem; }
+      .form-group { margin-bottom: 0.6rem; }
+      .login-footer { margin-top: 0.75rem; }
+
+      .dash-header { padding: 0.5rem 1rem; }
+      .dash-header-logo { width: 32px; height: 32px; }
+      .dash-header-subtitle { display: none; }
+      .dash-body { padding: 0.75rem 1.25rem; }
+      .dash-greeting { margin-bottom: 0.75rem; }
+      .dash-greeting h2 { font-size: 1.05rem; }
+      .dash-greeting p { display: none; }
+      .menu-halo-stage { height: 200px; margin-top: 0.25rem; }
     }
   </style>
 </head>
@@ -747,7 +786,7 @@
 
   <script type="module">
     import { auth, db } from "./firebase-config.js";
-    import { loginUser, logoutUser, getUserProfile } from "./auth.js";
+    import { loginUser, logoutUser, getUserProfile, getRolePermissions, hasPermission, ROLE_LABELS } from "./auth.js";
     import { icon } from "./icons.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -760,7 +799,7 @@
         sub: "",
         href: "medicine.html",
         color: "card-medicine",
-        role: "all"
+        perm: null
       },
       {
         id: "stock",
@@ -769,7 +808,7 @@
         sub: "Consumer / General",
         href: "stock.html",
         color: "card-stock",
-        role: "all"
+        perm: null
       },
       {
         id: "stocktake",
@@ -778,7 +817,7 @@
         sub: "สำหรับพนักงานนับ",
         href: "stocktake.html",
         color: "card-stocktake",
-        role: "all"
+        perm: null
       },
       {
         id: "monitor",
@@ -787,7 +826,7 @@
         sub: "สำหรับหัวหน้างาน",
         href: "monitor.html",
         color: "card-monitor",
-        role: "admin"
+        perm: "page_monitor"
       },
       {
         id: "dashboard",
@@ -796,7 +835,7 @@
         sub: "ภาพรวมสำหรับผู้บริหาร",
         href: "dashboard.html",
         color: "card-dashboard",
-        role: "admin"
+        perm: "page_dashboard"
       },
       {
         id: "dock",
@@ -805,7 +844,7 @@
         sub: "Management",
         href: "dock.html",
         color: "card-dock",
-        role: "all"
+        perm: null
       },
       {
         id: "wms",
@@ -814,7 +853,7 @@
         sub: "Receipt · Putaway · Pick · Pack · Ship",
         href: "wms.html",
         color: "card-wms",
-        role: "all"
+        perm: null
       },
       {
         id: "wi",
@@ -823,7 +862,7 @@
         sub: "WI Documents",
         href: "wi.html",
         color: "card-wi",
-        role: "all"
+        perm: null
       },
       {
         id: "users",
@@ -832,17 +871,17 @@
         sub: "User Management",
         href: "users.html",
         color: "card-users",
-        role: "admin"
+        perm: "page_users"
       }
     ];
 
     // ── Render เมนู (การ์ดหมุนวนบนวงรี) ───────────
-    function renderCards(role) {
+    function renderCards(permissions) {
       const stage = document.getElementById("menu-halo-stage");
       if (!stage) return;
       stage.innerHTML = "";
 
-      const items = MENUS.filter(menu => menu.role !== "admin" || role === "admin");
+      const items = MENUS.filter(menu => !menu.perm || hasPermission(permissions, menu.perm));
       if (!items.length) return;
 
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -855,7 +894,7 @@
         el.style.width  = CARD_W + "px";
         el.style.height = CARD_H + "px";
         el.innerHTML = `
-          ${menu.role === "admin" ? '<span class="admin-badge">Admin</span>' : ""}
+          ${menu.perm ? '<span class="admin-badge">Admin</span>' : ""}
           <span class="card-icon">${icon(menu.icon, { size: 34 })}</span>
           <span class="card-title">${menu.title}</span>
           ${menu.sub ? `<span class="card-sub">${menu.sub}</span>` : ""}
@@ -999,14 +1038,16 @@
         // มี session → ไปหน้า Dashboard
         const profile = await getUserProfile(user.uid);
         const name = profile.name || user.email;
-        const role = profile.role || "user";
+        const role = profile.role || "employee";
+        const allPerms = await getRolePermissions();
+        const permissions = allPerms[role] || {};
 
         document.getElementById("login-page").style.display = "none";
         document.getElementById("dashboard-page").style.display = "block";
         document.getElementById("user-name-display").textContent = name;
-        document.getElementById("user-role-display").textContent = role;
+        document.getElementById("user-role-display").textContent = ROLE_LABELS[role] || role;
         document.getElementById("greeting-name").textContent = name;
-        renderCards(role);
+        renderCards(permissions);
       } else {
         // ยังไม่ Login → แสดงหน้า Login
         document.getElementById("login-page").style.display = "flex";

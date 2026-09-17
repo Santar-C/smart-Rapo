@@ -13,7 +13,18 @@
   <style>
     .page-body { max-width: 1600px; }
     .wh3d-layout { display:grid; grid-template-columns: 1fr 320px; gap:1rem; height: calc(100dvh - 140px); min-height: 480px; }
-    @media (max-width: 900px) { .wh3d-layout { grid-template-columns: 1fr; height: auto; } #wh3d-canvas-wrap { height: 60dvh; } }
+    @media (max-width: 900px) {
+      .wh3d-layout { grid-template-columns: 1fr; height: auto; min-height: 0; }
+      #wh3d-canvas-wrap { height: 60dvh; min-height: 260px; }
+    }
+    /* ── Landscape phones/tablets with a short viewport: stack + shrink the
+       canvas instead of forcing the 480px min-height (which would overflow
+       a viewport that's shorter than that) ─────────────────────────────── */
+    @media (max-height: 480px) and (orientation: landscape) {
+      .wh3d-layout { grid-template-columns: 1fr; height: auto; min-height: 0; }
+      #wh3d-canvas-wrap { height: 55dvh; min-height: 200px; }
+      .wh3d-side { gap: .6rem; }
+    }
     #wh3d-canvas-wrap {
       position: relative; border-radius: var(--radius); overflow: hidden;
       border: 1.5px solid var(--border); box-shadow: var(--shadow); background: #0f172a;

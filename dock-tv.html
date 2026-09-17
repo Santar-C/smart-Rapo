@@ -67,6 +67,36 @@
     .job-in{background:#0ea5e9;color:#fff;font-weight:900;font-size:.72rem;padding:2px 10px;border-radius:999px;display:inline-block}
     .job-out{background:#f97316;color:#fff;font-weight:900;font-size:.72rem;padding:2px 10px;border-radius:999px;display:inline-block}
     .st-badge{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;display:inline-block}
+
+    /* ═══ Responsive fallback ═══════════════════════════════
+       This board is primarily a wall-mounted TV in landscape,
+       but must still degrade gracefully on a tablet (smaller
+       landscape resolution) or a phone (portrait fallback).
+    ══════════════════════════════════════════════════════════ */
+    @media (max-width: 1100px) {
+      .dock-grid{grid-template-columns:repeat(2,1fr)}
+      .clock{font-size:2rem}
+      .left{flex-basis:62%}
+      .right{flex-basis:38%}
+    }
+
+    @media (max-width: 860px), (orientation: portrait) {
+      html,body{overflow-y:auto;overflow-x:hidden}
+      .body{flex-direction:column;height:auto;min-height:calc(100vh - 70px);overflow:visible}
+      .hdr{height:auto;min-height:64px;flex-wrap:wrap;gap:.5rem;padding:.6rem 1rem}
+      .clock{font-size:1.7rem}
+      .clock-date{text-align:right}
+      .left{flex:none;width:100%;border-right:none;border-bottom:2px solid #1e2d48;max-height:58vh}
+      .dock-grid{grid-template-columns:repeat(2,1fr);overflow-y:auto}
+      .right{flex:none;width:100%;min-height:200px;max-height:38vh}
+    }
+
+    @media (max-width: 480px) {
+      .dock-grid{grid-template-columns:1fr}
+      .app-name{font-size:.95rem}
+      .clock{font-size:1.4rem}
+      .t-do-num{font-size:1.15rem}
+    }
   </style>
 </head>
 <body>

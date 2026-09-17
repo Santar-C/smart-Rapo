@@ -12,19 +12,57 @@ service cloud.firestore {
     function isOwner(uid) {
       return isLoggedIn() && request.auth.uid == uid;
     }
+    // สิทธิ์ของผู้ใช้ปัจจุบัน (role) — อ่านจาก users/{uid}.role
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    // เช็คสิทธิ์แบบละเอียดจากตาราง app_settings/role_permissions ที่ตั้งค่าได้ในหน้า
+    // users.html (Roles & Permissions) — fail-safe: ถ้า role ไม่มีอยู่จริง, เอกสารตั้งค่า
+    // ยังไม่มี, หรือ key ที่ถามไม่มีอยู่ใน map ของ role นั้น → get()/index จะ error และ
+    // Firestore ปฏิเสธ request โดยอัตโนมัติ (ปลอดภัยไว้ก่อนเสมอ ไม่มีทาง default เป็น true)
+    function hasPerm(key) {
+      return isLoggedIn() &&
+        get(/databases/$(database)/documents/app_settings/role_permissions).data[userRole()][key] == true;
+    }
+
     // ── Users Collection ──────────────────────────────────
     match /users/{userId} {
       allow read:   if isLoggedIn();
-      allow create: if isAdmin() || (isLoggedIn() && isOwner(userId));
-      allow update: if isAdmin() || isOwner(userId);
+      // สร้าง profile ของตัวเอง (login ครั้งแรก) ได้เฉพาะ role "employee" (สิทธิ์ต่ำสุด)
+      // เท่านั้น — กัน client ที่ถูกดัดแปลงสร้างตัวเองเป็น admin ตั้งแต่ create
+      // admin สร้าง user คนอื่นให้ role อะไรก็ได้ผ่านหน้า users.html
+      allow create: if isAdmin() || (isOwner(userId) && request.resource.data.role == 'employee');
+      // เจ้าของแก้ไขข้อมูลตัวเองได้ (เช่น name) แต่ "ห้ามแก้ role ของตัวเอง" —
+      // ป้องกันการ self-escalate สิทธิ์ผ่านการยิง request ตรงๆ ข้าม UI
+      // เปลี่ยน role ได้เฉพาะ admin เท่านั้น (ผ่านหน้า users.html)
+      allow update: if isAdmin() ||
+        (isOwner(userId) && request.resource.data.role == resource.data.role);
       allow delete: if isAdmin();
     }
-    // ── Products Collection ───────────────────────────────
+
+    // ── App Settings ────────────────────────────────────────
+    // role_permissions: ตาราง permission ทั้งระบบ (admin/sup/shipco/employee × ~29 key)
+    // เป็นจุดที่อ่อนไหวที่สุดในระบบสิทธิ์ทั้งหมด (แก้แล้วกระทบสิทธิ์ทุกคนทันที)
+    // เขียนได้เฉพาะ admin จริง (role=='admin') เท่านั้น ไม่ผูกกับ permission key ใดๆ
+    // เพื่อไม่ให้ role อื่นที่บังเอิญถูกให้สิทธิ์ page_users แล้วไปมอบสิทธิ์ admin ให้ตัวเองได้
+    match /app_settings/role_permissions {
+      allow read:  if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    // เอกสารอื่นใน app_settings (เช่น "รอบ" ปัจจุบันของ Stock Take) — จัดการผ่าน
+    // monitor.html เท่านั้น กันไม่ให้ rule ทั่วไปข้างล่างครอบคลุมถึง role_permissions
+    // (Firestore รวม rule ที่ match path เดียวกันแบบ OR ทั้งหมด ต้องกันไว้ชัดๆ)
+    match /app_settings/{settingId} {
+      allow read:  if isLoggedIn();
+      allow write: if settingId != 'role_permissions' && hasPerm('page_monitor');
+    }
+
+    // ── Products Collection (ของเดิม ไม่มีหน้าไหนใช้แล้ว) ──
     match /products/{productId} {
       allow read:   if isLoggedIn();
       allow write:  if isAdmin();
     }
-    // ── Transactions Collection ───────────────────────────
+    // ── Transactions Collection (ของเดิม ไม่มีหน้าไหนใช้แล้ว) ─
     match /transactions/{txId} {
       allow read:   if isLoggedIn();
       allow create: if isLoggedIn();
@@ -40,9 +78,11 @@ service cloud.firestore {
     // ── Medicines Collection ──────────────────────────────
     match /medicines/{medId} {
       allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow write:  if hasPerm('medicine_manage_tab');
     }
     // ── Medicine Batches ──────────────────────────────────
+    // ทุกคนที่ login เขียนได้ (พนักงานเบิกยา/dispense ลดจำนวนใน batch เอง
+    // ไม่ได้ผูกกับสิทธิ์ใดเป็นพิเศษ — รับยาเข้าถูกคุมที่ client ด้วย medicine_receive_action)
     match /medicine_batches/{batchId} {
       allow read:   if isLoggedIn();
       allow write:  if isLoggedIn();
@@ -55,21 +95,22 @@ service cloud.firestore {
     }
     // ── WI Documents ──────────────────────────────────────
     match /wi_documents/{docId} {
-      allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow read:          if isLoggedIn();
+      allow create, update: if hasPerm('wi_upload');
+      allow delete:         if hasPerm('wi_delete');
     }
     // ── Stock Products ────────────────────────────────────
-    // anonymous auth (request.auth != null) อ่านได้
+    // anonymous auth (request.auth != null) อ่าน/อัปเดตได้
     // เพื่อให้หน้าเบิกพนักงาน (stock-withdraw.html) ทำงานได้โดยไม่ต้อง login
+    // (คงพฤติกรรมเดิมไว้ทั้งหมด ไม่แตะ — เพิ่มแค่ create/delete ให้ละเอียดขึ้น)
     match /stock_products/{productId} {
       allow read:   if request.auth != null;
-      // update: หน้าเบิกพนักงาน (stock-withdraw.html, anonymous auth) ต้องตัดสต็อกเองได้
-      // create/delete (import/ลบสินค้า) สงวนไว้ให้ admin เท่านั้น
       allow update: if request.auth != null;
-      allow create, delete: if isAdmin();
+      allow create: if hasPerm('stock_manage_tab');
+      allow delete: if hasPerm('stock_product_delete');
     }
     // ── Stock Logs ────────────────────────────────────────
-    // anonymous auth อ่านและสร้าง record ได้ (เพื่อบันทึก transaction เบิก)
+    // anonymous auth อ่านและสร้าง record ได้ (เพื่อบันทึก transaction เบิก) — ไม่แตะ
     match /stock_logs/{logId} {
       allow read:   if request.auth != null;
       allow create: if request.auth != null;
@@ -78,88 +119,69 @@ service cloud.firestore {
 
     // ── Stock Take (Tag/Zone system) ───────────────────────
     // ใช้โดย stocktake.html, stocktake-scan.html (QR kiosk, anonymous auth),
-    // และ monitor.html (แท็บ Stock Take (Tag))
-    //
-    // master_stock: import/แก้ไข/ลบ สงวนไว้ให้ admin เท่านั้น (จัดการผ่าน monitor.html)
-    // อ่านได้ทุกคนที่ login แล้ว รวมถึง anonymous ที่เข้าจาก QR kiosk
+    // และ monitor.html (แท็บ Stock Take (Tag)) — เขียนโดย monitor.html เท่านั้น
+    // จึงผูกกับ page_monitor แทน isAdmin() ตรงๆ
     match /master_stock/{docId} {
       allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow write:  if hasPerm('page_monitor');
     }
-    // location_index: สรุปเบาๆ (แค่ location+zone+count) 1 เอกสารเดียว
-    // ให้ stocktake-scan.html โหลดแทน master_stock เต็ม (ลด read จาก 5,862 เหลือ 1)
-    // สร้าง/อัปเดตอัตโนมัติทุกครั้งที่ import/ล้าง Master ใน monitor.html
     match /location_index/{docId} {
       allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow write:  if hasPerm('page_monitor');
     }
-    // location_barcode_map: ตารางเทียบ "รหัสบาร์โค้ดของ WMS" ↔ "รหัส Location ที่คนอ่าน"
-    // (บาร์โค้ดจริงที่ติดหน้าช่องเป็นรหัสที่ WMS generate ไว้ คนละค่ากับรหัส location ที่เห็นด้วยตา)
     match /location_barcode_map/{docId} {
       allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow write:  if hasPerm('page_monitor');
     }
     // count_jobs / count_details: พนักงานหน้างาน (รวม anonymous จาก QR) ต้อง
-    // อ่าน/เขียนได้เอง เพื่อเริ่ม/นับ/ปิดงานได้โดยไม่ต้อง login เต็มรูปแบบ
+    // อ่าน/เขียนได้เอง เพื่อเริ่ม/นับ/ปิดงานได้โดยไม่ต้อง login เต็มรูปแบบ — ไม่แตะ
+    // delete: เฉพาะ monitor.html ตอนล้างข้อมูลผิดพลาด/ล้างทั้งรอบ
     match /count_jobs/{jobId} {
-      // create/update: kiosk (stocktake-scan.html, anonymous auth) เปิด/ปิดงานนับเอง
-      // delete: เฉพาะ monitor.html (admin) ตอนล้างข้อมูลผิดพลาด/ล้างทั้งรอบ
-      // ไม่มี flow ไหนที่ anonymous ต้องลบ job ของคนอื่น เลยตัดสิทธิ์ delete ออก
       allow read, create, update: if isLoggedIn();
-      allow delete: if isAdmin();
+      allow delete: if hasPerm('page_monitor');
     }
     match /count_details/{detId} {
       allow read, write: if isLoggedIn();
     }
-    // staff_list: รายชื่อพนักงานสำหรับ dropdown ตอนเริ่มนับ
-    // admin จัดการผ่าน monitor.html, ทุกคน (รวม anonymous) อ่านได้เพื่อแสดง dropdown
+    // staff_list: รายชื่อพนักงานสำหรับ dropdown ตอนเริ่มนับ — จัดการผ่าน monitor.html
     match /staff_list/{staffId} {
       allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
-    }
-    // app_settings: เก็บ "รอบ" (round) ปัจจุบันของ Stock Take
-    // ทุกคน (รวม anonymous จาก QR) ต้องอ่านได้เพื่อรู้ว่ากำลังนับรอบไหนอยู่
-    // เขียนได้เฉพาะ admin (ตอนเริ่มรอบใหม่ผ่าน monitor.html)
-    match /app_settings/{settingId} {
-      allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow write:  if hasPerm('page_monitor');
     }
     // stocktake_rounds: ประวัติทุก "รอบ" ที่เคยเริ่ม (ไม่ลบทิ้ง) ใช้โชว์ dropdown
-    // เลือกดูย้อนหลังใน Monitor — read ให้ admin (Monitor ใช้), เขียนตอนเริ่มรอบใหม่
+    // เลือกดูย้อนหลังใน Monitor
     match /stocktake_rounds/{roundId} {
-      allow read:   if isAdmin();
-      allow write:  if isAdmin();
+      allow read:   if hasPerm('page_monitor');
+      allow write:  if hasPerm('page_monitor');
     }
 
     // ── WMS Activity Log (wms.html) ───────────────────────
-    // wms_activity: แถวดิบ Receipt/Putaway/Picking/Packing/Shipping
-    // อ่านได้ทุกคนที่ login แล้ว (แท็บแดชบอร์ด), เขียน/ลบ (นำเข้า/Export&ล้าง/กู้คืน) เฉพาะ admin
+    // wms_activity / wms_daily_summary: เขียนได้เมื่อมีอย่างน้อยหนึ่งในสิทธิ์
+    // Import CSV / Export+ล้าง / กู้คืน Backup (ทั้ง 3 ปุ่มเขียน collection เดียวกันนี้
+    // แยกไม่ได้ในระดับ rule ว่ามาจากปุ่มไหน จึงคุมด้วยเงื่อนไข OR)
     match /wms_activity/{rowId} {
       allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow write:  if hasPerm('wms_import_csv') || hasPerm('wms_export_clear') || hasPerm('wms_restore_backup');
     }
-    // wms_daily_summary: สรุปยอดรายวัน เก็บถาวรแม้ล้างข้อมูลดิบไปแล้ว
     match /wms_daily_summary/{dateId} {
       allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow write:  if hasPerm('wms_import_csv') || hasPerm('wms_export_clear') || hasPerm('wms_restore_backup');
     }
     // sku_master: SKU → Ratio 1/2 (EA per case/pallet) นำเข้าจาก Master SKU.xlsx
-    // ใช้คำนวณ Picking KPI (เต็มพาเลท/หยิบเศษ) ในแดชบอร์ด
     match /sku_master/{sku} {
       allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow write:  if hasPerm('wms_import_sku_master');
     }
     // warehouse_locations: LocationID master นำเข้าจาก Power BI export
-    // ใช้สร้างผังคลัง 3D (warehouse-3d.html)
     match /warehouse_locations/{locationId} {
       allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow write:  if hasPerm('wms_import_location_master');
     }
-    // kpi_manual_entries: Actual ที่กรอกเองสำหรับ Process ที่ยังไม่มี
-    // ที่มาข้อมูลอัตโนมัติ (แท็บ KPI ใน wms.html)
+    // kpi_manual_entries: Actual ที่กรอกเองสำหรับ Process ที่ยังไม่มีที่มาข้อมูลอัตโนมัติ
     match /kpi_manual_entries/{entryId} {
       allow read:   if isLoggedIn();
-      allow write:  if isAdmin();
+      allow create: if hasPerm('wms_kpi_manual_add');
+      allow delete: if hasPerm('wms_kpi_manual_delete');
     }
   }
 }

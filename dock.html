@@ -9,8 +9,6 @@
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;900&display=swap" rel="stylesheet">
 
   <style>
@@ -64,21 +62,34 @@
 <!-- ══ Truck Manifest Print Area ══════════════════════════ -->
 <div id="mp"></div>
 
+<!-- ══ Auth/permission bridge — ใช้ auth.js (login จริง) เหมือนหน้าอื่นทั้งระบบ ══
+     module script รันก่อน DOMContentLoaded เสมอ ส่วน babel-standalone จะ transform
+     <script type="text/babel"> ก็ต่อเมื่อถึง DOMContentLoaded แล้ว เลยการันตีได้ว่า
+     window.__rapoAuthPromise / window.__rapoAuthHelpers พร้อมใช้ก่อน App() เริ่มทำงาน ══ -->
+<script type="module">
+  import { requireAuth, hasPermission, ROLE_LABELS, logoutUser } from "./auth.js";
+  import { rtdb } from "./firebase-config.js";
+  import {
+    ref, onValue, set as rtdbSet
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  window.__rapoAuthHelpers = { hasPermission, ROLE_LABELS, logoutUser };
+  // onValue คืนฟังก์ชัน unsubscribe มาตรงๆ (modular API v10) — เรียกมันแทน .off() แบบ v8 เดิม
+  window.__rapoRtdb = {
+    onValue: (path, cb, errCb) => onValue(ref(rtdb, path), cb, errCb),
+    set: (path, val) => rtdbSet(ref(rtdb, path), val)
+  };
+  window.__rapoAuthPromise = requireAuth();
+</script>
+
 <script type="text/babel">
 // ════════════════════════════════════════════════════════════
-// FIREBASE — rapo-system
+// FIREBASE — ใช้สะพาน window.__rapoRtdb / window.__rapoAuthPromise ที่ตั้งไว้จาก
+// <script type="module"> ด้านบน (auth.js + firebase-config.js ชุดเดียวกับทั้งระบบ)
+// แทนการสร้าง Firebase App v8 compat แยกต่างหากแบบเดิม — เพื่อให้ session ที่
+// login จริงผ่าน auth.js ใช้ auth token เดียวกันกับตอนอ่าน/เขียน Realtime DB
 // ════════════════════════════════════════════════════════════
-const FB = {
-  apiKey:"AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
-  authDomain:"rapo-system.firebaseapp.com",
-  databaseURL:"https://rapo-system-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId:"rapo-system",
-  storageBucket:"rapo-system.firebasestorage.app",
-  messagingSenderId:"87090183469",
-  appId:"1:87090183469:web:eafb1ded183755f329a7a4"
-};
-if(!firebase.apps.length) firebase.initializeApp(FB);
-const rtdb = firebase.database();
+const rtdb = window.__rapoRtdb;
 
 // ════════════════════════════════════════════════════════════
 // ICONS — เส้นเรียบสไตล์ Lucide แทนอิโมจิ (ไม่มีระบบ import ในหน้านี้
@@ -409,7 +420,7 @@ const SettingsView = ({settings, bays, isAdmin, onAddBay, onRenameBay, onDeleteB
   const saveToFirebase = async ()=>{
     setSaving(true);
     try {
-      await rtdb.ref('smartdock/settings').set(localSettings);
+      await rtdb.set('smartdock/settings', localSettings);
       setSaved(true); setTimeout(()=>setSaved(false), 2500);
     } catch(e){ alert('บันทึกไม่ได้: '+e.message); }
     setSaving(false);
@@ -1151,26 +1162,30 @@ function App() {
   const [online,   setOnline]   = React.useState(false);
   const [viewDate, setViewDate] = React.useState(TODAY());
   const [tab,      setTab]      = React.useState('board');
-  const [role,     setRole]     = React.useState('Admin');
   const [editId,   setEditId]   = React.useState(null);
   const [form,     setForm]     = React.useState(getBlank());
   const [scanOn,   setScanOn]   = React.useState(false);
   const [scanMsg,  setScanMsg]  = React.useState({text:'',ok:false});
+  const [authState,setAuthState]= React.useState(null); // {user, profile, permissions} จาก auth.js — null = กำลังตรวจสอบ
   const lastScan = React.useRef({text:'',t:0});
 
-  const isPower = ['Admin','Ship Co'].includes(role);
-  const isAdmin = role==='Admin';
-  const canDock = ['Admin','Sup'].includes(role);
+  React.useEffect(()=>{ window.__rapoAuthPromise.then(setAuthState); },[]);
+
+  const { hasPermission, ROLE_LABELS, logoutUser } = window.__rapoAuthHelpers;
+  const permissions = authState?.permissions || {};
+  const isPower  = hasPermission(permissions,'dock_power');
+  const isAdmin  = hasPermission(permissions,'dock_admin');
+  const canDock  = hasPermission(permissions,'dock_toggle_status');
+  const canView  = hasPermission(permissions,'dock_view');
+  const roleLabel = authState ? (ROLE_LABELS[authState.profile.role] || authState.profile.role) : '';
+  const userName  = authState?.profile?.name || authState?.user?.email || '';
 
   // ── Firebase realtime ─────────────────────────────────
   React.useEffect(()=>{
-    const bRef=rtdb.ref('smartdock/bookings');
-    const dRef=rtdb.ref('smartdock/bays');
-    const sRef=rtdb.ref('smartdock/settings');
-    bRef.on('value',s=>{ setBookings(safe(s.val())); setOnline(true); }, ()=>setOnline(false));
-    dRef.on('value',s=>{ const d=safe(s.val()); setBays(d.length?d.map(x=>typeof x==='string'?{name:x,status:'Available'}:x):INIT_BAYS); });
-    sRef.on('value',s=>{ const v=s.val(); if(v) setSettings({...DEFAULT_SETTINGS,...v}); });
-    return ()=>{ bRef.off(); dRef.off(); sRef.off(); };
+    const unsubB=rtdb.onValue('smartdock/bookings', s=>{ setBookings(safe(s.val())); setOnline(true); }, ()=>setOnline(false));
+    const unsubD=rtdb.onValue('smartdock/bays', s=>{ const d=safe(s.val()); setBays(d.length?d.map(x=>typeof x==='string'?{name:x,status:'Available'}:x):INIT_BAYS); });
+    const unsubS=rtdb.onValue('smartdock/settings', s=>{ const v=s.val(); if(v) setSettings({...DEFAULT_SETTINGS,...v}); });
+    return ()=>{ unsubB(); unsubD(); unsubS(); };
   },[]);
 
   // ── Auto generate Doc No ──────────────────────────────
@@ -1235,7 +1250,7 @@ function App() {
         if(next==='WaitingDoc') upd.timeWaitingDoc=t;
         if(next==='Completed')  upd.timeCompleted=t;
         const nb=bookings.map(x=>x.id===booking.id?upd:x);
-        rtdb.ref('smartdock/bookings').set(nb);
+        rtdb.set('smartdock/bookings', nb);
         setScanMsg({text:`${booking.shipmentNo} → ${STAT_LBL[next]}`,ok:true});
         setTimeout(()=>setScanMsg({text:'',ok:false}),3000);
       },()=>{}).catch(()=>setScanOn(false));
@@ -1243,8 +1258,8 @@ function App() {
   },[scanOn,bays,bookings]);
 
   // ── Helpers ───────────────────────────────────────────
-  const syncBookings = nb=>{ rtdb.ref('smartdock/bookings').set(nb); };
-  const syncBays     = nd=>{ rtdb.ref('smartdock/bays').set(nd); };
+  const syncBookings = nb=>{ rtdb.set('smartdock/bookings', nb); };
+  const syncBays     = nd=>{ rtdb.set('smartdock/bays', nd); };
 
   const isDelay = b=>{
     if(!b||b.status==='Completed'||b.status==='Pending') return false;
@@ -1322,7 +1337,7 @@ function App() {
       if(!reason.trim()){ alert('กรุณาระบุเหตุผลที่เปลี่ยนช่องจอด'); return; }
       changeLog = [...changeLog, {
         field:'allocation', from:original.allocation, to:form.allocation,
-        reason:reason.trim(), at:`${TODAY()} ${TIMENOW()}`, by:role
+        reason:reason.trim(), at:`${TODAY()} ${TIMENOW()}`, by:userName
       }];
     }
 
@@ -1339,7 +1354,7 @@ function App() {
     } else {
       nb=[...bookings, newEntry];
     }
-    rtdb.ref('smartdock/bookings').set(nb).then(()=>{
+    rtdb.set('smartdock/bookings', nb).then(()=>{
       setEditId(null);
       setForm(getBlank());
     }).catch(err=>alert('บันทึกไม่สำเร็จ: '+err.message));
@@ -1368,6 +1383,22 @@ function App() {
     {id:'settings',icon:'settings',lbl:'ตั้งค่า',h:!isAdmin},
   ];
 
+  if(!authState){
+    return (
+      <div className="h-full flex items-center justify-center bg-slate-900 text-white text-sm">
+        กำลังตรวจสอบสิทธิ์การใช้งาน...
+      </div>
+    );
+  }
+  if(!canView){
+    return (
+      <div className="h-full flex flex-col items-center justify-center gap-3 bg-slate-900 text-white text-sm">
+        <div>คุณไม่มีสิทธิ์เข้าถึงหน้านี้</div>
+        <a href="index.html" className="text-indigo-300 underline">กลับหน้าแรก</a>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-slate-50">
       {/* HEADER */}
@@ -1388,15 +1419,15 @@ function App() {
           </div>
         </div>
         <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-          <div className="flex gap-1 overflow-x-auto sh bg-slate-800/50 p-1 rounded-full border border-slate-700/50">
+          <div className="flex gap-1 overflow-x-auto sh bg-slate-800/50 p-1 rounded-full border border-slate-700/50 w-full md:w-auto">
             {TABS.filter(t=>!t.h).map(t=>(
               <button key={t.id} onClick={()=>setTab(t.id)}
-                className={`whitespace-nowrap text-xs font-semibold py-2 px-3 rounded-full transition-all ${tab===t.id?'bg-white text-indigo-700 shadow-md':'text-slate-300 hover:bg-slate-700 hover:text-white'}`}>
+                className={`whitespace-nowrap text-xs font-semibold py-2 px-3 rounded-full transition-all shrink-0 ${tab===t.id?'bg-white text-indigo-700 shadow-md':'text-slate-300 hover:bg-slate-700 hover:text-white'}`}>
                 <span className="inline-flex items-center gap-1"><Icon name={t.icon} size={12}/> {t.lbl}</span>
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center flex-wrap justify-center gap-2 w-full md:w-auto">
             <div className="flex items-center border border-slate-700 rounded-lg bg-slate-800 px-3 py-1.5">
               <span className="text-[11px] text-slate-400 mr-2"><Icon name="calendar" size={11}/></span>
               <input type="date" value={viewDate} onChange={e=>setViewDate(e.target.value)}
@@ -1404,18 +1435,17 @@ function App() {
             </div>
             <button onClick={()=>window.open(`dock-tv.html?date=${viewDate}`,'_blank')}
               className="bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors inline-flex items-center gap-1"><Icon name="monitor" size={12}/> TV</button>
-            <div className="flex items-center border border-slate-700 rounded-lg bg-slate-800 px-3 py-1.5">
-              <span className="text-[11px] text-slate-400 mr-2">สิทธิ์:</span>
-              <select value={role} onChange={e=>setRole(e.target.value)} className="bg-transparent text-white text-xs font-bold focus:outline-none cursor-pointer">
-                {['Admin','Ship Co','Sup','พนักงาน'].map(r=><option key={r} value={r} className="text-slate-900 bg-white">{r}</option>)}
-              </select>
+            <div className="flex items-center gap-2 border border-slate-700 rounded-lg bg-slate-800 px-3 py-1.5 flex-wrap justify-center">
+              <span className="text-[11px] text-slate-400">{userName}</span>
+              <span className="text-[10px] font-bold bg-indigo-600 text-white px-2 py-0.5 rounded-full">{roleLabel}</span>
+              <button onClick={logoutUser} className="text-[11px] text-slate-400 hover:text-white transition-colors">ออกจากระบบ</button>
             </div>
           </div>
         </div>
       </header>
 
       {/* MAIN */}
-      <div className="flex-1 overflow-hidden flex flex-col md:flex-row p-4 gap-4">
+      <div className="flex-1 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row p-4 gap-4">
         {/* Form Panel — only on board tab */}
         {isPower && tab==='board' && (
           <FormPanel form={form} setForm={setForm} bays={bays} settings={settings}
@@ -1423,7 +1453,7 @@ function App() {
         )}
 
         {/* Right content */}
-        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden gap-4">
+        <div className="flex-1 flex flex-col min-w-0 h-auto md:h-full overflow-visible md:overflow-hidden gap-4">
 
           {/* BOARD */}
           {tab==='board' && (<>
@@ -1457,7 +1487,7 @@ function App() {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto ds p-4 bg-slate-50/50">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {bays.map(dock=>{
                     const ab=dockBooks.find(b=>b.allocation===dock.name);
                     if(ab) return <DockCardOccupied key={dock.name} dock={dock} booking={ab} delay={isDelay(ab)} otd={getOTD(ab)}
