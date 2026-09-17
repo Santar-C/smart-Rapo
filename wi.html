@@ -148,7 +148,7 @@
 
 <script type="module">
   import { db, storage } from "./firebase-config.js";
-  import { requireAuth } from "./auth.js";
+  import { requireAuth, hasPermission } from "./auth.js";
   import { icon as svgIcon } from "./icons.js";
   import {
     collection, doc, setDoc, deleteDoc,
@@ -158,11 +158,11 @@
     ref as sRef, uploadBytesResumable, getDownloadURL, deleteObject
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-  let currentUser, profile;
+  let currentUser, profile, currentPerms;
   let allDocs = [], searchQ = "", catFilter = "all";
 
-  const { user, profile: prof } = await requireAuth();
-  currentUser = user; profile = prof;
+  const { user, profile: prof, permissions } = await requireAuth();
+  currentUser = user; profile = prof; currentPerms = permissions;
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">
@@ -175,7 +175,7 @@
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
     </nav>`;
 
-  if (profile.role === "admin") document.getElementById("admin-area").style.display = "block";
+  if (hasPermission(permissions, "wi_upload")) document.getElementById("admin-area").style.display = "block";
 
   let toastTimer;
   function toast(msg, cls="", dur=2500) {
@@ -243,7 +243,7 @@
           ? `<span class="badge badge-blue" style="font-size:0.68rem;">LINK</span>`
           : `<span class="badge badge-gray" style="font-size:0.68rem;">—</span>`;
 
-      const adminBtns = profile.role === "admin"
+      const adminBtns = hasPermission(currentPerms, "wi_delete")
         ? `<button onclick="deleteWI('${d.id}','${(d.storage_path||"").replace(/'/g,"")}')" class="btn btn-red btn-sm" style="margin-left:auto;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg> ลบ</button>`
         : "";
 
@@ -314,6 +314,7 @@
 
   // ── Save WI ─────────────────────────────────────────────
   document.getElementById("btn-save-wi").addEventListener("click", async () => {
+    if (!hasPermission(currentPerms, "wi_upload")) { toast("ไม่มีสิทธิ์อัปโหลด WI"); return; }
     const code  = document.getElementById("wi-code").value.trim();
     const title = document.getElementById("wi-title-input").value.trim();
     const cat   = document.getElementById("wi-cat-sel").value;
@@ -382,6 +383,7 @@
 
   // ── Delete WI ───────────────────────────────────────────
   window.deleteWI = async (id, storagePath) => {
+    if (!hasPermission(currentPerms, "wi_delete")) { toast("ไม่มีสิทธิ์ลบเอกสาร WI"); return; }
     if (!confirm(`ลบเอกสาร "${id}" แน่ใจหรือไม่?`)) return;
     // ลบจาก Storage ถ้ามีไฟล์
     if (storagePath) {

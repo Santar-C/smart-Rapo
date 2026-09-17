@@ -165,13 +165,13 @@
 
 <script type="module">
   import { db } from "./firebase-config.js";
-  import { requireAdmin } from "./auth.js";
+  import { requirePermission } from "./auth.js";
   import { icon } from "./icons.js";
   import {
     collection, doc, query, orderBy, onSnapshot
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const { user, profile } = await requireAdmin();
+  const { user, profile } = await requirePermission("page_dashboard");
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">

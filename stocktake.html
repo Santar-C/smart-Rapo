@@ -227,7 +227,7 @@
 
 <script type="module">
   import { db } from "./firebase-config.js";
-  import { requireAuth } from "./auth.js";
+  import { requireAuth, hasPermission } from "./auth.js";
   import { icon } from "./icons.js";
   import {
     collection, doc, addDoc, updateDoc, deleteDoc, getDocs, getDoc,
@@ -241,7 +241,7 @@
   // Normal = "Quantity": ยิงบาร์โค้ดซ้ำทีละชิ้นเพื่อนับจำนวน เทียบ Qty System
   function isBulkZone(zone) { return zone === "Zone B" || zone === "Overflow"; }
 
-  let currentUser, profile;
+  let currentUser, profile, currentPerms;
   let masterStock = [], allJobs = [], masterSearch = "";
   let curJob = null, scanEvents = []; // scanEvents: {docId, scanned_tag, timestamp/scan_time}
   let camStarted = false, html5Cam = null, locCam = null, lastScan = 0;
@@ -275,11 +275,11 @@
     else { warnEl.style.display = "none"; btn.disabled = false; }
   }
 
-  const { user, prof } = await (async () => {
+  const { user, prof, perms } = await (async () => {
     const r = await requireAuth();
-    return { user: r.user, prof: r.profile };
+    return { user: r.user, prof: r.profile, perms: r.permissions };
   })();
-  currentUser = user; profile = prof;
+  currentUser = user; profile = prof; currentPerms = perms;
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">
@@ -292,7 +292,7 @@
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
     </nav>`;
 
-  const isAdmin = profile.role === "admin";
+  const isAdmin = hasPermission(currentPerms, "stocktake_view_all_jobs");
 
   let toastTimer;
   function toast(msg, cls="", dur=2500) {

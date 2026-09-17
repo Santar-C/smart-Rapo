@@ -747,7 +747,7 @@
 
   <script type="module">
     import { auth, db } from "./firebase-config.js";
-    import { loginUser, logoutUser, getUserProfile } from "./auth.js";
+    import { loginUser, logoutUser, getUserProfile, getRolePermissions, hasPermission, ROLE_LABELS } from "./auth.js";
     import { icon } from "./icons.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
@@ -760,7 +760,7 @@
         sub: "",
         href: "medicine.html",
         color: "card-medicine",
-        role: "all"
+        perm: null
       },
       {
         id: "stock",
@@ -769,7 +769,7 @@
         sub: "Consumer / General",
         href: "stock.html",
         color: "card-stock",
-        role: "all"
+        perm: null
       },
       {
         id: "stocktake",
@@ -778,7 +778,7 @@
         sub: "สำหรับพนักงานนับ",
         href: "stocktake.html",
         color: "card-stocktake",
-        role: "all"
+        perm: null
       },
       {
         id: "monitor",
@@ -787,7 +787,7 @@
         sub: "สำหรับหัวหน้างาน",
         href: "monitor.html",
         color: "card-monitor",
-        role: "admin"
+        perm: "page_monitor"
       },
       {
         id: "dashboard",
@@ -796,7 +796,7 @@
         sub: "ภาพรวมสำหรับผู้บริหาร",
         href: "dashboard.html",
         color: "card-dashboard",
-        role: "admin"
+        perm: "page_dashboard"
       },
       {
         id: "dock",
@@ -805,7 +805,7 @@
         sub: "Management",
         href: "dock.html",
         color: "card-dock",
-        role: "all"
+        perm: null
       },
       {
         id: "wms",
@@ -814,7 +814,7 @@
         sub: "Receipt · Putaway · Pick · Pack · Ship",
         href: "wms.html",
         color: "card-wms",
-        role: "all"
+        perm: null
       },
       {
         id: "wi",
@@ -823,7 +823,7 @@
         sub: "WI Documents",
         href: "wi.html",
         color: "card-wi",
-        role: "all"
+        perm: null
       },
       {
         id: "users",
@@ -832,17 +832,17 @@
         sub: "User Management",
         href: "users.html",
         color: "card-users",
-        role: "admin"
+        perm: "page_users"
       }
     ];
 
     // ── Render เมนู (การ์ดหมุนวนบนวงรี) ───────────
-    function renderCards(role) {
+    function renderCards(permissions) {
       const stage = document.getElementById("menu-halo-stage");
       if (!stage) return;
       stage.innerHTML = "";
 
-      const items = MENUS.filter(menu => menu.role !== "admin" || role === "admin");
+      const items = MENUS.filter(menu => !menu.perm || hasPermission(permissions, menu.perm));
       if (!items.length) return;
 
       const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -855,7 +855,7 @@
         el.style.width  = CARD_W + "px";
         el.style.height = CARD_H + "px";
         el.innerHTML = `
-          ${menu.role === "admin" ? '<span class="admin-badge">Admin</span>' : ""}
+          ${menu.perm ? '<span class="admin-badge">Admin</span>' : ""}
           <span class="card-icon">${icon(menu.icon, { size: 34 })}</span>
           <span class="card-title">${menu.title}</span>
           ${menu.sub ? `<span class="card-sub">${menu.sub}</span>` : ""}
@@ -999,14 +999,16 @@
         // มี session → ไปหน้า Dashboard
         const profile = await getUserProfile(user.uid);
         const name = profile.name || user.email;
-        const role = profile.role || "user";
+        const role = profile.role || "employee";
+        const allPerms = await getRolePermissions();
+        const permissions = allPerms[role] || {};
 
         document.getElementById("login-page").style.display = "none";
         document.getElementById("dashboard-page").style.display = "block";
         document.getElementById("user-name-display").textContent = name;
-        document.getElementById("user-role-display").textContent = role;
+        document.getElementById("user-role-display").textContent = ROLE_LABELS[role] || role;
         document.getElementById("greeting-name").textContent = name;
-        renderCards(role);
+        renderCards(permissions);
       } else {
         // ยังไม่ Login → แสดงหน้า Login
         document.getElementById("login-page").style.display = "flex";

@@ -550,7 +550,7 @@
 
 <script type="module">
   import { auth, db, rtdb } from "./firebase-config.js";
-  import { requireAuth } from "./auth.js";
+  import { requireAuth, hasPermission } from "./auth.js";
   import { icon } from "./icons.js";
   import {
     collection, doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch,
@@ -610,13 +610,13 @@
   };
   const MONTHS = { JAN:'01',FEB:'02',MAR:'03',APR:'04',MAY:'05',JUN:'06',JUL:'07',AUG:'08',SEP:'09',OCT:'10',NOV:'11',DEC:'12' };
 
-  let currentUser, currentProfile;
+  let currentUser, currentProfile, currentPerms;
   let currentRows = [];
   let activeTypeFilter = 'all';
   let dashDate = todayISO();
 
-  const { user, profile } = await requireAuth();
-  currentUser = user; currentProfile = profile;
+  const { user, profile, permissions } = await requireAuth();
+  currentUser = user; currentProfile = profile; currentPerms = permissions;
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">
@@ -629,12 +629,13 @@
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
     </nav>`;
 
-  if (profile.role !== "admin") {
-    ["tab-import-btn","tab-archive-btn"].forEach(id => {
+  const wmsTabPermMap = { "tab-import-btn": "wms_import_tab", "tab-archive-btn": "wms_archive_tab" };
+  Object.entries(wmsTabPermMap).forEach(([id, key]) => {
+    if (!hasPermission(permissions, key)) {
       const el = document.getElementById(id);
       if (el) el.style.display = "none";
-    });
-  }
+    }
+  });
 
   function toast(msg, d = 2500) {
     const t = document.getElementById("toast");
@@ -760,7 +761,7 @@
   });
 
   btnImportCsv.addEventListener('click', async () => {
-    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    if (!hasPermission(currentPerms, 'wms_import_csv')) { toast('ไม่มีสิทธิ์ Import CSV'); return; }
     const files = Array.from(csvInput.files || []);
     if (!files.length) { toast('กรุณาเลือกไฟล์ก่อน'); return; }
     const resultEl = document.getElementById('import-result');
@@ -853,7 +854,7 @@
   });
 
   btnImportSkuMaster.addEventListener('click', async () => {
-    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    if (!hasPermission(currentPerms, 'wms_import_sku_master')) { toast('ไม่มีสิทธิ์ Import SKU Master'); return; }
     const file = skuMasterFileInput.files[0];
     if (!file) { toast('กรุณาเลือกไฟล์ก่อน'); return; }
     const resultEl = document.getElementById('sku-master-result');
@@ -934,7 +935,7 @@
   });
 
   btnImportLocationMaster.addEventListener('click', async () => {
-    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    if (!hasPermission(currentPerms, 'wms_import_location_master')) { toast('ไม่มีสิทธิ์ Import Location Master'); return; }
     const file = locationMasterFileInput.files[0];
     if (!file) { toast('กรุณาเลือกไฟล์ก่อน'); return; }
     const resultEl = document.getElementById('location-master-result');
@@ -1794,7 +1795,7 @@
   }
 
   async function deleteKpiManualEntry(id) {
-    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    if (!hasPermission(currentPerms, 'wms_kpi_manual_delete')) { toast('ไม่มีสิทธิ์ลบ KPI ด้วยมือ'); return; }
     if (!confirm('ลบรายการนี้?')) return;
     try {
       await deleteDoc(doc(db, 'kpi_manual_entries', id));
@@ -1817,7 +1818,7 @@
     }).join('');
 
     document.getElementById('btn-kpi-manual-add').addEventListener('click', async () => {
-      if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+      if (!hasPermission(currentPerms, 'wms_kpi_manual_add')) { toast('ไม่มีสิทธิ์เพิ่ม KPI ด้วยมือ'); return; }
       const procId = procSelect.value;
       const user = document.getElementById('kpi-manual-user').value.trim();
       const qty = parseFloat(document.getElementById('kpi-manual-qty').value);
@@ -2071,7 +2072,7 @@
   }
 
   document.getElementById('btn-export-clear').addEventListener('click', async () => {
-    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    if (!hasPermission(currentPerms, 'wms_export_clear')) { toast('ไม่มีสิทธิ์ Export แล้วล้างข้อมูล'); return; }
     const snap = await getDocs(collection(db, 'wms_activity'));
     if (snap.empty) { toast('ไม่มีข้อมูลให้ Export'); return; }
     if (!confirm(`Export ข้อมูลทั้งหมด ${snap.size} รายการ แล้วลบออกจากระบบทันที?\nกรุณาตรวจสอบว่าไฟล์ถูกดาวน์โหลดสำเร็จก่อนปิดหน้าต่างนี้`)) return;
@@ -2103,7 +2104,7 @@
   });
 
   document.getElementById('btn-import-backup').addEventListener('click', async () => {
-    if (currentProfile.role !== 'admin') { toast('สิทธิ์ Admin เท่านั้น'); return; }
+    if (!hasPermission(currentPerms, 'wms_restore_backup')) { toast('ไม่มีสิทธิ์กู้คืนข้อมูลจาก Backup'); return; }
     const f = document.getElementById('backup-file').files[0];
     if (!f) { toast('กรุณาเลือกไฟล์ Backup (.json)'); return; }
     try {

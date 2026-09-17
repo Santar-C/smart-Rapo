@@ -184,19 +184,19 @@
 
 <script type="module">
   import { auth, db } from "./firebase-config.js";
-  import { requireAuth } from "./auth.js";
+  import { requireAuth, hasPermission } from "./auth.js";
   import { icon } from "./icons.js";
   import {
     collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
     deleteDoc, query, orderBy, limit, onSnapshot, serverTimestamp, where
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  let currentUser, currentProfile;
+  let currentUser, currentProfile, currentPerms;
   let allMedicines = [], allLogs = [];
   let selectedMedD = null, selectedMedRv = null;
 
-  const { user, profile } = await requireAuth();
-  currentUser = user; currentProfile = profile;
+  const { user, profile, permissions } = await requireAuth();
+  currentUser = user; currentProfile = profile; currentPerms = permissions;
 
   document.getElementById("topbar-placeholder").innerHTML = `
     <nav class="topbar">
@@ -209,11 +209,14 @@
       <div class="topbar-user"><span>${profile.name}</span><span class="role">${profile.role}</span></div>
     </nav>`;
 
-  if (profile.role !== "admin") {
-    ["tab-receive-btn","tab-status-btn","tab-manage-btn"].forEach(id =>
-      document.getElementById(id).style.display = "none"
-    );
-  }
+  const tabPermMap = {
+    "tab-receive-btn": "medicine_receive_tab",
+    "tab-status-btn":  "medicine_status_tab",
+    "tab-manage-btn":  "medicine_manage_tab"
+  };
+  Object.entries(tabPermMap).forEach(([id, key]) => {
+    if (!hasPermission(permissions, key)) document.getElementById(id).style.display = "none";
+  });
 
   function toast(msg, d = 2500) {
     const t = document.getElementById("toast");
@@ -371,7 +374,7 @@
 
   // ── Receive Medicine ──────────────────────────────────────
   document.getElementById("btn-receive-med").addEventListener("click", async () => {
-    if (currentProfile.role !== "admin") { toast("สิทธิ์ Admin เท่านั้น"); return; }
+    if (!hasPermission(currentPerms, "medicine_receive_action")) { toast("ไม่มีสิทธิ์รับยาเข้า"); return; }
     if (!selectedMedRv) { toast("กรุณาเลือกยา"); return; }
     const lot    = document.getElementById("rv-lot").value.trim();
     const expiry = document.getElementById("rv-expiry").value;
