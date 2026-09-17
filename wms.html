@@ -206,6 +206,12 @@
     .kpi-calc-tip .ct-row { display:flex; justify-content:space-between; gap:10px; padding:2px 0; border-top:1px solid rgba(255,255,255,.06); }
     .kpi-calc-tip .ct-row span:first-child { color:#8C9BB5; }
     .kpi-calc-tip .ct-row span:last-child { color:#E9EEF5; font-weight:700; font-family:'JetBrains Mono',monospace; }
+
+    /* ── Manual Entry form row — was a hardcoded 5-column inline grid,
+       unusable below ~700px; now a real responsive grid ─────────── */
+    #kpi-manual-form { display:grid; grid-template-columns:1.4fr 1fr .8fr .8fr auto; gap:.6rem; align-items:end; }
+    @media (max-width: 768px) { #kpi-manual-form { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 600px) { #kpi-manual-form { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -505,7 +511,7 @@
 
     <div class="kpi-panel">
       <div class="kpi-panel-title">✍️ บันทึกข้อมูลเอง (Manual Entry) — สำหรับ Process ที่ยังไม่มี Actual อัตโนมัติ</div>
-      <div style="display:grid;grid-template-columns:1.4fr 1fr .8fr .8fr auto;gap:.6rem;align-items:end;margin-bottom:1rem" id="kpi-manual-form">
+      <div style="margin-bottom:1rem" id="kpi-manual-form">
         <div>
           <label style="display:block;font-size:10px;font-weight:700;color:var(--ts2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.3rem">Process</label>
           <select id="kpi-manual-proc" style="width:100%;padding:.5rem .6rem;border-radius:8px;border:1px solid var(--bd2);background:var(--bgc3);color:var(--tp2);font-size:.8rem"></select>

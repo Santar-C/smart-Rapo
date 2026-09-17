@@ -14,6 +14,13 @@
     #toast.show { transform:translateX(-50%) translateY(0); }
     #toast.ok  { background:#16a34a; }
     #toast.err { background:#dc2626; }
+
+    .users-list-head { flex-wrap: wrap; gap: 0.6rem; }
+    .users-search-wrap { width: 200px; }
+    @media (max-width: 600px) {
+      .users-list-head { padding: 0.75rem 1rem; }
+      .users-search-wrap { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -75,9 +82,9 @@
 
   <!-- รายชื่อ User -->
   <div class="card" style="padding:0; overflow:hidden;">
-    <div style="padding:0.85rem 1.25rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+    <div class="users-list-head" style="padding:0.85rem 1.25rem; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
       <div class="card-title" style="margin-bottom:0;display:flex;align-items:center;gap:0.5rem;"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> รายชื่อผู้ใช้งานทั้งหมด</div>
-      <div class="search-bar" style="margin:0; width:200px;">
+      <div class="search-bar users-search-wrap" style="margin:0;">
         <input type="text" id="user-search" placeholder="ค้นหา..." autocomplete="off" style="padding:0.45rem 0.75rem 0.45rem 2rem; font-size:0.85rem;">
       </div>
     </div>

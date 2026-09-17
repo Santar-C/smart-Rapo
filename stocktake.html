@@ -51,6 +51,21 @@
     .job-card.counting { border-color:var(--indigo); }
     .job-card.finished { opacity:0.65; }
     .job-card.has-mismatch { border-color:var(--red); }
+
+    .ring-wrap { width:100px; height:100px; }
+    .ring-wrap svg { width:100%; height:100%; display:block; }
+
+    @media (max-width: 600px) {
+      .scan-sticky-bar { top: 50px !important; }
+      .ring-wrap { width: 82px; height: 82px; }
+      .progress-wrap { gap: 0.85rem; }
+      .chk-list { max-height: 340px; }
+    }
+    @media (max-height: 480px) and (orientation: landscape) {
+      .scan-sticky-bar { top: 40px !important; }
+      .ring-wrap { width: 72px; height: 72px; }
+      .chk-list { max-height: 220px; }
+    }
   </style>
 </head>
 <body>
@@ -98,7 +113,7 @@
 
   <!-- ═══ SCREEN: SCAN (Checklist) ═══ -->
   <div id="screen-scan" style="display:none">
-    <div class="card" style="position:sticky;top:60px;z-index:50;margin-bottom:0.75rem;padding:0.85rem 1.25rem;">
+    <div class="card scan-sticky-bar" style="position:sticky;top:60px;z-index:50;margin-bottom:0.75rem;padding:0.85rem 1.25rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
         <div>
           <div style="font-size:0.72rem;color:var(--gray);"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg> Location</div>
@@ -118,8 +133,8 @@
 
     <div class="card" style="margin-bottom:0.75rem;padding:0.85rem 1.25rem;">
       <div class="progress-wrap">
-        <div style="position:relative;width:100px;height:100px;flex-shrink:0;">
-          <svg width="100" height="100" viewBox="0 0 100 100" class="ring-svg">
+        <div class="ring-wrap" style="position:relative;flex-shrink:0;">
+          <svg viewBox="0 0 100 100" class="ring-svg">
             <circle cx="50" cy="50" r="43" fill="none" stroke="#e2e8f0" stroke-width="9"/>
             <circle cx="50" cy="50" r="43" fill="none" stroke="#16a34a" stroke-width="9"
               id="ring-dash" stroke-dasharray="270" stroke-dashoffset="270"
