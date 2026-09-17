@@ -1419,15 +1419,15 @@ function App() {
           </div>
         </div>
         <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-          <div className="flex gap-1 overflow-x-auto sh bg-slate-800/50 p-1 rounded-full border border-slate-700/50">
+          <div className="flex gap-1 overflow-x-auto sh bg-slate-800/50 p-1 rounded-full border border-slate-700/50 w-full md:w-auto">
             {TABS.filter(t=>!t.h).map(t=>(
               <button key={t.id} onClick={()=>setTab(t.id)}
-                className={`whitespace-nowrap text-xs font-semibold py-2 px-3 rounded-full transition-all ${tab===t.id?'bg-white text-indigo-700 shadow-md':'text-slate-300 hover:bg-slate-700 hover:text-white'}`}>
+                className={`whitespace-nowrap text-xs font-semibold py-2 px-3 rounded-full transition-all shrink-0 ${tab===t.id?'bg-white text-indigo-700 shadow-md':'text-slate-300 hover:bg-slate-700 hover:text-white'}`}>
                 <span className="inline-flex items-center gap-1"><Icon name={t.icon} size={12}/> {t.lbl}</span>
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center flex-wrap justify-center gap-2 w-full md:w-auto">
             <div className="flex items-center border border-slate-700 rounded-lg bg-slate-800 px-3 py-1.5">
               <span className="text-[11px] text-slate-400 mr-2"><Icon name="calendar" size={11}/></span>
               <input type="date" value={viewDate} onChange={e=>setViewDate(e.target.value)}
@@ -1435,7 +1435,7 @@ function App() {
             </div>
             <button onClick={()=>window.open(`dock-tv.html?date=${viewDate}`,'_blank')}
               className="bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors inline-flex items-center gap-1"><Icon name="monitor" size={12}/> TV</button>
-            <div className="flex items-center gap-2 border border-slate-700 rounded-lg bg-slate-800 px-3 py-1.5">
+            <div className="flex items-center gap-2 border border-slate-700 rounded-lg bg-slate-800 px-3 py-1.5 flex-wrap justify-center">
               <span className="text-[11px] text-slate-400">{userName}</span>
               <span className="text-[10px] font-bold bg-indigo-600 text-white px-2 py-0.5 rounded-full">{roleLabel}</span>
               <button onClick={logoutUser} className="text-[11px] text-slate-400 hover:text-white transition-colors">ออกจากระบบ</button>
@@ -1445,7 +1445,7 @@ function App() {
       </header>
 
       {/* MAIN */}
-      <div className="flex-1 overflow-hidden flex flex-col md:flex-row p-4 gap-4">
+      <div className="flex-1 overflow-y-auto md:overflow-hidden flex flex-col md:flex-row p-4 gap-4">
         {/* Form Panel — only on board tab */}
         {isPower && tab==='board' && (
           <FormPanel form={form} setForm={setForm} bays={bays} settings={settings}
@@ -1453,7 +1453,7 @@ function App() {
         )}
 
         {/* Right content */}
-        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden gap-4">
+        <div className="flex-1 flex flex-col min-w-0 h-auto md:h-full overflow-visible md:overflow-hidden gap-4">
 
           {/* BOARD */}
           {tab==='board' && (<>
@@ -1487,7 +1487,7 @@ function App() {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto ds p-4 bg-slate-50/50">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {bays.map(dock=>{
                     const ab=dockBooks.find(b=>b.allocation===dock.name);
                     if(ab) return <DockCardOccupied key={dock.name} dock={dock} booking={ab} delay={isDelay(ab)} otd={getOTD(ab)}

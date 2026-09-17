@@ -168,7 +168,7 @@
       max-width: 440px;
       height: 420px;
     }
-    @media (min-width: 901px) {
+    @media (min-width: 901px) and (min-height: 700px) {
       .login-visual { display: block; }
     }
     .halo-visual-label {
@@ -646,10 +646,49 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── RESPONSIVE ──────────────────────────────── */
+    @media (max-width: 900px) {
+      .menu-halo-stage { height: 240px; }
+      .dash-body { padding: 1.15rem; }
+    }
     @media (max-width: 480px) {
-      .menu-halo-stage { height: 230px; }
+      .menu-halo-stage { height: 210px; }
       .dash-body { padding: 1rem; }
       .user-badge span.name { display: none; }
+      .dash-header { padding: 0.85rem 1rem; }
+      .dash-header-title { font-size: 1rem; }
+      .dash-greeting h2 { font-size: 1.2rem; }
+      .login-card { padding: 2rem 1.35rem; }
+    }
+    @media (max-width: 360px) {
+      .login-card { padding: 1.5rem 1.1rem; }
+      .login-logo img, .login-logo .logo-fallback { width: 70px; height: 70px; }
+    }
+
+    /* ── มือถือ/แท็บเล็ตแนวนอน จอเตี้ย ───────────────
+       เน้นลดความสูงของทุกส่วนที่ซ้อนกันแนวตั้ง กัน login-card /
+       เมนูหมุนวนโดน rapo-dock ลอยทับหรือล้นจอ */
+    @media (max-height: 480px) and (orientation: landscape) {
+      #login-page { gap: 1.5rem; padding: 1rem 1.5rem; align-items: center; }
+      .rapo-dock-wrap { top: 0.5rem; }
+      .rapo-dock { height: 38px; }
+      .rapo-dock-item { height: 30px; font-size: .68rem; padding: 0 10px; }
+      .login-visual { display: none !important; }
+      .login-card { padding: 1.1rem 1.5rem; max-height: 92dvh; overflow-y: auto; }
+      .login-logo { margin-bottom: 0.6rem; }
+      .login-logo img, .login-logo .logo-fallback { width: 52px; height: 52px; border-radius: 12px; }
+      .login-title { font-size: 1.2rem; margin-bottom: 0.1rem; }
+      .login-subtitle { margin-bottom: 0.9rem; }
+      .form-group { margin-bottom: 0.6rem; }
+      .login-footer { margin-top: 0.75rem; }
+
+      .dash-header { padding: 0.5rem 1rem; }
+      .dash-header-logo { width: 32px; height: 32px; }
+      .dash-header-subtitle { display: none; }
+      .dash-body { padding: 0.75rem 1.25rem; }
+      .dash-greeting { margin-bottom: 0.75rem; }
+      .dash-greeting h2 { font-size: 1.05rem; }
+      .dash-greeting p { display: none; }
+      .menu-halo-stage { height: 200px; margin-top: 0.25rem; }
     }
   </style>
 </head>
