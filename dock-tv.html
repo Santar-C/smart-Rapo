@@ -44,7 +44,8 @@
     .tag{font-size:.62rem;padding:2px 6px;border-radius:5px;font-weight:700}
     .tv{background:#1e2d48;color:#94a3b8} .ti{background:#0c2340;color:#60a5fa} .to{background:#2c1207;color:#fb923c}
     .dc-foot{padding:.35rem .75rem;background:rgba(255,255,255,.03);border-top:1px solid #1e2d48;display:flex;justify-content:space-between;font-size:.68rem;color:#64748b;flex-shrink:0}
-    .empty-bay{padding:.5rem .75rem;flex:1;display:flex;align-items:center;justify-content:center;color:#1e3a5f;font-weight:700;font-size:.82rem}
+    .empty-bay{padding:.5rem .75rem;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;color:#1e3a5f;font-weight:700;font-size:.82rem;text-align:center}
+    .empty-bay .eb-note{color:#64748b;font-weight:600;font-size:.68rem;max-width:100%;overflow-wrap:break-word}
     /* RIGHT */
     .right{flex:0 0 32%;display:flex;flex-direction:column;overflow:hidden;background:#080e1a}
     .wl-hdr{padding:.45rem 1rem;background:rgba(251,191,36,.06);border-bottom:1px solid rgba(251,191,36,.15);font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fbbf24;flex-shrink:0;display:flex;align-items:center;justify-content:space-between}
@@ -177,6 +178,7 @@ function isDelay(b){
   var now=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
   return now>b.end_time||now>b.endTime;
 }
+function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function gTime(b){return b.end_time||b.endTime||'';}
 function gStart(b){return b.start_time||b.startTime||'';}
 function gLic(b){return b.license_plate||b.license||'';}
@@ -264,7 +266,9 @@ function renderDocks(){
       h+='<div class="dc-head"><span class="dn">'+bay.name+'</span>';
       h+=isBusy?'<span style="font-size:.62rem;color:#ef4444;font-weight:700">CLOSED</span>':'<span style="font-size:.62rem;color:#1e3a5f;font-weight:700">EMPTY</span>';
       h+='</div>';
-      h+='<div class="empty-bay">'+(isBusy?(bay.status==='Maintenance'?'<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> ซ่อมบำรุง':'<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> ปิดชั่วคราว'):'<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><path d="M20 6 9 17l-5-5"/></svg> ว่าง')+'</div>';
+      var ebLabel=isBusy?(bay.status==='Maintenance'?'<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> ซ่อมบำรุง':'<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg> ปิดชั่วคราว'):'<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><path d="M20 6 9 17l-5-5"/></svg> ว่าง';
+      var ebNote=(isBusy&&bay.note)?'<div class="eb-note">'+esc(bay.note)+'</div>':'';
+      h+='<div class="empty-bay">'+ebLabel+ebNote+'</div>';
     }
     h+='</div>';
   }

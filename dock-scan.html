@@ -106,8 +106,13 @@ function App(){
       async (text)=>{
         if(busyRef.current) return;
         busyRef.current = true;
+        // ห้าม reset busyRef กลับเป็น false ตรงนี้ — กล้องยังไม่หยุดจริงทันทีที่
+        // handleScan() เสร็จ (setScanning(false) เป็นแค่ state update, qr.stop()
+        // ที่หยุดกล้องจริงเกิดทีหลังผ่าน useEffect cleanup) ถ้า reset ที่นี่ QR
+        // ตัวเดิมที่ยังอยู่ในเฟรมอาจถูกอ่านซ้ำก่อนกล้องหยุดจริง ทำให้เลื่อน
+        // สถานะข้ามไป 2 ขั้นแทนที่จะเป็น 1 ขั้น — ต้อง reset ใน rescan() แทน
+        // ตอนผู้ใช้กดสแกนต่อไปเองเท่านั้น
         await handleScan(text.trim());
-        busyRef.current = false;
       },
       ()=>{} // เฟรมที่ยังหาไม่เจอ — เงียบไว้ ไม่ต้องโชว์ error รัวๆ
     ).catch(err=>{
@@ -182,7 +187,7 @@ function App(){
     }
   },[]);
 
-  const rescan = ()=>{ setResult(null); setScanning(true); };
+  const rescan = ()=>{ busyRef.current = false; setResult(null); setScanning(true); };
 
   // ── Auth กำลังเตรียมตัว ───────────────────────────────────
   if(authErr){
