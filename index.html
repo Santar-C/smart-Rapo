@@ -1016,7 +1016,14 @@
       measure();
       render();
       scheduleAutoplay();
-      window.addEventListener("resize", () => { measure(); render(); });
+      // resize ไม่ debounce มาก่อน — ตอนลาก/หมุนจอ event ยิงถี่มาก (หลายสิบครั้ง/วินาที)
+      // แต่ละครั้งคำนวณตำแหน่งการ์ดใหม่ทันที ยิ่งมี breakpoint เยอะขึ้นยิ่งเห็นการ์ด
+      // "เลื่อน/กระพริบ" ชัดเจนระหว่างลาก — รวมงานทุก event ในเฟรมเดียวด้วย rAF แทน
+      let menuResizeRaf = 0;
+      window.addEventListener("resize", () => {
+        cancelAnimationFrame(menuResizeRaf);
+        menuResizeRaf = requestAnimationFrame(() => { measure(); render(); });
+      });
     }
 
     // ── อัปเดต Header วันที่ ──────────────────────
@@ -1191,7 +1198,11 @@
       measure();
       render();
       scheduleAutoplay();
-      window.addEventListener("resize", () => { measure(); render(); });
+      let loginResizeRaf = 0;
+      window.addEventListener("resize", () => {
+        cancelAnimationFrame(loginResizeRaf);
+        loginResizeRaf = requestAnimationFrame(() => { measure(); render(); });
+      });
     }
 
     // ── Brand dock (proximity-magnify nav bar) ────
