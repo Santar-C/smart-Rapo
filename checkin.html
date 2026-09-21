@@ -4,9 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Driver Check-in — CEVA Logistics</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- คอมไพล์ล่วงหน้าแล้ว ไม่ต้องพึ่ง cdn.tailwindcss.com — ดูรายละเอียดใน dock.html -->
+  <link rel="stylesheet" href="assets/tailwind-built.css">
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;900&display=swap" rel="stylesheet">
   <style>
     body { font-family:"Sarabun",sans-serif; position:relative; }
@@ -242,6 +244,12 @@
   };
   if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
   var db = firebase.database();
+  var fbAuth = firebase.auth();
+  // คนขับรถไม่ login หน้านี้ แต่ RTDB rule ต้องการ auth != null เสมอ —
+  // login แบบ anonymous เองตั้งแต่เข้าหน้า ไม่ต้องพึ่งพา session ของแท็บ/เครื่องอื่น
+  fbAuth.onAuthStateChanged(function(user){
+    if (!user) fbAuth.signInAnonymously().catch(function(err){ console.error('Auth error:', err); });
+  });
 
   // ══════════════════════════════════════════════════════
   // CEVA WAREHOUSE GPS (ปรับพิกัดตามจริงก่อน Go-Live)
@@ -270,7 +278,9 @@
   setInterval(tick,1000); tick();
 
   // ── Load booking info ─────────────────────────────────
-  if (bookingId) {
+  // รอ auth (anonymous) พร้อมก่อนอ่าน RTDB — ตอน page เพิ่งโหลด sign-in
+  // อาจยังไม่เสร็จ ถ้ายิง .once() ทันทีจะโดน rule ปฏิเสธ (rule ต้องการ auth != null)
+  function loadBookingInfo() {
     db.ref("smartdock/bookings").once("value", function(snap) {
       var data = snap.val();
       var list = data ? (Array.isArray(data) ? data.filter(Boolean) : Object.values(data).filter(Boolean)) : [];
@@ -299,6 +309,13 @@
         document.getElementById("s-coords").textContent = "—";
         document.getElementById("s-dist").textContent  = "—";
       }
+    });
+  }
+
+  if (bookingId) {
+    fbAuth.onAuthStateChanged(function(user){
+      if (!user) return; // จะถูกเรียกอีกรอบหลัง signInAnonymously() สำเร็จ
+      loadBookingInfo();
     });
   } else {
     // Demo mode (no booking ID)

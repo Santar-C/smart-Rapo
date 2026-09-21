@@ -4,7 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Dock Pro — RAPO</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind CDN (cdn.tailwindcss.com) ต้องคอมไพล์ CSS ผ่าน JS ตอน runtime และ
+       Tailwind เองเตือนว่าไม่ควรใช้ script ตัวนี้ใน production — เครื่องที่เข้า
+       เว็บโดเมนนี้ไม่ได้ (เช่นอยู่หลัง proxy บริษัทที่กรองโดเมนนี้) จะเห็นหน้าเว็บ
+       ไม่มีสไตล์เลย (element ยืดเต็มขนาดจริง) เปลี่ยนมาใช้ไฟล์ CSS ที่คอมไพล์ไว้
+       ล่วงหน้าแล้ว โหลดจากเซิร์ฟเวอร์เดียวกับหน้านี้เอง ไม่ต้องพึ่ง CDN ภายนอกอีก
+       (สร้างจาก: npx tailwindcss -i input.css -o assets/tailwind-built.css --minify
+       สแกน dock.html, dock-scan.html, checkin.html, supplier-booking.html —
+       ถ้าเพิ่ม class Tailwind ใหม่ในหน้าพวกนี้ ต้องรันคำสั่งนี้ใหม่แล้ว commit ไฟล์) -->
+  <link rel="stylesheet" href="assets/tailwind-built.css">
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>

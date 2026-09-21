@@ -4,9 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Supplier Booking Portal — CEVA Logistics</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- คอมไพล์ล่วงหน้าแล้ว ไม่ต้องพึ่ง cdn.tailwindcss.com — ดูรายละเอียดใน dock.html -->
+  <link rel="stylesheet" href="assets/tailwind-built.css">
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;900&display=swap" rel="stylesheet">
   <style>
     body { font-family: "Sarabun", sans-serif; position:relative; }
@@ -253,6 +255,12 @@
   };
   if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
   var db = firebase.database();
+  var fbAuth = firebase.auth();
+  // ซัพพลายเออร์ไม่ login หน้านี้ แต่ RTDB rule ต้องการ auth != null เสมอ —
+  // login แบบ anonymous เองตั้งแต่เข้าหน้า (เสร็จเร็วกว่าเวลาที่คนกรอกฟอร์มจนกดส่ง)
+  fbAuth.onAuthStateChanged(function(user){
+    if (!user) fbAuth.signInAnonymously().catch(function(err){ console.error('Auth error:', err); });
+  });
 
   // ── Header date ───────────────────────────────────────
   var days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
