@@ -8,6 +8,7 @@
   <!-- Firebase v8 -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;overflow:hidden;background:#060a14;color:#fff;font-family:'Sarabun',Tahoma,Arial,sans-serif}
@@ -147,6 +148,16 @@ var FB_CFG = {
 };
 if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
 var db = firebase.database();
+var fbAuth = firebase.auth();
+// จอนี้ไม่มีใคร login (จอทีวีติดผนัง) แต่ RTDB rule ต้องการ auth != null เสมอ
+// เดิมพึ่งพา session ของแท็บอื่นที่ login ไว้แล้วในเบราว์เซอร์เดียวกันโดยบังเอิญ
+// (เครื่องไหนไม่เคย login เลยเลยต่อไม่ติด ค้างที่ "กำลังเชื่อมต่อ Firebase...")
+// ล็อกอินแบบ anonymous เองเสมอ ไม่ต้องพึ่งพาแท็บ/เครื่องอื่นอีกต่อไป
+fbAuth.onAuthStateChanged(function(user){
+  if(!user) fbAuth.signInAnonymously().catch(function(err){
+    document.getElementById('slbl').textContent = 'Auth error: ' + err.message;
+  });
+});
 
 var bays = [], bookings = {};
 var targetDate = new Date().toISOString().split('T')[0];

@@ -277,6 +277,7 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script>
   var firebaseConfig = {
     apiKey:            "AIzaSyCx2A8zmYI1GxvJY2-De6A7FPo1tgVRJk8",
@@ -289,13 +290,25 @@
   };
   if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   var rtdb = firebase.database();
+  var fbAuth = firebase.auth();
 
   var bays = [];
   var selected = new Set();
   var printQueue = [];
   var printIndex = 0;
 
+  // ไม่มีใคร login หน้านี้ (เปิดจาก dock.html เพื่อพิมพ์ QR) แต่ RTDB rule
+  // ต้องการ auth != null เสมอ — login แบบ anonymous เองก่อนอ่านข้อมูล
+  fbAuth.onAuthStateChanged(function(user){
+    if (user) loadBays();
+    else fbAuth.signInAnonymously().catch(function(err){
+      document.getElementById("loading-wrap").innerHTML =
+        '<div style="text-align:center; color:#ef4444; font-size:0.9rem; padding:2rem;">เชื่อมต่อไม่สำเร็จ: ' + err.message + '</div>';
+    });
+  });
+
   // ── Load Bays ─────────────────────────────────────────────
+  function loadBays() {
   rtdb.ref("smartdock/bays").once("value", function(snap) {
     var data = snap.val();
     if (!data) {
@@ -314,6 +327,7 @@
     document.getElementById("loading-wrap").style.display   = "none";
     document.getElementById("grid-preview").style.display   = "grid";
   });
+  }
 
   // ── Render Grid ────────────────────────────────────────────
   function renderGrid() {
