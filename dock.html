@@ -151,6 +151,7 @@ const STAT_CLS  = {
   WaitingDoc:'bg-orange-100 text-orange-700 border-orange-300',
   Completed:'bg-emerald-100 text-emerald-700 border-emerald-300',
 };
+const CHANGE_FIELD_LBL = {allocation:'ช่องจอด', status:'สถานะ'};
 const INIT_BAYS = Array.from({length:9},(_,i)=>({name:`Dock ${String(i+1).padStart(2,'0')}`,status:'Available'}));
 const VEHICLES  = ['4WT','6WT','20FT','40FT','40HQ'];
 const DEFAULT_SETTINGS = {
@@ -360,10 +361,19 @@ const printManifest = b=>{
 // ════════════════════════════════════════════════════════════
 
 // ── Status Badge ───────────────────────────────────────────
-const StatusBadge = ({booking, onCycle})=>(
-  <span onClick={e=>{e.stopPropagation();onCycle(booking);}}
-    className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer select-none transition-colors ${STAT_CLS[booking.status]}`}>
-    {STAT_LBL[booking.status]}
+const StatusBadge = ({booking, onCycle, onStepBack, canStepBack})=>(
+  <span className="inline-flex items-center gap-1">
+    {canStepBack && booking.status!==STATUSES[0] && (
+      <button onClick={e=>{e.stopPropagation();onStepBack(booking);}}
+        title="ถอยสถานะ (ต้องระบุเหตุผล)"
+        className="w-5 h-5 shrink-0 rounded-full border border-slate-300 bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-700 flex items-center justify-center transition-colors">
+        <Icon name="arrowLeft" size={11}/>
+      </button>
+    )}
+    <span onClick={e=>{e.stopPropagation();onCycle(booking);}}
+      className={`px-2.5 py-1 rounded-full text-[11px] font-bold border cursor-pointer select-none transition-colors ${STAT_CLS[booking.status]}`}>
+      {STAT_LBL[booking.status]}
+    </span>
   </span>
 );
 
@@ -660,14 +670,14 @@ const FormPanel = React.memo(({form, setForm, bays, settings, onSubmit, editId, 
 ));
 
 // ── Waitlist Card ──────────────────────────────────────────
-const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle})=>(
+const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle, onStepBack})=>(
   <div className="w-[265px] shrink-0 border border-slate-200 rounded-xl shadow-sm bg-white hover:border-indigo-300 transition-all">
     <div className="px-3 py-2 bg-slate-50 flex justify-between items-center border-b border-slate-100 rounded-t-xl">
       <span className="font-bold text-slate-700 text-sm flex items-center gap-1.5">
         คิว{idx+1}
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${booking.jobType==='OUT'?'bg-orange-100 text-orange-600':'bg-sky-100 text-sky-600'}`}>{booking.jobType}</span>
       </span>
-      <StatusBadge booking={booking} onCycle={onCycle}/>
+      <StatusBadge booking={booking} onCycle={onCycle} onStepBack={onStepBack} canStepBack={isPower}/>
     </div>
     <div className="px-3 pt-2 text-indigo-700 font-black text-[13px] tracking-tight">{booking.doNumber||'-'}</div>
     <div className="p-3 pt-1 text-xs text-slate-600 space-y-1">
@@ -690,7 +700,7 @@ const WaitlistCard = ({booking, idx, isPower, onEdit, onManifest, onCycle})=>(
 );
 
 // ── Dock Card (occupied) ───────────────────────────────────
-const DockCardOccupied = ({dock, booking, delay, otd, isPower, onEdit, onManifest, onDelete, onCycle})=>(
+const DockCardOccupied = ({dock, booking, delay, otd, isPower, onEdit, onManifest, onDelete, onCycle, onStepBack})=>(
   <div className={`bg-white rounded-2xl shadow-sm border flex flex-col transition-all hover:shadow-md ${delay?'border-red-400 ring-2 ring-red-100':'border-slate-200 hover:border-indigo-300'}`} style={{minHeight:'270px'}}>
     {delay && <div className="bg-red-500 text-white text-[10px] font-bold py-1 text-center pr rounded-t-2xl flex items-center justify-center gap-1"><Icon name="alertTriangle" size={11}/> DELAY — เกินเวลา Plan ออก</div>}
     <div className={`px-4 py-2.5 flex justify-between items-center font-bold text-sm ${delay?'bg-red-50 text-red-800 border-b border-red-100':'bg-indigo-50/50 text-indigo-900 border-b border-indigo-50'} ${!delay?'rounded-t-2xl':''}`}>
@@ -703,7 +713,7 @@ const DockCardOccupied = ({dock, booking, delay, otd, isPower, onEdit, onManifes
     </div>
     <div className="p-4 text-xs text-slate-700 flex-1 flex flex-col gap-2">
       <div className="flex justify-between items-center">
-        <StatusBadge booking={booking} onCycle={onCycle}/>
+        <StatusBadge booking={booking} onCycle={onCycle} onStepBack={onStepBack} canStepBack={isPower}/>
         {booking.timeArrived && <span className="text-[10px] text-slate-400">มาถึง {booking.timeArrived}</span>}
       </div>
       <div className="space-y-1">
@@ -832,7 +842,7 @@ const ScheduleView = ({bays,bookings,viewDate,isPower,onEdit})=>{
 };
 
 // ── List / Report View ─────────────────────────────────────
-const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDelete,onManifest,onCycle,onExport})=>{
+const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDelete,onManifest,onCycle,onStepBack,onExport})=>{
   const data=bookings.filter(b=>completed?(b.date===viewDate):(b.status!=='Completed'&&b.date===viewDate));
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fi">
@@ -853,14 +863,14 @@ const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDele
             <thead className="bg-slate-50 text-slate-500 border-b border-slate-200 text-[10px] uppercase tracking-wider">
               {completed ? (
                 <tr>
-                  <th className="p-4 font-bold">วันที่ / แผนเวลา</th><th className="p-4 font-bold">Doc No. / ซัพฯ</th>
+                  <th className="p-4 font-bold">วันที่ / แผนเวลา</th><th className="p-4 font-bold">DO No. / ซัพฯ</th>
                   <th className="p-4 font-bold">ทะเบียน</th><th className="p-4 font-bold">ช่องจอด</th>
                   <th className="p-4 font-bold">มาถึง</th><th className="p-4 font-bold">เสร็จสิ้น</th>
                   <th className="p-4 font-bold">สถานะ</th><th className="p-4 font-bold text-center">Manifest</th>
                 </tr>
               ) : (
                 <tr>
-                  <th className="p-4 font-bold">วันที่ / เวลา</th><th className="p-4 font-bold">Doc No. / ซัพฯ</th>
+                  <th className="p-4 font-bold">วันที่ / เวลา</th><th className="p-4 font-bold">DO No. / ซัพฯ</th>
                   <th className="p-4 font-bold">ทะเบียน / ขนาด</th><th className="p-4 font-bold">ช่องจอด</th>
                   <th className="p-4 font-bold">สถานะ</th><th className="p-4 font-bold text-center">จัดการ</th>
                 </tr>
@@ -871,12 +881,12 @@ const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDele
                 completed ? (
                   <tr key={b.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="p-4"><div className="font-bold">{b.date}</div><div className="text-indigo-600 font-bold text-[11px]">{b.startTime} - {b.endTime}</div></td>
-                    <td className="p-4"><div className="font-bold text-indigo-700">{b.shipmentNo}</div><div className="text-slate-500 text-[11px]">{b.vendor}</div></td>
+                    <td className="p-4"><div className="font-bold text-indigo-700">{b.doNumber||'-'}</div><div className="text-slate-500 text-[11px]">{b.vendor}</div></td>
                     <td className="p-4 font-bold">{b.license}</td>
                     <td className="p-4">
                       <div className="font-bold text-indigo-600">{b.allocation}</div>
                       {!!b.changeLog?.length && (
-                        <button onClick={()=>alert(b.changeLog.map(c=>`${c.at} (${c.by}) — เปลี่ยน${c.field==='allocation'?'ช่องจอด':c.field} จาก "${c.from}" เป็น "${c.to}"\nเหตุผล: ${c.reason}`).join('\n\n'))}
+                        <button onClick={()=>alert(b.changeLog.map(c=>`${c.at} (${c.by}) — เปลี่ยน${CHANGE_FIELD_LBL[c.field]||c.field} จาก "${c.from}" เป็น "${c.to}"\nเหตุผล: ${c.reason}`).join('\n\n'))}
                           className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-bold hover:bg-amber-100 transition-colors">
                           <Icon name="alertTriangle" size={9} className="inline mr-0.5"/> มีการเปลี่ยนแปลง ({b.changeLog.length})
                         </button>
@@ -884,7 +894,7 @@ const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDele
                     </td>
                     <td className="p-4 text-slate-600">{b.timeArrived||'—'}</td>
                     <td className="p-4 text-emerald-600 font-bold">{b.timeCompleted||'—'}</td>
-                    <td className="p-4"><StatusBadge booking={b} onCycle={onCycle}/></td>
+                    <td className="p-4"><StatusBadge booking={b} onCycle={onCycle} onStepBack={onStepBack} canStepBack={isPower}/></td>
                     <td className="p-4 text-center">
                       <button onClick={()=>onManifest(b)} className="p-1.5 bg-sky-50 hover:bg-sky-100 text-sky-600 rounded-lg transition-colors" title="Manifest"><Icon name="printer" size={13}/></button>
                     </td>
@@ -892,18 +902,18 @@ const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDele
                 ) : (
                   <tr key={b.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="p-4"><div className="font-bold">{b.date}</div><div className="text-indigo-600 font-bold text-[11px]">{b.startTime} - {b.endTime}</div></td>
-                    <td className="p-4"><div className="font-bold text-indigo-700">{b.shipmentNo}</div><div className="text-slate-500 text-[11px]">{b.vendor}</div></td>
+                    <td className="p-4"><div className="font-bold text-indigo-700">{b.doNumber||'-'}</div><div className="text-slate-500 text-[11px]">{b.vendor}</div></td>
                     <td className="p-4"><div className="font-bold">{b.license}</div><div className="text-slate-500 text-[11px]">{b.vehicle}</div></td>
                     <td className="p-4">
                       <div className="font-bold text-indigo-600">{b.allocation}</div>
                       {!!b.changeLog?.length && (
-                        <button onClick={()=>alert(b.changeLog.map(c=>`${c.at} (${c.by}) — เปลี่ยน${c.field==='allocation'?'ช่องจอด':c.field} จาก "${c.from}" เป็น "${c.to}"\nเหตุผล: ${c.reason}`).join('\n\n'))}
+                        <button onClick={()=>alert(b.changeLog.map(c=>`${c.at} (${c.by}) — เปลี่ยน${CHANGE_FIELD_LBL[c.field]||c.field} จาก "${c.from}" เป็น "${c.to}"\nเหตุผล: ${c.reason}`).join('\n\n'))}
                           className="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 font-bold hover:bg-amber-100 transition-colors">
                           <Icon name="alertTriangle" size={9} className="inline mr-0.5"/> เปลี่ยนแล้ว ({b.changeLog.length})
                         </button>
                       )}
                     </td>
-                    <td className="p-4"><StatusBadge booking={b} onCycle={onCycle}/></td>
+                    <td className="p-4"><StatusBadge booking={b} onCycle={onCycle} onStepBack={onStepBack} canStepBack={isPower}/></td>
                     <td className="p-4">
                       <div className="flex justify-center gap-2">
                         {isPower&&<button onClick={()=>onEdit(b)} className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors" title="แก้ไข"><Icon name="edit" size={13}/></button>}
@@ -1291,6 +1301,20 @@ function App() {
     if(next==='Completed'&&!upd.timeCompleted)   upd.timeCompleted=t;
     syncBookings(bookings.map(x=>x.id===b.id?upd:x));
   };
+  const handleStepBack = b=>{
+    if(!isPower){alert('ต้องสแกนบาร์โค้ดที่หน้างาน');return;}
+    const i=STATUSES.indexOf(b.status);
+    if(i<=0) return;
+    const prevStatus=STATUSES[i-1];
+    const reason=prompt(`ถอยสถานะจาก "${STAT_LBL[b.status]}" กลับเป็น "${STAT_LBL[prevStatus]}"\nกรุณาระบุเหตุผลที่ต้องถอยสถานะ:`);
+    if(reason===null) return; // ยกเลิก
+    if(!reason.trim()){ alert('กรุณาระบุเหตุผลที่ถอยสถานะ'); return; }
+    const changeLog=[...(b.changeLog||[]), {
+      field:'status', from:STAT_LBL[b.status], to:STAT_LBL[prevStatus],
+      reason:reason.trim(), at:`${TODAY()} ${TIMENOW()}`, by:userName
+    }];
+    syncBookings(bookings.map(x=>x.id===b.id?{...b,status:prevStatus,changeLog}:x));
+  };
   const handleToggleBay=(name,cur)=>{
     if(!canDock)return;
     let next='Available';
@@ -1474,7 +1498,7 @@ function App() {
               <div className="p-4 flex overflow-x-auto sh gap-3">
                 {waitlist.map((b,i)=>(
                   <WaitlistCard key={b.id} booking={b} idx={i} isPower={isPower}
-                    onEdit={handleEdit} onManifest={printManifest} onCycle={handleCycle}/>
+                    onEdit={handleEdit} onManifest={printManifest} onCycle={handleCycle} onStepBack={handleStepBack}/>
                 ))}
                 {!waitlist.length && <div className="w-full text-center py-6 text-slate-400 text-sm">Waitlist ว่าง</div>}
               </div>
@@ -1500,7 +1524,7 @@ function App() {
                     const ab=dockBooks.find(b=>b.allocation===dock.name);
                     if(ab) return <DockCardOccupied key={dock.name} dock={dock} booking={ab} delay={isDelay(ab)} otd={getOTD(ab)}
                       isPower={isPower} onEdit={handleEdit} onManifest={printManifest}
-                      onDelete={handleDelete} onCycle={handleCycle}/>;
+                      onDelete={handleDelete} onCycle={handleCycle} onStepBack={handleStepBack}/>;
                     return <DockCardEmpty key={dock.name} dock={dock} canDock={canDock} isAdmin={isAdmin}
                       onToggle={handleToggleBay} onPrintQR={printQR}/>;
                   })}
@@ -1510,8 +1534,8 @@ function App() {
           </>)}
 
           {tab==='schedule' && <ScheduleView bays={bays} bookings={bookings} viewDate={viewDate} isPower={isPower} onEdit={handleEdit}/>}
-          {tab==='list'     && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={false} isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
-          {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onExport={exportCSV}/>}
+          {tab==='list'     && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={false} isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onStepBack={handleStepBack} onExport={exportCSV}/>}
+          {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onStepBack={handleStepBack} onExport={exportCSV}/>}
           {tab==='analytics' && <AnalyticsView bookings={bookings}/>}
           {tab==='scan'     && <ScanView scanOn={scanOn} setScanOn={setScanOn} scanMsg={scanMsg}/>}
           {tab==='qr'       && <QRView bays={bays}/>}
