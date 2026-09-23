@@ -192,7 +192,6 @@ const genDocNo = (date,type,bookings)=>{
 const printQR = bay=>{
   const code = bay.name.toUpperCase().replace(/\s+/g,'-');
   const qrUrl= `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(code)}&color=021D49&margin=10`;
-  const today= new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
   const w = window.open('','_blank','width=600,height=850');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;900&display=swap" rel="stylesheet">
@@ -211,7 +210,7 @@ const printQR = bay=>{
     .chip{font-size:2.3mm;padding:1mm 3mm;border-radius:2mm;font-weight:700}
     .ft{margin-top:auto;padding-top:4mm;border-top:1px solid #e2e8f0;width:100%;display:flex;justify-content:space-between;font-size:2.3mm;color:#94a3b8}
   </style></head><body>
-  <div class="hdr"><div style="display:flex;align-items:center;gap:3mm"><div class="logo">R</div><div><div class="co">RAPO — Smart Dock</div><div class="sub">ป้ายประจำช่องจอด / Dock Badge</div></div></div><div style="text-align:right;font-size:2.5mm;color:#94a3b8">${today}</div></div>
+  <div class="hdr"><div style="display:flex;align-items:center;gap:3mm"><div class="logo">R</div><div><div class="co">RAPO — Smart Dock</div><div class="sub">ป้ายประจำช่องจอด / Dock Badge</div></div></div></div>
   <div class="dn">${bay.name}</div>
   <div class="qw"><img class="qi" src="${qrUrl}" onload="window.print();window.close()"><div class="qc">${code}</div></div>
   <div class="ins"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> สแกน QR Code เพื่ออัปเดตสถานะ<br>Scan this QR Code to update dock status</div>
