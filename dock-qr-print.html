@@ -409,7 +409,6 @@
 
     var code  = bay.name.toUpperCase().replace(/\s+/g,"-");
     var qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=" + encodeURIComponent(code) + "&color=021D49&bgcolor=ffffff&margin=10";
-    var today = new Date().toLocaleDateString("th-TH", { year:"numeric", month:"long", day:"numeric" });
 
     // สร้าง print content
     document.getElementById("print-sheet").innerHTML =
@@ -418,7 +417,6 @@
           '<div class="print-logo-box">R</div>' +
           '<div><div class="print-company">RAPO — Smart Dock</div><div class="print-sub">ป้ายประจำช่องจอด / Dock Badge</div></div>' +
         '</div>' +
-        '<div style="text-align:right;font-size:2.5mm;color:#94a3b8;">' + today + '</div>' +
       '</div>' +
 
       '<div class="print-dock-name">' + bay.name + '</div>' +

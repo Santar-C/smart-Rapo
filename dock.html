@@ -152,6 +152,23 @@ const STAT_CLS  = {
   Completed:'bg-emerald-100 text-emerald-700 border-emerald-300',
 };
 const CHANGE_FIELD_LBL = {allocation:'ช่องจอด', status:'สถานะ'};
+const changeLogNote = b => (b.changeLog||[]).map(c=>
+  `${c.at} (${c.by}) เปลี่ยน${CHANGE_FIELD_LBL[c.field]||c.field} จาก "${c.from}" เป็น "${c.to}" — เหตุผล: ${c.reason}`
+).join(' | ');
+const summarizeReport = data=>{
+  const countBy = key=>{
+    const m={}; data.forEach(b=>{ const v=b[key]||'ไม่ระบุ'; m[v]=(m[v]||0)+1; });
+    return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+  };
+  return {
+    total: data.length,
+    inCount: data.filter(b=>b.jobType==='IN').length,
+    outCount: data.filter(b=>b.jobType==='OUT').length,
+    byVehicle: countBy('vehicle'),
+    byDock: countBy('allocation'),
+    byVendor: countBy('vendor'),
+  };
+};
 const INIT_BAYS = Array.from({length:9},(_,i)=>({name:`Dock ${String(i+1).padStart(2,'0')}`,status:'Available'}));
 const VEHICLES  = ['4WT','6WT','20FT','40FT','40HQ'];
 const DEFAULT_SETTINGS = {
@@ -175,7 +192,6 @@ const genDocNo = (date,type,bookings)=>{
 const printQR = bay=>{
   const code = bay.name.toUpperCase().replace(/\s+/g,'-');
   const qrUrl= `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(code)}&color=021D49&margin=10`;
-  const today= new Date().toLocaleDateString('th-TH',{year:'numeric',month:'long',day:'numeric'});
   const w = window.open('','_blank','width=600,height=850');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;900&display=swap" rel="stylesheet">
@@ -194,7 +210,7 @@ const printQR = bay=>{
     .chip{font-size:2.3mm;padding:1mm 3mm;border-radius:2mm;font-weight:700}
     .ft{margin-top:auto;padding-top:4mm;border-top:1px solid #e2e8f0;width:100%;display:flex;justify-content:space-between;font-size:2.3mm;color:#94a3b8}
   </style></head><body>
-  <div class="hdr"><div style="display:flex;align-items:center;gap:3mm"><div class="logo">R</div><div><div class="co">RAPO — Smart Dock</div><div class="sub">ป้ายประจำช่องจอด / Dock Badge</div></div></div><div style="text-align:right;font-size:2.5mm;color:#94a3b8">${today}</div></div>
+  <div class="hdr"><div style="display:flex;align-items:center;gap:3mm"><div class="logo">R</div><div><div class="co">RAPO — Smart Dock</div><div class="sub">ป้ายประจำช่องจอด / Dock Badge</div></div></div></div>
   <div class="dn">${bay.name}</div>
   <div class="qw"><img class="qi" src="${qrUrl}" onload="window.print();window.close()"><div class="qc">${code}</div></div>
   <div class="ins"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></svg> สแกน QR Code เพื่ออัปเดตสถานะ<br>Scan this QR Code to update dock status</div>
@@ -842,21 +858,49 @@ const ScheduleView = ({bays,bookings,viewDate,isPower,onEdit})=>{
 };
 
 // ── List / Report View ─────────────────────────────────────
-const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDelete,onManifest,onCycle,onStepBack,onExport})=>{
-  const data=bookings.filter(b=>completed?(b.date===viewDate):(b.status!=='Completed'&&b.date===viewDate));
+const ListView = ({bookings,viewDate,setViewDate,reportFrom,setReportFrom,reportTo,setReportTo,completed,isPower,onEdit,onDelete,onManifest,onCycle,onStepBack,onExport})=>{
+  const data=bookings.filter(b=>completed?(b.date>=reportFrom&&b.date<=reportTo):(b.status!=='Completed'&&b.date===viewDate));
+  const summary = React.useMemo(()=>completed?summarizeReport(data):null, [completed, data]);
+  const setMonth = e=>{
+    if(!e.target.value) return;
+    const [y,m]=e.target.value.split('-').map(Number);
+    setReportFrom(`${e.target.value}-01`);
+    setReportTo(new Date(y,m,0).toISOString().split('T')[0]);
+  };
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden fi">
-      <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+      <div className="p-4 border-b border-slate-100 flex flex-wrap justify-between items-center gap-3">
         <h3 className="font-bold text-lg flex items-center gap-2"><Icon name={completed?"barChart":"clipboardList"} size={17}/> {completed?"รายงาน Completed":"คิวทั้งหมด"}</h3>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center border border-slate-200 rounded-lg bg-slate-50 px-3 py-1.5">
-            <span className="text-[11px] text-slate-400 mr-2"><Icon name="calendar" size={11}/></span>
-            <input type="date" value={viewDate} onChange={e=>setViewDate(e.target.value)}
-              className="bg-transparent text-slate-700 text-xs font-bold focus:outline-none cursor-pointer"/>
-          </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {completed ? (<>
+            <div className="flex items-center border border-slate-200 rounded-lg bg-slate-50 px-3 py-1.5 gap-2">
+              <span className="text-[11px] text-slate-400"><Icon name="calendar" size={11}/></span>
+              <input type="date" value={reportFrom} onChange={e=>setReportFrom(e.target.value)}
+                className="bg-transparent text-slate-700 text-xs font-bold focus:outline-none cursor-pointer"/>
+              <span className="text-slate-300 text-[11px]">ถึง</span>
+              <input type="date" value={reportTo} onChange={e=>setReportTo(e.target.value)}
+                className="bg-transparent text-slate-700 text-xs font-bold focus:outline-none cursor-pointer"/>
+            </div>
+            <div className="flex items-center border border-slate-200 rounded-lg bg-slate-50 px-3 py-1.5 gap-2">
+              <span className="text-[11px] text-slate-400">เลือกเดือน</span>
+              <input type="month" onChange={setMonth}
+                className="bg-transparent text-slate-700 text-xs font-bold focus:outline-none cursor-pointer"/>
+            </div>
+          </>) : (
+            <div className="flex items-center border border-slate-200 rounded-lg bg-slate-50 px-3 py-1.5">
+              <span className="text-[11px] text-slate-400 mr-2"><Icon name="calendar" size={11}/></span>
+              <input type="date" value={viewDate} onChange={e=>setViewDate(e.target.value)}
+                className="bg-transparent text-slate-700 text-xs font-bold focus:outline-none cursor-pointer"/>
+            </div>
+          )}
           {completed && <button onClick={onExport} className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors inline-flex items-center gap-1.5"><Icon name="download" size={14}/> Export CSV</button>}
         </div>
       </div>
+      {completed && !!summary.total && (
+        <div className="px-4 pt-4">
+          <ReportSummary summary={summary}/>
+        </div>
+      )}
       <div className="flex-1 overflow-auto ds p-4">
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           <table className="w-full text-left text-xs md:text-sm min-w-[900px]">
@@ -927,6 +971,58 @@ const ListView = ({bookings,viewDate,setViewDate,completed,isPower,onEdit,onDele
               {!data.length && <tr><td colSpan={completed?8:6} className="p-12 text-center text-slate-400">ไม่มีข้อมูล</td></tr>}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Report Summary — สรุปภาพรวมของช่วงวันที่ที่เลือกในรายงาน ──
+const ReportSummary = ({summary})=>{
+  const Stat = ({label,value,cls='text-slate-800'})=>(
+    <div className="bg-slate-50 border border-slate-100 rounded-xl px-3 py-2.5 text-center">
+      <div className={`text-xl font-black ${cls}`}>{value}</div>
+      <div className="text-[10px] text-slate-400 font-bold mt-0.5">{label}</div>
+    </div>
+  );
+  return (
+    <div className="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4 space-y-3">
+      <div className="text-xs font-bold text-indigo-700 flex items-center gap-1.5"><Icon name="barChart" size={13}/> สรุปภาพรวมช่วงที่เลือก</div>
+      <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
+        <Stat label="รวมทั้งหมด" value={summary.total} cls="text-indigo-600"/>
+        <Stat label="ขาเข้า (IN)" value={summary.inCount} cls="text-sky-600"/>
+        <Stat label="ขาออก (OUT)" value={summary.outCount} cls="text-orange-600"/>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div>
+          <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">ขนาดรถ (รวม {summary.total})</div>
+          <div className="space-y-1">
+            {summary.byVehicle.map(([v,n])=>(
+              <div key={v} className="flex justify-between bg-white rounded-lg px-2.5 py-1 border border-slate-100">
+                <span className="text-slate-600">{v}</span><span className="font-bold text-slate-800">{n}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">ช่องจอดที่ใช้บ่อยสุด</div>
+          <div className="space-y-1">
+            {summary.byDock.slice(0,5).map(([d,n])=>(
+              <div key={d} className="flex justify-between bg-white rounded-lg px-2.5 py-1 border border-slate-100">
+                <span className="text-slate-600">{d}</span><span className="font-bold text-slate-800">{n}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase">ลูกค้า/ซัพฯ ที่มาบ่อยสุด</div>
+          <div className="space-y-1">
+            {summary.byVendor.slice(0,5).map(([v,n])=>(
+              <div key={v} className="flex justify-between bg-white rounded-lg px-2.5 py-1 border border-slate-100">
+                <span className="text-slate-600 truncate">{v}</span><span className="font-bold text-slate-800 shrink-0">{n}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -1179,6 +1275,8 @@ function App() {
   const [settings, setSettings] = React.useState(DEFAULT_SETTINGS);
   const [online,   setOnline]   = React.useState(false);
   const [viewDate, setViewDate] = React.useState(TODAY());
+  const [reportFrom, setReportFrom] = React.useState(TODAY());
+  const [reportTo,   setReportTo]   = React.useState(TODAY());
   const [tab,      setTab]      = React.useState('board');
   const [editId,   setEditId]   = React.useState(null);
   const [form,     setForm]     = React.useState(getBlank());
@@ -1392,12 +1490,29 @@ function App() {
     }).catch(err=>alert('บันทึกไม่สำเร็จ: '+err.message));
   };
   const exportCSV=()=>{
-    const done=bookings.filter(b=>b.date===viewDate);
+    const done=bookings.filter(b=>b.date>=reportFrom&&b.date<=reportTo);
     if(!done.length){alert('ไม่มีข้อมูล');return;}
-    const rows=[['วันที่','ช่องจอด','Doc No','IN/OUT','บริษัท','ทะเบียน','ขนาดรถ','Plan เข้า','Plan ออก','มาถึง','โหลด','รอเอกสาร','เสร็จ']];
-    done.forEach(b=>rows.push([b.date,b.allocation,b.shipmentNo,b.jobType,b.vendor,b.license,b.vehicle,b.startTime,b.endTime,b.timeArrived||'',b.timeLoading||'',b.timeWaitingDoc||'',b.timeCompleted||'']));
-    const csv=rows.map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
-    Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'})),download:`dock_${viewDate}.csv`}).click();
+    const rows=[['วันที่','ช่องจอด','Doc No','DO No','IN/OUT','บริษัท','ทะเบียน','ขนาดรถ','Plan เข้า','Plan ออก','มาถึง','โหลด','รอเอกสาร','เสร็จ','สถานะ','หมายเหตุ (การเปลี่ยนแปลง)']];
+    done.forEach(b=>rows.push([b.date,b.allocation,b.shipmentNo,b.doNumber||'',b.jobType,b.vendor,b.license,b.vehicle,b.startTime,b.endTime,b.timeArrived||'',b.timeLoading||'',b.timeWaitingDoc||'',b.timeCompleted||'',STAT_LBL[b.status]||b.status,changeLogNote(b)]));
+
+    const summary=summarizeReport(done);
+    rows.push([]);
+    rows.push([`สรุปภาพรวม ${reportFrom} ถึง ${reportTo}`]);
+    rows.push(['รวมทั้งหมด',summary.total]);
+    rows.push(['ขาเข้า (IN)',summary.inCount]);
+    rows.push(['ขาออก (OUT)',summary.outCount]);
+    rows.push([]);
+    rows.push(['ขนาดรถ','จำนวน']);
+    summary.byVehicle.forEach(([v,n])=>rows.push([v,n]));
+    rows.push([]);
+    rows.push(['ช่องจอด','จำนวนครั้งที่ใช้']);
+    summary.byDock.forEach(([d,n])=>rows.push([d,n]));
+    rows.push([]);
+    rows.push(['ลูกค้า/ซัพพลายเออร์','จำนวนครั้ง']);
+    summary.byVendor.forEach(([v,n])=>rows.push([v,n]));
+
+    const csv=rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'})),download:`dock_report_${reportFrom}_to_${reportTo}.csv`}).click();
   };
 
   const todayBooks = bookings.filter(b=>b.date===viewDate&&b.status!=='Completed');
@@ -1534,8 +1649,8 @@ function App() {
           </>)}
 
           {tab==='schedule' && <ScheduleView bays={bays} bookings={bookings} viewDate={viewDate} isPower={isPower} onEdit={handleEdit}/>}
-          {tab==='list'     && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={false} isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onStepBack={handleStepBack} onExport={exportCSV}/>}
-          {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onStepBack={handleStepBack} onExport={exportCSV}/>}
+          {tab==='list'     && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} reportFrom={reportFrom} setReportFrom={setReportFrom} reportTo={reportTo} setReportTo={setReportTo} completed={false} isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onStepBack={handleStepBack} onExport={exportCSV}/>}
+          {tab==='reports'  && <ListView bookings={bookings} viewDate={viewDate} setViewDate={setViewDate} reportFrom={reportFrom} setReportFrom={setReportFrom} reportTo={reportTo} setReportTo={setReportTo} completed={true}  isPower={isPower} onEdit={handleEdit} onDelete={handleDelete} onManifest={printManifest} onCycle={handleCycle} onStepBack={handleStepBack} onExport={exportCSV}/>}
           {tab==='analytics' && <AnalyticsView bookings={bookings}/>}
           {tab==='scan'     && <ScanView scanOn={scanOn} setScanOn={setScanOn} scanMsg={scanMsg}/>}
           {tab==='qr'       && <QRView bays={bays}/>}
