@@ -49,6 +49,11 @@
       #reader{max-height:80vh;}
       .scan-stage>button{max-width:46%;}
     }
+
+    /* ── vh fallback สำหรับจอ/เบราว์เซอร์ที่ไม่รู้จัก dvh ──
+       ดูรายละเอียดใน dock.html — element selector นี้ specificity ต่ำกว่า
+       class h-[100dvh] เสมอ จึงถูกทับอัตโนมัติเมื่อ dvh ใช้งานได้จริง */
+    body { height: 100vh; }
   </style>
 </head>
 <body class="h-[100dvh] overflow-hidden text-white flex flex-col">
