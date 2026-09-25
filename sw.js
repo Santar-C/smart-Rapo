@@ -3,10 +3,10 @@
 
 const CACHE_NAME = "rapo-v1";
 const PRECACHE = [
-  "/rapo-app/index.html",
-  "/rapo-app/firebase-config.js",
-  "/rapo-app/auth.js",
-  "/rapo-app/assets/logo.png"
+  "index.html",
+  "firebase-config.js",
+  "auth.js",
+  "assets/logo.png"
 ];
 
 self.addEventListener("install", e => {
