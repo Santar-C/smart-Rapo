@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Sarabun',sans-serif;background:#020c1b;color:#e2e8f0;min-height:100dvh;overflow:hidden}
+  body{font-family:'Sarabun',sans-serif;background:#020c1b;color:#e2e8f0;min-height:100vh;min-height:100dvh;overflow:hidden}
   .top{background:linear-gradient(90deg,#001630,#002048);padding:.6rem 1.4rem;
     display:flex;align-items:center;gap:1rem;border-bottom:2px solid #0f3460}
   .logo{width:40px;height:40px;border-radius:9px;background:#E6100D;display:flex;
@@ -31,7 +31,7 @@
   .k-l{font-size:.7rem;color:#64748b;margin-top:.2rem;font-weight:700}
 
   .wrap{display:grid;grid-template-columns:1.35fr 1fr;gap:.7rem;padding:0 1.4rem 1rem;
-    height:calc(100dvh - 148px)}
+    height:calc(100vh - 148px);height:calc(100dvh - 148px)}
   .panel{background:#04121f;border:1px solid #0f3460;border-radius:14px;
     display:flex;flex-direction:column;overflow:hidden}
   .p-head{padding:.55rem 1rem;background:#071a2f;border-bottom:1px solid #0f3460;
@@ -100,7 +100,7 @@
     .kpi { padding: .4rem 1.4rem; gap: .5rem; }
     .k { padding: .4rem .6rem; }
     .k-n { font-size: 1.5rem; }
-    .wrap { height: calc(100dvh - 108px); }
+    .wrap { height:calc(100vh - 108px);height:calc(100dvh - 108px); }
   }
   @media (max-height: 480px) and (orientation: landscape) and (max-width: 768px) {
     .top { padding: .35rem 1rem; }

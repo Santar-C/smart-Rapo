@@ -15,7 +15,7 @@
       --sky:#0284c7;--purple:#7c3aed;--gray:#6b7280;--border:#e2e8f0;
       --light:#f8fafc;--radius:12px;--shadow:0 2px 16px rgba(0,0,0,.07)
     }
-    body{font-family:'Sarabun',sans-serif;background:#021D49;color:#1e293b;min-height:100dvh;position:relative}
+    body{font-family:'Sarabun',sans-serif;background:#021D49;color:#1e293b;min-height:100vh;min-height:100dvh;position:relative}
     body::before{content:'';position:fixed;inset:0;background-image:url('assets/%E0%B8%AA%E0%B8%B7%E0%B9%88%E0%B8%AD.jpg');
       background-size:cover;background-position:center;filter:brightness(.5) contrast(1.12) saturate(.7);z-index:0}
     body::after{content:'';position:fixed;inset:0;
@@ -123,7 +123,7 @@
     /* CSS TOOLTIP — ไม่ต้องพึ่ง JS เลย */
     
     .modal-box{background:#fff;border-radius:16px;padding:1.5rem;width:100%;
-      max-width:520px;max-height:88dvh;overflow-y:auto;
+      max-width:520px;max-height:88vh;max-height:88dvh;overflow-y:auto;
       box-shadow:0 24px 64px rgba(0,0,0,.35)}
     .modal-hdr{display:flex;align-items:flex-start;justify-content:space-between;
       margin-bottom:1rem;gap:.5rem}
