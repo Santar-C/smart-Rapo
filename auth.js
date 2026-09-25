@@ -136,7 +136,7 @@ export async function loginUser(email, password) {
 // ── Logout ──────────────────────────────────────────────────
 export async function logoutUser() {
   await signOut(auth);
-  window.location.href = "/rapo-app/index.html";
+  window.location.href = "index.html";
 }
 
 // ── ดึง Profile (role, name) จาก Firestore ─────────────────
@@ -201,7 +201,7 @@ export function requireAuth(callback) {
   return new Promise((resolve) => {
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        window.location.href = "/rapo-app/index.html";
+        window.location.href = "index.html";
         return;
       }
       const profile = await getUserProfile(user.uid);
@@ -220,7 +220,7 @@ export function requirePermission(key, callback) {
   return new Promise((resolve, reject) => {
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        window.location.href = "/rapo-app/index.html";
+        window.location.href = "index.html";
         return;
       }
       const profile = await getUserProfile(user.uid);
