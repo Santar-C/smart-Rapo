@@ -20,8 +20,8 @@ export class RapoEmbed implements ComponentFramework.StandardControl<IInputs, IO
         this.iframe.style.display = "block";
         this.iframe.style.width = "100%";
         this.iframe.style.height = "100%";
-        // dock-scan.html needs the camera for QR scanning
-        this.iframe.setAttribute("allow", "camera; clipboard-write; fullscreen");
+        // dock-scan.html needs the camera for QR scanning, checkin.html needs geolocation
+        this.iframe.setAttribute("allow", "camera; geolocation; clipboard-write; fullscreen");
 
         container.style.width = "100%";
         container.style.height = "100%";
