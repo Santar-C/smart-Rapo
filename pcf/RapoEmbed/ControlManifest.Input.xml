@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest>
+  <control namespace="Rapo" constructor="RapoEmbed" version="0.0.1"
+           display-name-key="RAPO Embed"
+           description-key="Shows the RAPO web app (smart-Rapo) inside a canvas app"
+           control-type="standard">
+    <!-- The control loads a page from an external domain, so it must be declared.
+         Declaring external service usage makes any app using this control Premium. -->
+    <external-service-usage enabled="true">
+      <domain>santar-c.github.io</domain>
+    </external-service-usage>
+    <property name="sourceUrl"
+              display-name-key="Source URL"
+              description-key="Page to show, e.g. https://santar-c.github.io/smart-Rapo/dock.html"
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false"
+              default-value="https://santar-c.github.io/smart-Rapo/index.html" />
+    <resources>
+      <code path="index.ts" order="1" />
+    </resources>
+  </control>
+</manifest>
